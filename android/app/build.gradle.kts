@@ -47,13 +47,15 @@ android {
         multiDexEnabled = true
     }
 
-    // Signing configuration for release builds
-    signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = keystoreProperties["storeFile"]?.let { file(it as String) }
-            storePassword = keystoreProperties["storePassword"] as String
+    // Signing configuration for release builds (only if key.properties exists)
+    if (keystorePropertiesFile.exists()) {
+        signingConfigs {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = keystoreProperties["storeFile"]?.let { file(it as String) }
+                storePassword = keystoreProperties["storePassword"] as String
+            }
         }
     }
 
@@ -70,7 +72,10 @@ android {
             isShrinkResources = false
         }
         getByName("release") {
-            signingConfig = signingConfigs.getByName("release")
+            // Only set signing config if key.properties exists
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             buildConfigField("String", "ENV", "\"production\"")
             isMinifyEnabled = true
             isShrinkResources = true
