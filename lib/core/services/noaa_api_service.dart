@@ -152,6 +152,104 @@ class NoaaApiService {
     }
   }
 
+  // STEP 2.4: Complete Forecast Fetching
+  /// Fetch all available forecast types for a reach
+  /// Orchestrates multiple API calls to get complete forecast data
+  /// Returns combined data with all available forecasts
+  Future<Map<String, dynamic>> fetchAllForecasts(String reachId) async {
+    print('NOAA_API: Fetching all forecasts for reach: $reachId');
+
+    // Initialize combined response structure
+    Map<String, dynamic>? combinedResponse;
+    final forecastTypes = ['short_range', 'medium_range', 'long_range'];
+    final results = <String, Map<String, dynamic>?>{};
+
+    // Fetch each forecast type
+    for (final forecastType in forecastTypes) {
+      try {
+        print('NOAA_API: Attempting to fetch $forecastType...');
+        final response = await fetchForecast(reachId, forecastType);
+        results[forecastType] = response;
+
+        // Use first successful response as base for reach info
+        combinedResponse ??= response;
+
+        print('NOAA_API: ✅ Successfully fetched $forecastType');
+      } catch (e) {
+        print('NOAA_API: ⚠️ Failed to fetch $forecastType: $e');
+        results[forecastType] = null;
+        // Continue with other forecast types
+      }
+    }
+
+    // Check if we got at least one forecast
+    if (combinedResponse == null) {
+      throw ApiException(
+        'No forecast data available for reach $reachId. All forecast types failed.',
+      );
+    }
+
+    // Merge all successful forecasts into combined response
+    final mergedResponse = Map<String, dynamic>.from(combinedResponse);
+
+    // Clear forecast sections and rebuild with all available data
+    mergedResponse['analysisAssimilation'] = {};
+    mergedResponse['shortRange'] = {};
+    mergedResponse['mediumRange'] = {};
+    mergedResponse['longRange'] = {};
+    mergedResponse['mediumRangeBlend'] = {};
+
+    // Merge forecast data from each successful response
+    for (final entry in results.entries) {
+      final forecastType = entry.key;
+      final response = entry.value;
+
+      if (response != null) {
+        // Merge the forecast sections from this response
+        _mergeForecastSections(mergedResponse, response, forecastType);
+      }
+    }
+
+    final successCount = results.values.where((r) => r != null).length;
+    print(
+      'NOAA_API: ✅ Successfully combined $successCount/$forecastTypes.length forecast types for reach $reachId',
+    );
+
+    return mergedResponse;
+  }
+
+  /// Helper method to merge forecast sections from individual responses
+  void _mergeForecastSections(
+    Map<String, dynamic> target,
+    Map<String, dynamic> source,
+    String forecastType,
+  ) {
+    // Map forecast types to their response sections
+    switch (forecastType) {
+      case 'short_range':
+        if (source['shortRange'] != null) {
+          target['shortRange'] = source['shortRange'];
+        }
+        if (source['analysisAssimilation'] != null) {
+          target['analysisAssimilation'] = source['analysisAssimilation'];
+        }
+        break;
+      case 'medium_range':
+        if (source['mediumRange'] != null) {
+          target['mediumRange'] = source['mediumRange'];
+        }
+        if (source['mediumRangeBlend'] != null) {
+          target['mediumRangeBlend'] = source['mediumRangeBlend'];
+        }
+        break;
+      case 'long_range':
+        if (source['longRange'] != null) {
+          target['longRange'] = source['longRange'];
+        }
+        break;
+    }
+  }
+
   /// Clean up resources
   void dispose() {
     _client.close();

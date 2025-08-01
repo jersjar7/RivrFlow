@@ -397,7 +397,7 @@ class ForecastResponse {
     );
   }
 
-  // Enhanced parsing with ensemble fallback logic
+  // Enhanced parsing for single forecasts with series or mean data
   static ForecastSeries? _parseForecastSection(
     dynamic section,
     String forecastType,
@@ -407,7 +407,7 @@ class ForecastResponse {
       return null;
     }
 
-    // STEP 1: Try series data first (preferred for single forecasts)
+    // STEP 1: Try 'series' data first (used by short_range)
     final series = section['series'];
     if (series != null && series is Map<String, dynamic>) {
       try {
@@ -423,11 +423,30 @@ class ForecastResponse {
       }
     }
 
-    // STEP 2: Fall back to ensemble members (member1, member2, etc.)
-    for (int i = 1; i <= 6; i++) {
-      final memberKey = 'member$i';
-      final memberData = section[memberKey];
+    // STEP 2: Try 'mean' data (used by medium_range/long_range sometimes)
+    final mean = section['mean'];
+    if (mean != null && mean is Map<String, dynamic>) {
+      try {
+        final forecastSeries = ForecastSeries.fromJson(mean);
+        if (forecastSeries.isNotEmpty) {
+          print(
+            'FORECAST_PARSER: Using mean data for $forecastType (${forecastSeries.data.length} points)',
+          );
+          return forecastSeries;
+        }
+      } catch (e) {
+        print('FORECAST_PARSER: Mean data invalid for $forecastType: $e');
+      }
+    }
 
+    // STEP 3: Fall back to ensemble members dynamically
+    final memberKeys = section.keys
+        .where((key) => key.startsWith('member'))
+        .toList();
+    memberKeys.sort(); // member1, member2, etc.
+
+    for (final memberKey in memberKeys) {
+      final memberData = section[memberKey];
       if (memberData != null && memberData is Map<String, dynamic>) {
         try {
           final memberSeries = ForecastSeries.fromJson(memberData);
@@ -447,12 +466,12 @@ class ForecastResponse {
     }
 
     print(
-      'FORECAST_PARSER: No valid data found for $forecastType (tried series + 6 members)',
+      'FORECAST_PARSER: No valid data found for $forecastType (tried series, mean, and ${memberKeys.length} members)',
     );
     return null;
   }
 
-  // Enhanced ensemble parsing with better member handling
+  // Enhanced ensemble parsing to collect ALL available data
   static Map<String, ForecastSeries> _parseEnsembleForecast(
     dynamic section,
     String forecastType,
@@ -464,7 +483,7 @@ class ForecastResponse {
 
     final result = <String, ForecastSeries>{};
 
-    // Try to get series/mean data first
+    // STEP 1: Try to get 'series' data and store as 'mean'
     final seriesData = section['series'];
     if (seriesData != null && seriesData is Map<String, dynamic>) {
       try {
@@ -472,24 +491,43 @@ class ForecastResponse {
         if (series.isNotEmpty) {
           result['mean'] = series;
           print(
-            'FORECAST_PARSER: Found series/mean for $forecastType (${series.data.length} points)',
+            'FORECAST_PARSER: Found series data for $forecastType as mean (${series.data.length} points)',
           );
         }
       } catch (e) {
-        print('FORECAST_PARSER: Series/mean invalid for $forecastType: $e');
+        print('FORECAST_PARSER: Series data invalid for $forecastType: $e');
       }
     }
 
-    // Parse all ensemble members
-    for (final entry in section.entries) {
-      if (entry.key.startsWith('member') &&
-          entry.value is Map<String, dynamic>) {
-        try {
-          final memberSeries = ForecastSeries.fromJson(
-            entry.value as Map<String, dynamic>,
+    // STEP 2: Try to get explicit 'mean' data (overrides series if both exist)
+    final meanData = section['mean'];
+    if (meanData != null && meanData is Map<String, dynamic>) {
+      try {
+        final mean = ForecastSeries.fromJson(meanData);
+        if (mean.isNotEmpty) {
+          result['mean'] = mean;
+          print(
+            'FORECAST_PARSER: Found explicit mean data for $forecastType (${mean.data.length} points)',
           );
+        }
+      } catch (e) {
+        print('FORECAST_PARSER: Mean data invalid for $forecastType: $e');
+      }
+    }
+
+    // STEP 3: Collect ALL ensemble members dynamically
+    final memberKeys = section.keys
+        .where((key) => key.startsWith('member'))
+        .toList();
+    memberKeys.sort(); // Ensure consistent ordering: member1, member2, etc.
+
+    for (final memberKey in memberKeys) {
+      final memberData = section[memberKey];
+      if (memberData != null && memberData is Map<String, dynamic>) {
+        try {
+          final memberSeries = ForecastSeries.fromJson(memberData);
           if (memberSeries.isNotEmpty) {
-            result[entry.key] = memberSeries;
+            result[memberKey] = memberSeries;
           }
         } catch (e) {
           // Skip invalid members silently
@@ -498,9 +536,15 @@ class ForecastResponse {
       }
     }
 
+    final memberCount = memberKeys.length;
+    final validMemberCount = result.keys
+        .where((k) => k.startsWith('member'))
+        .length;
+
     print(
-      'FORECAST_PARSER: Found ${result.length} valid series for $forecastType: ${result.keys.join(", ")}',
+      'FORECAST_PARSER: Found ${result.length} valid series for $forecastType: ${result.keys.join(", ")} ($validMemberCount/$memberCount members valid)',
     );
+
     return result;
   }
 
@@ -513,24 +557,36 @@ class ForecastResponse {
         return shortRange;
       case 'medium_range':
         // Try mean first, fall back to first available member
-        return mediumRange['mean'] ??
-            mediumRange['member1'] ??
-            mediumRange['member2'] ??
-            mediumRange['member3'] ??
-            mediumRange['member4'] ??
-            mediumRange['member5'] ??
-            mediumRange['member6'] ??
-            (mediumRange.isNotEmpty ? mediumRange.values.first : null);
+        if (mediumRange['mean']?.isNotEmpty == true) {
+          return mediumRange['mean'];
+        }
+        // Dynamically find first available member
+        final memberKeys = mediumRange.keys
+            .where((k) => k.startsWith('member'))
+            .toList();
+        memberKeys.sort();
+        for (final memberKey in memberKeys) {
+          if (mediumRange[memberKey]?.isNotEmpty == true) {
+            return mediumRange[memberKey];
+          }
+        }
+        return null;
       case 'long_range':
         // Try mean first, fall back to first available member
-        return longRange['mean'] ??
-            longRange['member1'] ??
-            longRange['member2'] ??
-            longRange['member3'] ??
-            longRange['member4'] ??
-            longRange['member5'] ??
-            longRange['member6'] ??
-            (longRange.isNotEmpty ? longRange.values.first : null);
+        if (longRange['mean']?.isNotEmpty == true) {
+          return longRange['mean'];
+        }
+        // Dynamically find first available member
+        final memberKeys = longRange.keys
+            .where((k) => k.startsWith('member'))
+            .toList();
+        memberKeys.sort();
+        for (final memberKey in memberKeys) {
+          if (longRange[memberKey]?.isNotEmpty == true) {
+            return longRange[memberKey];
+          }
+        }
+        return null;
       case 'medium_range_blend':
         return mediumRangeBlend;
       default:
@@ -550,6 +606,13 @@ class ForecastResponse {
         .toList();
   }
 
+  // Get all ensemble data including mean (for hydrographs)
+  Map<String, ForecastSeries> getAllEnsembleData(String forecastType) {
+    return forecastType.toLowerCase() == 'medium_range'
+        ? Map.from(mediumRange)
+        : Map.from(longRange);
+  }
+
   // Get the latest flow value with automatic fallback
   double? getLatestFlow(String forecastType) {
     final forecast = getPrimaryForecast(forecastType);
@@ -563,14 +626,22 @@ class ForecastResponse {
     switch (forecastType.toLowerCase()) {
       case 'medium_range':
         if (mediumRange['mean']?.isNotEmpty == true) return 'ensemble mean';
-        for (int i = 1; i <= 6; i++) {
-          if (mediumRange['member$i']?.isNotEmpty == true) return 'member$i';
+        final memberKeys = mediumRange.keys
+            .where((k) => k.startsWith('member'))
+            .toList();
+        memberKeys.sort();
+        for (final memberKey in memberKeys) {
+          if (mediumRange[memberKey]?.isNotEmpty == true) return memberKey;
         }
         return 'no data';
       case 'long_range':
         if (longRange['mean']?.isNotEmpty == true) return 'ensemble mean';
-        for (int i = 1; i <= 6; i++) {
-          if (longRange['member$i']?.isNotEmpty == true) return 'member$i';
+        final memberKeys = longRange.keys
+            .where((k) => k.startsWith('member'))
+            .toList();
+        memberKeys.sort();
+        for (final memberKey in memberKeys) {
+          if (longRange[memberKey]?.isNotEmpty == true) return memberKey;
         }
         return 'no data';
       default:
@@ -586,13 +657,15 @@ class ForecastResponse {
 
   List<String> _availableForecasts() {
     final available = <String>[];
-    if (analysisAssimilation?.isNotEmpty == true)
+    if (analysisAssimilation?.isNotEmpty == true) {
       available.add('analysis_assimilation');
+    }
     if (shortRange?.isNotEmpty == true) available.add('short_range');
     if (mediumRange.isNotEmpty) available.add('medium_range');
     if (longRange.isNotEmpty) available.add('long_range');
-    if (mediumRangeBlend?.isNotEmpty == true)
+    if (mediumRangeBlend?.isNotEmpty == true) {
       available.add('medium_range_blend');
+    }
     return available;
   }
 }
