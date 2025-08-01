@@ -6,6 +6,60 @@ import 'package:rivrflow/features/auth/providers/auth_provider.dart';
 import 'firebase_options.dart'; // This file should be auto-generated
 import 'features/auth/presentation/pages/auth_coordinator.dart';
 
+// Add this import at the top with your other imports
+import 'core/services/noaa_api_service.dart';
+import 'core/models/reach_data.dart';
+
+// Add this corrected test function before main()
+Future<void> testStep2() async {
+  print('🧪 Testing Step 2: API Services Layer');
+  final api = NoaaApiService();
+
+  // Test 2.1: Reach Info
+  print('\n📍 Testing fetchReachInfo...');
+  try {
+    final reachData = await api.fetchReachInfo('23021904');
+    print('✅ Reach info success: ${reachData['name']}');
+    print('   Lat/Lng: ${reachData['latitude']}, ${reachData['longitude']}');
+  } catch (e) {
+    print('❌ Reach info failed: $e');
+  }
+
+  // Test 2.2: Return Periods
+  print('\n🔢 Testing fetchReturnPeriods...');
+  final returnPeriods = await api.fetchReturnPeriods('23021904');
+  print('✅ Return periods: ${returnPeriods.length} items');
+  if (returnPeriods.isNotEmpty) {
+    print('   Sample data keys: ${(returnPeriods.first as Map).keys.take(3)}');
+  }
+
+  // Test 2.3: Forecast
+  print('\n📈 Testing fetchForecast...');
+  try {
+    final forecastData = await api.fetchForecast('23021904');
+    print('✅ Forecast success: ${forecastData.keys}');
+
+    // Test enhanced parsing
+    print('\n🔄 Testing enhanced forecast parsing...');
+    final forecast = ForecastResponse.fromJson(forecastData);
+    print('✅ Parsing success: ${forecast.reach.riverName}');
+
+    // Test public methods instead of private ones
+    final shortRange = forecast.getPrimaryForecast('short_range');
+    final mediumRange = forecast.getPrimaryForecast('medium_range');
+    print('   Short range available: ${shortRange != null}');
+    print('   Medium range available: ${mediumRange != null}');
+
+    // Test fallback logic
+    final shortRangeSource = forecast.getDataSource('short_range');
+    print('   Short range data source: $shortRangeSource');
+  } catch (e) {
+    print('❌ Forecast failed: $e');
+  }
+
+  print('\n🎉 Step 2 testing complete!');
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -153,6 +207,14 @@ class HomePage extends StatelessWidget {
                       );
                     },
                     child: const Text('View Favorites'),
+                  ),
+                  CupertinoButton(
+                    color: CupertinoColors.systemOrange,
+                    onPressed: () async {
+                      print('🧪 Starting API tests...');
+                      await testStep2();
+                    },
+                    child: const Text('Test APIs'),
                   ),
                 ],
               ),

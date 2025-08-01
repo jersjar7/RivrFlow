@@ -287,7 +287,6 @@ class ReachData {
   }
 }
 
-// lib/core/models/forecast_data.dart
 class ForecastPoint {
   final DateTime validTime;
   final double flow;
@@ -384,45 +383,128 @@ class ForecastResponse {
   factory ForecastResponse.fromJson(Map<String, dynamic> json) {
     return ForecastResponse(
       reach: ReachData.fromNoaaApi(json['reach'] as Map<String, dynamic>),
-      analysisAssimilation: _parseForecastSection(json['analysisAssimilation']),
-      shortRange: _parseForecastSection(json['shortRange']),
-      mediumRange: _parseEnsembleForecast(json['mediumRange']),
-      longRange: _parseEnsembleForecast(json['longRange']),
-      mediumRangeBlend: _parseForecastSection(json['mediumRangeBlend']),
+      analysisAssimilation: _parseForecastSection(
+        json['analysisAssimilation'],
+        'analysis_assimilation',
+      ),
+      shortRange: _parseForecastSection(json['shortRange'], 'short_range'),
+      mediumRange: _parseEnsembleForecast(json['mediumRange'], 'medium_range'),
+      longRange: _parseEnsembleForecast(json['longRange'], 'long_range'),
+      mediumRangeBlend: _parseForecastSection(
+        json['mediumRangeBlend'],
+        'medium_range_blend',
+      ),
     );
   }
 
-  static ForecastSeries? _parseForecastSection(dynamic section) {
-    if (section == null || section is! Map<String, dynamic>) return null;
+  // Enhanced parsing with ensemble fallback logic
+  static ForecastSeries? _parseForecastSection(
+    dynamic section,
+    String forecastType,
+  ) {
+    if (section == null || section is! Map<String, dynamic>) {
+      print('FORECAST_PARSER: No data for $forecastType');
+      return null;
+    }
 
+    // STEP 1: Try series data first (preferred for single forecasts)
     final series = section['series'];
-    if (series == null || series is! Map<String, dynamic>) return null;
+    if (series != null && series is Map<String, dynamic>) {
+      try {
+        final forecastSeries = ForecastSeries.fromJson(series);
+        if (forecastSeries.isNotEmpty) {
+          print(
+            'FORECAST_PARSER: Using series data for $forecastType (${forecastSeries.data.length} points)',
+          );
+          return forecastSeries;
+        }
+      } catch (e) {
+        print('FORECAST_PARSER: Series data invalid for $forecastType: $e');
+      }
+    }
 
-    return ForecastSeries.fromJson(series);
+    // STEP 2: Fall back to ensemble members (member1, member2, etc.)
+    for (int i = 1; i <= 6; i++) {
+      final memberKey = 'member$i';
+      final memberData = section[memberKey];
+
+      if (memberData != null && memberData is Map<String, dynamic>) {
+        try {
+          final memberSeries = ForecastSeries.fromJson(memberData);
+          if (memberSeries.isNotEmpty) {
+            print(
+              'FORECAST_PARSER: Using $memberKey data for $forecastType (${memberSeries.data.length} points)',
+            );
+            return memberSeries;
+          }
+        } catch (e) {
+          print(
+            'FORECAST_PARSER: $memberKey data invalid for $forecastType: $e',
+          );
+          continue; // Try next member
+        }
+      }
+    }
+
+    print(
+      'FORECAST_PARSER: No valid data found for $forecastType (tried series + 6 members)',
+    );
+    return null;
   }
 
-  static Map<String, ForecastSeries> _parseEnsembleForecast(dynamic section) {
-    if (section == null || section is! Map<String, dynamic>) return {};
+  // Enhanced ensemble parsing with better member handling
+  static Map<String, ForecastSeries> _parseEnsembleForecast(
+    dynamic section,
+    String forecastType,
+  ) {
+    if (section == null || section is! Map<String, dynamic>) {
+      print('FORECAST_PARSER: No ensemble data for $forecastType');
+      return {};
+    }
 
     final result = <String, ForecastSeries>{};
 
+    // Try to get series/mean data first
+    final seriesData = section['series'];
+    if (seriesData != null && seriesData is Map<String, dynamic>) {
+      try {
+        final series = ForecastSeries.fromJson(seriesData);
+        if (series.isNotEmpty) {
+          result['mean'] = series;
+          print(
+            'FORECAST_PARSER: Found series/mean for $forecastType (${series.data.length} points)',
+          );
+        }
+      } catch (e) {
+        print('FORECAST_PARSER: Series/mean invalid for $forecastType: $e');
+      }
+    }
+
+    // Parse all ensemble members
     for (final entry in section.entries) {
-      if (entry.value is Map<String, dynamic>) {
+      if (entry.key.startsWith('member') &&
+          entry.value is Map<String, dynamic>) {
         try {
-          result[entry.key] = ForecastSeries.fromJson(
+          final memberSeries = ForecastSeries.fromJson(
             entry.value as Map<String, dynamic>,
           );
+          if (memberSeries.isNotEmpty) {
+            result[entry.key] = memberSeries;
+          }
         } catch (e) {
-          // Skip invalid forecast members
+          // Skip invalid members silently
           continue;
         }
       }
     }
 
+    print(
+      'FORECAST_PARSER: Found ${result.length} valid series for $forecastType: ${result.keys.join(", ")}',
+    );
     return result;
   }
 
-  // Get the primary forecast series for a given type
+  // Enhanced primary forecast getter with automatic fallback
   ForecastSeries? getPrimaryForecast(String forecastType) {
     switch (forecastType.toLowerCase()) {
       case 'analysis_assimilation':
@@ -430,9 +512,25 @@ class ForecastResponse {
       case 'short_range':
         return shortRange;
       case 'medium_range':
-        return mediumRange['mean'];
+        // Try mean first, fall back to first available member
+        return mediumRange['mean'] ??
+            mediumRange['member1'] ??
+            mediumRange['member2'] ??
+            mediumRange['member3'] ??
+            mediumRange['member4'] ??
+            mediumRange['member5'] ??
+            mediumRange['member6'] ??
+            (mediumRange.isNotEmpty ? mediumRange.values.first : null);
       case 'long_range':
-        return longRange['mean'];
+        // Try mean first, fall back to first available member
+        return longRange['mean'] ??
+            longRange['member1'] ??
+            longRange['member2'] ??
+            longRange['member3'] ??
+            longRange['member4'] ??
+            longRange['member5'] ??
+            longRange['member6'] ??
+            (longRange.isNotEmpty ? longRange.values.first : null);
       case 'medium_range_blend':
         return mediumRangeBlend;
       default:
@@ -450,6 +548,35 @@ class ForecastResponse {
         .where((e) => e.key.startsWith('member'))
         .map((e) => e.value)
         .toList();
+  }
+
+  // Get the latest flow value with automatic fallback
+  double? getLatestFlow(String forecastType) {
+    final forecast = getPrimaryForecast(forecastType);
+    if (forecast == null || forecast.isEmpty) return null;
+
+    return forecast.data.first.flow;
+  }
+
+  // Get data source info for debugging
+  String getDataSource(String forecastType) {
+    switch (forecastType.toLowerCase()) {
+      case 'medium_range':
+        if (mediumRange['mean']?.isNotEmpty == true) return 'ensemble mean';
+        for (int i = 1; i <= 6; i++) {
+          if (mediumRange['member$i']?.isNotEmpty == true) return 'member$i';
+        }
+        return 'no data';
+      case 'long_range':
+        if (longRange['mean']?.isNotEmpty == true) return 'ensemble mean';
+        for (int i = 1; i <= 6; i++) {
+          if (longRange['member$i']?.isNotEmpty == true) return 'member$i';
+        }
+        return 'no data';
+      default:
+        final forecast = getPrimaryForecast(forecastType);
+        return forecast?.isNotEmpty == true ? 'series data' : 'no data';
+    }
   }
 
   @override
