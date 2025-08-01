@@ -110,13 +110,16 @@ class NoaaApiService {
   }
 
   // STEP 2.3: Forecast Fetching
-  /// Fetch streamflow forecast data from NOAA API
+  /// Fetch streamflow forecast data from NOAA API for a specific series
   /// Returns data in format expected by ForecastResponse.fromJson()
-  Future<Map<String, dynamic>> fetchForecast(String reachId) async {
+  Future<Map<String, dynamic>> fetchForecast(
+    String reachId,
+    String series,
+  ) async {
     try {
-      print('NOAA_API: Fetching forecast for: $reachId');
+      print('NOAA_API: Fetching $series forecast for: $reachId');
 
-      final url = AppConfig.getForecastUrl(reachId);
+      final url = AppConfig.getForecastUrl(reachId, series);
       print('NOAA_API: Forecast URL: $url');
 
       final response = await _client
@@ -133,17 +136,17 @@ class NoaaApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        print('NOAA_API: Successfully fetched forecast');
+        print('NOAA_API: Successfully fetched $series forecast');
         return data;
       } else if (response.statusCode == 404) {
-        throw Exception('Forecast not available for reach: $reachId');
+        throw Exception('$series forecast not available for reach: $reachId');
       } else {
         throw Exception(
           'Forecast API error: ${response.statusCode} - ${response.body}',
         );
       }
     } catch (e) {
-      print('NOAA_API: Error fetching forecast: $e');
+      print('NOAA_API: Error fetching $series forecast: $e');
       final userMessage = ErrorService.handleError(e, context: 'fetchForecast');
       throw ApiException(userMessage);
     }

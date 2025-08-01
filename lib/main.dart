@@ -36,7 +36,7 @@ Future<void> testStep2() async {
   // Test 2.3: Forecast
   print('\n📈 Testing fetchForecast...');
   try {
-    final forecastData = await api.fetchForecast('23021904');
+    final forecastData = await api.fetchForecast('23021904', 'medium_range');
     print('✅ Forecast success: ${forecastData.keys}');
 
     // Test enhanced parsing
