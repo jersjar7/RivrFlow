@@ -229,7 +229,7 @@ class ReachData {
   bool get hasReturnPeriods =>
       returnPeriods != null && returnPeriods!.isNotEmpty;
 
-  bool isCacheStale({Duration maxAge = const Duration(days: 30)}) {
+  bool isCacheStale({Duration maxAge = const Duration(days: 180)}) {
     return DateTime.now().difference(cachedAt) > maxAge;
   }
 
