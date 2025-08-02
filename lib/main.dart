@@ -2,10 +2,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'package:rivrflow/core/providers/reach_data_provider.dart';
 import 'package:rivrflow/core/services/forecast_service.dart';
 import 'package:rivrflow/features/auth/providers/auth_provider.dart';
-import 'firebase_options.dart'; // This file should be auto-generated
+import 'package:rivrflow/core/providers/reach_data_provider.dart';
+import 'firebase_options.dart';
 import 'features/auth/presentation/pages/auth_coordinator.dart';
 
 // Add this import at the top with your other imports
@@ -497,13 +497,65 @@ class HomePage extends StatelessWidget {
                     },
                     child: const Text('View Favorites'),
                   ),
-                  CupertinoButton(
-                    color: CupertinoColors.systemOrange,
-                    onPressed: () async {
-                      print('🧪 Starting API tests...');
-                      await testCompleteForecastSystem();
+
+                  const SizedBox(height: 12),
+
+                  // Updated Test API button with ReachDataProvider
+                  Consumer<ReachDataProvider>(
+                    builder: (context, reachProvider, _) {
+                      return Column(
+                        children: [
+                          CupertinoButton(
+                            color: CupertinoColors.systemOrange,
+                            onPressed: reachProvider.isLoading
+                                ? null
+                                : () async {
+                                    // Test provider integration
+                                    await reachProvider.loadReach('23021904');
+                                  },
+                            child: Text(
+                              reachProvider.isLoading
+                                  ? 'Loading...'
+                                  : 'Test Provider',
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // Show provider results
+                          if (reachProvider.hasData)
+                            Text(
+                              '✅ ${reachProvider.currentReach!.displayName}',
+                              style: const TextStyle(
+                                color: CupertinoColors.systemGreen,
+                                fontSize: 14,
+                              ),
+                            ),
+
+                          if (reachProvider.errorMessage != null)
+                            Text(
+                              '❌ ${reachProvider.errorMessage}',
+                              style: const TextStyle(
+                                color: CupertinoColors.systemRed,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+
+                          const SizedBox(height: 8),
+
+                          // Raw API test button
+                          CupertinoButton(
+                            color: CupertinoColors.systemGrey,
+                            onPressed: () async {
+                              print('🧪 Starting raw API tests...');
+                              await testCompleteForecastSystem();
+                            },
+                            child: const Text('Raw API Test'),
+                          ),
+                        ],
+                      );
                     },
-                    child: const Text('Test APIs'),
                   ),
                 ],
               ),
