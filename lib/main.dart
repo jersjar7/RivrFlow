@@ -2,6 +2,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/providers/reach_data_provider.dart';
 import 'package:rivrflow/core/services/forecast_service.dart';
 import 'package:rivrflow/features/auth/providers/auth_provider.dart';
 import 'firebase_options.dart'; // This file should be auto-generated
@@ -359,8 +360,11 @@ class RivrFlowApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => AuthProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
+        ChangeNotifierProvider(create: (context) => ReachDataProvider()),
+      ],
       child: CupertinoApp(
         title: 'RivrFlow',
         theme: const CupertinoThemeData(
