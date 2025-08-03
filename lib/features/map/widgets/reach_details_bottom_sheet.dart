@@ -67,7 +67,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.only(left: 16, right: 16, top: 20, bottom: 16),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           // Stream order icon
@@ -113,8 +113,21 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
             ),
           ),
 
-          // Loading indicator or flow status
+          // Status widget (if you want to keep it)
           _buildStatusWidget(),
+
+          const SizedBox(width: 8),
+
+          // 🔧 Add close button
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => Navigator.pop(context),
+            child: const Icon(
+              CupertinoIcons.xmark_circle_fill,
+              color: CupertinoColors.systemGrey3,
+              size: 24,
+            ),
+          ),
         ],
       ),
     );
@@ -129,11 +142,16 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           if (_errorMessage != null) _buildErrorCard(),
           if (_reachData != null) _buildDetailedInfo(),
           if (_currentFlow != null) _buildFlowInfo(),
-          // Show message when no flow data available
+          // Show message when no flow data available (response = -9999)
           if (_reachData != null &&
               _currentFlow == null &&
               _errorMessage == null)
             _buildNoFlowDataCard(),
+          // Show message when no return period data available (response = null)
+          if (_reachData != null &&
+              !_reachData!.hasReturnPeriods &&
+              _errorMessage == null)
+            _buildNoReturnPeriodCard(),
         ],
       ),
     );
@@ -368,32 +386,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       return const CupertinoActivityIndicator(radius: 8);
     }
 
-    if (_errorMessage != null) {
-      return const Icon(
-        CupertinoIcons.exclamationmark_triangle,
-        color: CupertinoColors.systemRed,
-        size: 16,
-      );
-    }
-
-    if (_currentFlow != null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppConstants.getFlowCategoryColor(_flowCategory),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          '${_currentFlow!.toStringAsFixed(0)} CFS',
-          style: const TextStyle(
-            color: CupertinoColors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
-    }
-
+    // When done loading, just show nothing
     return const SizedBox.shrink();
   }
 
@@ -578,6 +571,34 @@ Widget _buildNoFlowDataCard() {
           child: Text(
             'Current flow data is not available for this stream.',
             style: TextStyle(color: CupertinoColors.systemGrey, fontSize: 14),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildNoReturnPeriodCard() {
+  return Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(top: 16),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: CupertinoColors.systemOrange.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        const Icon(
+          CupertinoIcons.info_circle,
+          color: CupertinoColors.systemOrange,
+          size: 16,
+        ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Text(
+            'Return period values are not available for this stream.',
+            style: TextStyle(color: CupertinoColors.systemOrange, fontSize: 14),
           ),
         ),
       ],

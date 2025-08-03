@@ -19,9 +19,8 @@ class AppConstants {
 
   /// Get stream order icon for consistent iconography
   static IconData getStreamOrderIcon(int streamOrder) {
-    if (streamOrder >= 8) return CupertinoIcons.drop_fill;
-    if (streamOrder >= 5) return CupertinoIcons.drop;
-    return CupertinoIcons.minus_circled;
+    // Always return water drop icon regardless of stream order
+    return CupertinoIcons.drop_fill;
   }
 
   /// Get flow category color for consistent styling
