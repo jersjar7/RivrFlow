@@ -616,7 +616,18 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           Expanded(
             flex: 2,
             child: CupertinoButton.filled(
-              onPressed: widget.onViewForecast,
+              onPressed: () {
+                // Navigate to reach overview page
+                Navigator.pushNamed(
+                  context,
+                  '/reach-overview',
+                  arguments: {
+                    'reachId': widget
+                        .selectedReach
+                        .reachId, // 🔧 Fixed: use selectedReach.reachId
+                  },
+                );
+              },
               child: const Text('View Forecast'),
             ),
           ),
