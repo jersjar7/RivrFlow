@@ -35,8 +35,8 @@ class MapVectorTilesService {
       // Add vector source
       await _addVectorSource();
 
-      // Add styled layer
-      await _addStyledLayer();
+      // Add the CORRECT styled layers (multiple layers like working code)
+      await _addStyledLayers();
 
       _isLoaded = true;
       print('✅ River reaches vector tiles loaded successfully');
@@ -51,22 +51,26 @@ class MapVectorTilesService {
     if (_mapboxMap == null || !_isLoaded) return;
 
     try {
-      // If visible not specified, determine current state and toggle
-      if (visible == null) {
-        final currentVisibility = await _mapboxMap!.style.getStyleLayerProperty(
-          AppConfig.vectorLayerId,
-          'visibility',
-        );
-        visible = currentVisibility != 'visible';
+      final layerIds = [
+        'streams2-debug-correct',
+        'streams2-order-1-2',
+        'streams2-order-3-4',
+        'streams2-order-5-plus',
+      ];
+
+      for (final layerId in layerIds) {
+        try {
+          await _mapboxMap!.style.setStyleLayerProperty(
+            layerId,
+            'visibility',
+            visible == true ? 'visible' : 'none',
+          );
+        } catch (e) {
+          // Layer might not exist, that's fine
+        }
       }
 
-      await _mapboxMap!.style.setStyleLayerProperty(
-        AppConfig.vectorLayerId,
-        'visibility',
-        visible ? 'visible' : 'none',
-      );
-
-      print('✅ River reaches ${visible ? 'shown' : 'hidden'}');
+      print('✅ River reaches ${visible == true ? 'shown' : 'hidden'}');
     } catch (e) {
       print('❌ Error toggling river reaches visibility: $e');
     }
@@ -99,57 +103,119 @@ class MapVectorTilesService {
     print('✅ Vector source added: ${AppConfig.vectorSourceId}');
   }
 
-  /// Add styled layer for river reaches
-  Future<void> _addStyledLayer() async {
-    await _mapboxMap!.style.addLayer(
-      LineLayer(
-        id: AppConfig.vectorLayerId,
-        sourceId: AppConfig.vectorSourceId,
-        sourceLayer: AppConfig.vectorSourceLayer,
-        lineColor: 0xFF0000FF, // Bright blue
-        lineWidth: 4.0, // Thicker lines for easier tapping
-        lineOpacity: 0.9,
-        // Remove zoom filter temporarily to see all streams
-      ),
-    );
-    print('✅ Styled layer added: ${AppConfig.vectorLayerId}');
+  /// Add styled layers for river reaches (MULTIPLE LAYERS like working code)
+  Future<void> _addStyledLayers() async {
+    try {
+      // Add the main debug layer
+      await _mapboxMap!.style.addLayer(
+        LineLayer(
+          id: 'streams2-debug-correct',
+          sourceId: AppConfig.vectorSourceId,
+          sourceLayer: AppConfig.vectorSourceLayer, // 'streams2-7jgd8p'
+          lineColor: 0xFFFF0000, // Bright red for debug
+          lineWidth: 5.0, // Very thick so it's visible
+          lineOpacity: 1.0, // Full opacity
+        ),
+      );
+      print('✅ Added debug layer: streams2-debug-correct');
+
+      // Add stream order layers with proper styling and filters
+      await _mapboxMap!.style.addLayer(
+        LineLayer(
+          id: 'streams2-order-1-2',
+          sourceId: AppConfig.vectorSourceId,
+          sourceLayer: AppConfig.vectorSourceLayer, // 'streams2-7jgd8p'
+          lineColor: 0xFF87CEEB, // Light blue
+          lineWidth: 1.0,
+          lineOpacity: 0.8,
+          filter: [
+            "<=",
+            ["get", "streamOrde"], // Note: it's "streamOrde" not "streamOrder"
+            2,
+          ],
+        ),
+      );
+      print('✅ Added layer: streams2-order-1-2');
+
+      await _mapboxMap!.style.addLayer(
+        LineLayer(
+          id: 'streams2-order-3-4',
+          sourceId: AppConfig.vectorSourceId,
+          sourceLayer: AppConfig.vectorSourceLayer, // 'streams2-7jgd8p'
+          lineColor: 0xFF4682B4, // Steel blue
+          lineWidth: 2.0,
+          lineOpacity: 0.8,
+          filter: [
+            "all",
+            [
+              ">=",
+              ["get", "streamOrde"],
+              3,
+            ],
+            [
+              "<=",
+              ["get", "streamOrde"],
+              4,
+            ],
+          ],
+        ),
+      );
+      print('✅ Added layer: streams2-order-3-4');
+
+      await _mapboxMap!.style.addLayer(
+        LineLayer(
+          id: 'streams2-order-5-plus',
+          sourceId: AppConfig.vectorSourceId,
+          sourceLayer: AppConfig.vectorSourceLayer, // 'streams2-7jgd8p'
+          lineColor: 0xFF191970, // Midnight blue
+          lineWidth: 3.5,
+          lineOpacity: 0.9,
+          filter: [
+            ">=",
+            ["get", "streamOrde"],
+            5,
+          ],
+        ),
+      );
+      print('✅ Added layer: streams2-order-5-plus');
+    } catch (e) {
+      print('❌ Failed to add styled layers: $e');
+      rethrow;
+    }
   }
 
   /// Remove existing vector source and layers to avoid conflicts
   Future<void> _removeExistingLayers() async {
     try {
-      // Try to remove layer first
-      if (await _layerExists(AppConfig.vectorLayerId)) {
-        await _mapboxMap!.style.removeStyleLayer(AppConfig.vectorLayerId);
+      // Remove all possible layer IDs
+      final layersToRemove = [
+        'streams2-debug-correct',
+        'streams2-order-1-2',
+        'streams2-order-3-4',
+        'streams2-order-5-plus',
+        AppConfig.vectorLayerId, // Also remove the old generic layer
+      ];
+
+      // Try to remove layers first
+      for (final layerId in layersToRemove) {
+        try {
+          await _mapboxMap!.style.removeStyleLayer(layerId);
+        } catch (e) {
+          // Layer might not exist, that's fine
+        }
       }
 
       // Then remove source
-      if (await _sourceExists(AppConfig.vectorSourceId)) {
+      try {
         await _mapboxMap!.style.removeStyleSource(AppConfig.vectorSourceId);
+      } catch (e) {
+        // Source might not exist, that's fine
       }
+
+      print('ℹ️ Cleaned up existing layers/sources');
     } catch (e) {
       // Ignore errors when removing non-existent layers/sources
       print('ℹ️ Cleaned up existing layers/sources');
-    }
-  }
-
-  /// Check if a layer exists
-  Future<bool> _layerExists(String layerId) async {
-    try {
-      await _mapboxMap!.style.getStyleLayerProperty(layerId, 'id');
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// Check if a source exists
-  Future<bool> _sourceExists(String sourceId) async {
-    try {
-      await _mapboxMap!.style.getStyleSourceProperty(sourceId, 'type');
-      return true;
-    } catch (e) {
-      return false;
     }
   }
 
@@ -164,11 +230,24 @@ class MapVectorTilesService {
           zoom >= AppConfig.minZoomForVectorTiles &&
           zoom <= AppConfig.maxZoomForVectorTiles;
 
-      await _mapboxMap!.style.setStyleLayerProperty(
-        AppConfig.vectorLayerId,
-        'visibility',
-        shouldShow ? 'visible' : 'none',
-      );
+      final layerIds = [
+        'streams2-debug-correct',
+        'streams2-order-1-2',
+        'streams2-order-3-4',
+        'streams2-order-5-plus',
+      ];
+
+      for (final layerId in layerIds) {
+        try {
+          await _mapboxMap!.style.setStyleLayerProperty(
+            layerId,
+            'visibility',
+            shouldShow ? 'visible' : 'none',
+          );
+        } catch (e) {
+          // Layer might not exist, that's fine
+        }
+      }
     } catch (e) {
       print('❌ Error updating layer visibility: $e');
     }

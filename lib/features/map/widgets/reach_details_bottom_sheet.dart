@@ -36,17 +36,6 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              height: 4,
-              width: 40,
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey3,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
             // Header
             _buildHeader(),
 
@@ -63,7 +52,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
       child: Row(
         children: [
           const Icon(
