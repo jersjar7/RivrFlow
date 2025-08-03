@@ -106,15 +106,10 @@ class MapVectorTilesService {
         id: AppConfig.vectorLayerId,
         sourceId: AppConfig.vectorSourceId,
         sourceLayer: AppConfig.vectorSourceLayer,
-        lineColor: 0xFF2196F3, // Blue color for all streams initially
-        lineWidth: 2.0,
-        lineOpacity: 0.8,
-        // Basic visibility filter - show only at appropriate zoom levels
-        filter: [
-          ">=",
-          ["zoom"],
-          AppConfig.minZoomForVectorTiles,
-        ],
+        lineColor: 0xFF0000FF, // Bright blue
+        lineWidth: 4.0, // Thicker lines for easier tapping
+        lineOpacity: 0.9,
+        // Remove zoom filter temporarily to see all streams
       ),
     );
     print('✅ Styled layer added: ${AppConfig.vectorLayerId}');

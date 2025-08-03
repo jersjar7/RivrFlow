@@ -128,17 +128,29 @@ class _MapPageState extends State<MapPage> {
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
     try {
+      print('🗺️ Map created, initializing...');
+
+      // Wait a moment for map to fully initialize
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Check if map style is loaded
+      print('🎨 Checking map style...');
+
       // Initialize services
       _vectorTilesService.setMapboxMap(mapboxMap);
       _reachSelectionService.setMapboxMap(mapboxMap);
 
+      print('🚀 Services initialized, loading vector tiles...');
+
       // Load vector tiles
       await _vectorTilesService.loadRiverReaches();
 
+      print('✅ Map setup complete');
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      print('❌ Map creation error: $e');
       setState(() {
         _isLoading = false;
         _errorMessage = 'Failed to load river data: ${e.toString()}';
