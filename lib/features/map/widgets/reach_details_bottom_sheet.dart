@@ -2,6 +2,9 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:rivrflow/features/map/widgets/components/return_periods_info_sheet.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/forecast_service.dart';
 import '../../../core/services/error_service.dart';
@@ -503,298 +506,8 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
   void _showReturnPeriodsInfo(Map<int, double> returnPeriods) {
     showCupertinoModalPopup(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Flood Risk Thresholds'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 16),
-
-              // Explanation section
-              _buildExplanationSection(),
-
-              const SizedBox(height: 16),
-
-              // Current usage section
-              _buildCurrentUsageSection(),
-
-              const SizedBox(height: 16),
-
-              // Risk thresholds table
-              _buildRiskThresholdsTable(returnPeriods),
-            ],
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('Got it!'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExplanationSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'What are Return Periods?',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: CupertinoColors.label,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'A "return period" tells you how rare a flood is. A 10-year flood has a 10% chance of happening in any given year. The higher the number, the more dangerous the flood.',
-          style: TextStyle(fontSize: 14, color: CupertinoColors.label),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemGreen.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                CupertinoIcons.lightbulb,
-                color: CupertinoColors.systemGreen,
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: const Text(
-                  'Think of it like this: A 100-year flood is much more dangerous than a 2-year flood.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: CupertinoColors.systemGreen,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCurrentUsageSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'How We Use This Data',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: CupertinoColors.label,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'RivrFlow compares current river flow to these thresholds to show you the flood risk level:',
-          style: TextStyle(fontSize: 14, color: CupertinoColors.label),
-        ),
-        const SizedBox(height: 8),
-
-        // Risk level indicators
-        _buildRiskLevelIndicator(
-          'Normal',
-          'Below 2-year level',
-          CupertinoColors.systemGreen,
-          CupertinoIcons.checkmark_circle_fill,
-        ),
-        _buildRiskLevelIndicator(
-          'Elevated',
-          'Between 2-5 year levels',
-          CupertinoColors.systemYellow,
-          CupertinoIcons.arrow_up_circle,
-        ),
-        _buildRiskLevelIndicator(
-          'High',
-          'Between 5-25 year levels',
-          CupertinoColors.systemOrange,
-          CupertinoIcons.arrow_up_circle_fill,
-        ),
-        _buildRiskLevelIndicator(
-          'Flood Risk',
-          'Above 25-year level',
-          CupertinoColors.systemRed,
-          CupertinoIcons.exclamationmark_triangle_fill,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRiskLevelIndicator(
-    String level,
-    String description,
-    Color color,
-    IconData icon,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: CupertinoColors.label,
-                ),
-                children: [
-                  TextSpan(
-                    text: '$level: ',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: color),
-                  ),
-                  TextSpan(text: description),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRiskThresholdsTable(Map<int, double> returnPeriods) {
-    // Sort return periods by year and convert cms to cfs
-    const cmsToCs = 35.3147; // 1 cms = 35.3147 cubic feet per second
-    final sortedPeriods = returnPeriods.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Risk Thresholds for This Location',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: CupertinoColors.label,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: CupertinoColors.systemGrey4),
-          ),
-          child: Column(
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 12,
-                ),
-                decoration: const BoxDecoration(
-                  color: CupertinoColors.systemGrey6,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(7),
-                    topRight: Radius.circular(7),
-                  ),
-                ),
-                child: const Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        'Return Period',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: CupertinoColors.secondaryLabel,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        'Flow (ft³/s)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: CupertinoColors.secondaryLabel,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Data rows
-              ...sortedPeriods.asMap().entries.map((entry) {
-                final index = entry.key;
-                final period = entry.value;
-                final isLast = index == sortedPeriods.length - 1;
-                final flowInCfs = period.value * cmsToCs; // Convert cms to cfs
-
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    border: isLast
-                        ? null
-                        : const Border(
-                            bottom: BorderSide(
-                              color: CupertinoColors.systemGrey5,
-                            ),
-                          ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          '${period.key}-year',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          flowInCfs.toStringAsFixed(0),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: CupertinoColors.secondaryLabel,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 8),
-        const Text(
-          'Current flow is compared to these values to determine flood risk.',
-          style: TextStyle(
-            fontSize: 11,
-            color: CupertinoColors.systemGrey,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      ],
+      builder: (context) =>
+          ReturnPeriodsInfoSheet(returnPeriods: returnPeriods),
     );
   }
 
@@ -1115,15 +828,143 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
   }
 
   void _copyReachInfo() {
-    // Implementation for copying reach info
-    print('BOTTOM_SHEET: Copy reach info: ${widget.selectedReach.reachId}');
+    final reachInfo = _buildReachInfoText();
+
+    Clipboard.setData(ClipboardData(text: reachInfo)).then((_) {
+      // Show confirmation to user
+      if (mounted) {
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Copied'),
+            content: const Text('Reach information copied to clipboard'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        );
+      }
+    });
+
+    print('BOTTOM_SHEET: Copied reach info to clipboard');
   }
 
-  void _shareReachLocation() {
-    // Implementation for sharing location
-    print(
-      'BOTTOM_SHEET: Share location: ${widget.selectedReach.coordinatesString}',
+  void _shareReachLocation() async {
+    final locationText = _buildLocationShareText();
+
+    try {
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          text: locationText,
+          subject: 'River Location: ${widget.selectedReach.displayName}',
+        ),
+      );
+
+      if (result.status == ShareResultStatus.success) {
+        print('BOTTOM_SHEET: Successfully shared location');
+      } else if (result.status == ShareResultStatus.dismissed) {
+        print('BOTTOM_SHEET: User dismissed share dialog');
+      }
+    } catch (e) {
+      print('BOTTOM_SHEET: Error sharing location: $e');
+    }
+  }
+
+  // Helper method to build comprehensive reach information text
+  String _buildReachInfoText() {
+    final buffer = StringBuffer();
+
+    // Basic info
+    buffer.writeln('🏞️ ${widget.selectedReach.displayName}');
+    buffer.writeln('📍 Reach ID: ${widget.selectedReach.reachId}');
+    buffer.writeln('🌊 Stream Order: ${widget.selectedReach.streamOrder}');
+    buffer.writeln('📍 Coordinates: ${widget.selectedReach.coordinatesString}');
+
+    if (widget.selectedReach.hasLocation) {
+      buffer.writeln('📍 Location: ${widget.selectedReach.formattedLocation}');
+    }
+
+    // NOAA data (if available)
+    if (_reachData != null) {
+      buffer.writeln('\n📊 NOAA Data:');
+      buffer.writeln('🏞️ River: ${_reachData!.riverName}');
+
+      if (_reachData!.formattedLocation.isNotEmpty) {
+        buffer.writeln('📍 ${_reachData!.formattedLocation}');
+      }
+
+      // Current flow (if available)
+      if (_currentFlow != null) {
+        buffer.writeln(
+          '💧 Current Flow: ${_currentFlow!.toStringAsFixed(0)} CFS',
+        );
+        if (_flowCategory != null) {
+          buffer.writeln('⚠️ Risk Level: $_flowCategory');
+        }
+      }
+
+      // Available forecasts
+      if (_reachData!.availableForecasts.isNotEmpty) {
+        buffer.writeln(
+          '📈 Available Forecasts: ${_reachData!.availableForecasts.join(', ')}',
+        );
+      }
+
+      // Return periods (if available)
+      if (_reachData!.hasReturnPeriods) {
+        final years = (_reachData!.returnPeriods!.keys.toList()..sort())
+            .map((year) => '${year}yr')
+            .join(', ');
+        buffer.writeln('📊 Return Periods: $years');
+      }
+    }
+
+    buffer.writeln('\n📱 Shared from RivrFlow');
+
+    return buffer.toString();
+  }
+
+  // Helper method to build location-focused share text
+  String _buildLocationShareText() {
+    final buffer = StringBuffer();
+
+    buffer.writeln('📍 ${widget.selectedReach.displayName}');
+
+    if (_reachData?.riverName != null &&
+        _reachData!.riverName != widget.selectedReach.displayName) {
+      buffer.writeln('🏞️ ${_reachData!.riverName}');
+    }
+
+    buffer.writeln(
+      '\n📍 Coordinates: ${widget.selectedReach.coordinatesString}',
     );
+
+    if (widget.selectedReach.hasLocation) {
+      buffer.writeln('📍 ${widget.selectedReach.formattedLocation}');
+    }
+
+    // Add current flow if available (important for safety)
+    if (_currentFlow != null && _flowCategory != null) {
+      buffer.writeln(
+        '\n💧 Current Flow: ${_currentFlow!.toStringAsFixed(0)} CFS ($_flowCategory)',
+      );
+    }
+
+    // Add Google Maps link
+    final coords = widget.selectedReach.coordinatesString.split(', ');
+    if (coords.length == 2) {
+      final lat = coords[0];
+      final lng = coords[1];
+      buffer.writeln('\n🗺️ View on Google Maps:');
+      buffer.writeln('https://maps.google.com/?q=$lat,$lng');
+    }
+
+    buffer.writeln('\n📱 Shared from RivrFlow');
+
+    return buffer.toString();
   }
 
   Future<void> _refreshData() async {
