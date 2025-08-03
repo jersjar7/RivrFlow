@@ -29,7 +29,7 @@ class ForecastCategoryGrid extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              _buildGrid(context, availableTypes, reachProvider),
+              _buildVerticalCards(context, availableTypes, reachProvider),
             ],
           ),
         );
@@ -37,30 +37,23 @@ class ForecastCategoryGrid extends StatelessWidget {
     );
   }
 
-  Widget _buildGrid(
+  Widget _buildVerticalCards(
     BuildContext context,
     List<String> availableTypes,
     ReachDataProvider reachProvider,
   ) {
     final categories = _getForecastCategories();
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.0, // Adjusted for 5 items
-      ),
-      itemCount: categories.length,
-      itemBuilder: (context, index) {
-        final category = categories[index];
+    return Column(
+      children: categories.map((category) {
         final isAvailable = availableTypes.contains(category.type);
         final isLoading = reachProvider.isLoading;
 
-        return _buildCategoryCard(context, category, isAvailable, isLoading);
-      },
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildCategoryCard(context, category, isAvailable, isLoading),
+        );
+      }).toList(),
     );
   }
 
@@ -80,6 +73,7 @@ class ForecastCategoryGrid extends StatelessWidget {
         duration: const Duration(milliseconds: 300),
         opacity: opacity,
         child: Container(
+          height: 100,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(
@@ -116,34 +110,84 @@ class ForecastCategoryGrid extends StatelessWidget {
               // Content
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    // Icon and status
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // Icon container
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        category.icon,
+                        color: CupertinoColors.white,
+                        size: 28,
+                      ),
+                    ),
+
+                    const SizedBox(width: 16),
+
+                    // Text content
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Title
+                          Text(
+                            category.displayName,
+                            style: const TextStyle(
+                              color: CupertinoColors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          // Subtitle
+                          Text(
+                            category.timeRange,
+                            style: TextStyle(
+                              color: CupertinoColors.white.withOpacity(0.8),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          // Description
+                          Text(
+                            isAvailable
+                                ? category.description
+                                : 'Not available',
+                            style: TextStyle(
+                              color: CupertinoColors.white.withOpacity(0.7),
+                              fontSize: 12,
+                              height: 1.2,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Status indicator and arrow
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: CupertinoColors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            category.icon,
-                            color: CupertinoColors.white,
-                            size: 24,
-                          ),
-                        ),
                         if (isLoading)
                           const CupertinoActivityIndicator(
                             color: CupertinoColors.white,
-                            radius: 8,
+                            radius: 10,
                           )
                         else if (isAvailable)
                           Container(
-                            width: 8,
-                            height: 8,
+                            width: 10,
+                            height: 10,
                             decoration: const BoxDecoration(
                               color: CupertinoColors.systemGreen,
                               shape: BoxShape.circle,
@@ -151,8 +195,8 @@ class ForecastCategoryGrid extends StatelessWidget {
                           )
                         else
                           Container(
-                            width: 8,
-                            height: 8,
+                            width: 10,
+                            height: 10,
                             decoration: BoxDecoration(
                               color: CupertinoColors.systemGrey.withOpacity(
                                 0.6,
@@ -160,61 +204,21 @@ class ForecastCategoryGrid extends StatelessWidget {
                               shape: BoxShape.circle,
                             ),
                           ),
+
+                        const SizedBox(height: 8),
+
+                        // Arrow indicator
+                        if (isAvailable && !isLoading)
+                          Icon(
+                            CupertinoIcons.chevron_right,
+                            color: CupertinoColors.white.withOpacity(0.6),
+                            size: 18,
+                          ),
                       ],
-                    ),
-
-                    const Spacer(),
-
-                    // Title
-                    Text(
-                      category.displayName,
-                      style: const TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    // Subtitle
-                    Text(
-                      category.timeRange,
-                      style: TextStyle(
-                        color: CupertinoColors.white.withOpacity(0.8),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // Description
-                    Text(
-                      isAvailable ? category.description : 'Not available',
-                      style: TextStyle(
-                        color: CupertinoColors.white.withOpacity(0.7),
-                        fontSize: 11,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-
-              // Tap indicator
-              if (isAvailable && !isLoading)
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Icon(
-                    CupertinoIcons.chevron_right,
-                    color: CupertinoColors.white.withOpacity(0.6),
-                    size: 16,
-                  ),
-                ),
             ],
           ),
         ),
@@ -224,17 +228,6 @@ class ForecastCategoryGrid extends StatelessWidget {
 
   List<ForecastCategory> _getForecastCategories() {
     return [
-      ForecastCategory(
-        type: 'analysis_assimilation',
-        displayName: 'Current Analysis',
-        timeRange: 'Real-time',
-        description: 'Current flow conditions and recent observations',
-        icon: CupertinoIcons.dot_radiowaves_left_right,
-        gradientColors: [
-          CupertinoColors.systemBlue,
-          CupertinoColors.systemTeal,
-        ],
-      ),
       ForecastCategory(
         type: 'short_range',
         displayName: 'Short Range',
@@ -255,17 +248,6 @@ class ForecastCategoryGrid extends StatelessWidget {
         gradientColors: [
           CupertinoColors.systemYellow,
           CupertinoColors.systemOrange,
-        ],
-      ),
-      ForecastCategory(
-        type: 'medium_range_blend',
-        displayName: 'Medium Blend',
-        timeRange: '10 days',
-        description: 'Enhanced accuracy using advanced weather blending',
-        icon: CupertinoIcons.shuffle,
-        gradientColors: [
-          CupertinoColors.systemIndigo,
-          CupertinoColors.systemPurple,
         ],
       ),
       ForecastCategory(

@@ -27,7 +27,7 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-    _pulseAnimation = Tween(begin: 1.0, end: 1.05).animate(
+    _pulseAnimation = Tween(begin: 0.96, end: 0.98).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _pulseController.repeat(reverse: true);
