@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
 import '../../core/config.dart';
+import '../../core/services/cache_service.dart';
 import 'services/map_vector_tiles_service.dart';
 import 'services/map_reach_selection_service.dart';
 import 'models/selected_reach.dart';
@@ -28,11 +29,23 @@ class _MapPageState extends State<MapPage> {
   void initState() {
     super.initState();
     _setupSelectionCallbacks();
+    _initializeCacheService();
   }
 
   void _setupSelectionCallbacks() {
     _reachSelectionService.onReachSelected = _onReachSelected;
     _reachSelectionService.onEmptyTap = _onEmptyTap;
+  }
+
+  /// Initialize cache service for recent searches and other caching needs
+  Future<void> _initializeCacheService() async {
+    try {
+      await CacheService().initialize();
+      print('🗄️ Cache service initialized for recent searches');
+    } catch (e) {
+      print('❌ Cache service initialization error: $e');
+      // Don't fail the whole page if cache fails - search will still work
+    }
   }
 
   @override
@@ -177,12 +190,20 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _showSearchModal() {
+    if (_mapboxMap == null) {
+      print('❌ Map not ready for search');
+      return;
+    }
+
     showMapSearchModal(
       context,
       mapboxMap: _mapboxMap,
       onPlaceSelected: (place) {
-        print('🎯 Selected place: ${place.shortName}');
-        // Optionally show a confirmation or perform additional actions
+        print(
+          '🎯 Selected place: ${place.shortName} at ${place.latitude}, ${place.longitude}',
+        );
+        // The flyTo animation will happen automatically in the modal
+        // Recent search caching is handled automatically by the search widget
       },
     );
   }

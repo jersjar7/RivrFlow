@@ -2,6 +2,7 @@
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 /// Simple cache service for secure storage and preferences
 class CacheService {
@@ -30,6 +31,10 @@ class CacheService {
   static const String _biometricEnabledKey = 'biometric_enabled';
   static const String _biometricAvailableKey = 'biometric_available';
   static const String _biometricTypeKey = 'biometric_type';
+
+  // Recent searches keys
+  static const String _recentSearchesKey = 'rivrflow_recent_searches';
+  static const int _maxRecentSearches = 5;
 
   /// Initialize the cache service
   Future<void> initialize() async {
@@ -230,6 +235,88 @@ class CacheService {
     } catch (e) {
       print('CACHE_SERVICE: Error clearing biometric preferences: $e');
     }
+  }
+
+  // MARK: - Recent Search Caching
+
+  /// Load recent searches from cache
+  Future<List<Map<String, dynamic>>> getRecentSearches() async {
+    try {
+      await _ensurePrefsInitialized();
+      final jsonString = _prefs!.getString(_recentSearchesKey);
+      if (jsonString == null) {
+        print('CACHE_SERVICE: No recent searches found');
+        return [];
+      }
+
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+      final searches = jsonList.cast<Map<String, dynamic>>();
+      print('CACHE_SERVICE: Loaded ${searches.length} recent searches');
+      return searches;
+    } catch (e) {
+      print('CACHE_SERVICE: Error loading recent searches: $e');
+      return [];
+    }
+  }
+
+  /// Save recent searches to cache
+  Future<void> storeRecentSearches(List<Map<String, dynamic>> searches) async {
+    try {
+      await _ensurePrefsInitialized();
+      final jsonString = jsonEncode(searches);
+      await _prefs!.setString(_recentSearchesKey, jsonString);
+      print('CACHE_SERVICE: Stored ${searches.length} recent searches');
+    } catch (e) {
+      print('CACHE_SERVICE: Error storing recent searches: $e');
+    }
+  }
+
+  /// Add a new search to recent searches (maintains max limit and deduplicates)
+  Future<List<Map<String, dynamic>>> addRecentSearch(
+    Map<String, dynamic> searchData,
+  ) async {
+    try {
+      // Get current searches
+      final currentSearches = await getRecentSearches();
+
+      // Remove if already exists (based on placeName)
+      final placeName = searchData['placeName'] as String?;
+      final updated = currentSearches
+          .where((search) => search['placeName'] != placeName)
+          .toList();
+
+      // Add to beginning
+      updated.insert(0, searchData);
+
+      // Keep only max recent searches
+      final trimmed = updated.take(_maxRecentSearches).toList();
+
+      // Save to cache
+      await storeRecentSearches(trimmed);
+
+      print('CACHE_SERVICE: Added recent search: $placeName');
+      return trimmed;
+    } catch (e) {
+      print('CACHE_SERVICE: Error adding recent search: $e');
+      return [];
+    }
+  }
+
+  /// Clear all recent searches
+  Future<void> clearRecentSearches() async {
+    try {
+      await _ensurePrefsInitialized();
+      await _prefs!.remove(_recentSearchesKey);
+      print('CACHE_SERVICE: Recent searches cleared');
+    } catch (e) {
+      print('CACHE_SERVICE: Error clearing recent searches: $e');
+    }
+  }
+
+  /// Get number of recent searches
+  Future<int> getRecentSearchesCount() async {
+    final searches = await getRecentSearches();
+    return searches.length;
   }
 
   // MARK: - General Cache Methods
