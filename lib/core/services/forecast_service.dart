@@ -46,11 +46,23 @@ class ForecastService {
         // Step 3: Create complete reach data
         reach = ReachData.fromNoaaApi(reachInfo);
 
-        // Merge return periods if available
-        if (returnPeriods.isNotEmpty) {
-          final returnPeriodData = ReachData.fromReturnPeriodApi(returnPeriods);
-          reach = reach.mergeWith(returnPeriodData);
-          print('FORECAST_SERVICE: ✅ Merged return period data');
+        // 🔧 FIX: Wrap return period processing in try-catch
+        try {
+          // Merge return periods if available
+          if (returnPeriods.isNotEmpty) {
+            final returnPeriodData = ReachData.fromReturnPeriodApi(
+              returnPeriods,
+            );
+            reach = reach.mergeWith(returnPeriodData);
+            print('FORECAST_SERVICE: ✅ Merged return period data');
+          }
+        } catch (e) {
+          print(
+            'FORECAST_SERVICE: ⚠️ Failed to parse return periods for reach $reachId: $e',
+          );
+          print('FORECAST_SERVICE: ✅ Continuing without return period data');
+          // Continue without return periods - the reach will work fine without them
+          // No need to throw or break the entire loading process
         }
 
         // Step 4: Cache the complete reach data
@@ -184,7 +196,9 @@ class ForecastService {
 
     for (final type in types) {
       final flow = forecast.getLatestFlow(type);
-      if (flow != null) {
+      // 🔧 Filter out missing data values
+      if (flow != null && flow > -9000) {
+        // Check for missing data sentinel values
         print('FORECAST_SERVICE: Using $type for current flow: $flow');
         return flow;
       }

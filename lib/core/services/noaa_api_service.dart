@@ -82,17 +82,42 @@ class NoaaApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Ensure we return a List as expected by ReachData.fromReturnPeriodApi()
+        // Validate the data structure before returning
         if (data is List) {
+          // Check if the data contains valid values
+          bool hasValidData = true;
+          for (final item in data) {
+            if (item is! Map || item.isEmpty) {
+              hasValidData = false;
+              break;
+            }
+            // Check if the item has the expected numeric fields
+            final values = item.values;
+            if (values.any((value) => value != null && value is! num)) {
+              hasValidData = false;
+              break;
+            }
+          }
+
+          if (hasValidData && data.isNotEmpty) {
+            print(
+              'NOAA_API: Successfully fetched return periods (${data.length} items)',
+            );
+            return data;
+          } else {
+            print(
+              'NOAA_API: Return period data contains invalid values, skipping',
+            );
+            return []; // Return empty list for invalid data
+          }
+        } else if (data is Map && data.isNotEmpty) {
           print(
-            'NOAA_API: Successfully fetched return periods (${data.length} items)',
-          );
-          return data;
-        } else {
-          print(
-            'NOAA_API: Return period API returned non-array data, wrapping in array',
+            'NOAA_API: Return period API returned single object, wrapping in array',
           );
           return [data];
+        } else {
+          print('NOAA_API: Return period API returned empty or invalid data');
+          return [];
         }
       } else if (response.statusCode == 404) {
         print('NOAA_API: No return periods found for reach: $reachId');
