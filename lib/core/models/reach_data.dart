@@ -618,7 +618,7 @@ class ForecastResponse {
     final forecast = getPrimaryForecast(forecastType);
     if (forecast == null || forecast.isEmpty) return null;
 
-    return forecast.data.first.flow;
+    return forecast.getFlowAt(DateTime.now().toUtc());
   }
 
   // Get data source info for debugging
