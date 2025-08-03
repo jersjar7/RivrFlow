@@ -6,8 +6,31 @@
 
 import 'package:flutter/cupertino.dart';
 
+/// Forecast information for display
+class ForecastInfo {
+  final String name;
+  final String purpose;
+  final String duration;
+  final String frequency;
+  final String type;
+  final String useCase;
+  final List<String> sourceUrls; // Support multiple URLs
+
+  const ForecastInfo({
+    required this.name,
+    required this.purpose,
+    required this.duration,
+    required this.frequency,
+    required this.type,
+    required this.useCase,
+    required this.sourceUrls,
+  });
+}
+
 class AppConstants {
   AppConstants._(); // Private constructor to prevent instantiation
+
+  // MARK: - Stream Order Styling
 
   /// Get stream order color for consistent styling
   static Color getStreamOrderColor(int streamOrder) {
@@ -22,6 +45,8 @@ class AppConstants {
     // Always return water drop icon regardless of stream order
     return CupertinoIcons.drop_fill;
   }
+
+  // MARK: - Flow Category Styling
 
   /// Get flow category color for consistent styling
   static Color getFlowCategoryColor(String? flowCategory) {
@@ -52,6 +77,125 @@ class AppConstants {
         return CupertinoIcons.checkmark_circle_fill;
       default:
         return CupertinoIcons.question_circle;
+    }
+  }
+
+  // MARK: - NOAA Forecast Definitions
+
+  /// Static forecast definitions - never change
+  static const Map<String, ForecastInfo> forecastDefinitions = {
+    'analysis_assimilation': ForecastInfo(
+      name: 'Analysis & Assimilation',
+      purpose: 'Real-time analysis of current streamflow and hydrologic states',
+      duration: 'Current conditions (hourly snapshots)',
+      frequency: 'Updated hourly',
+      type: 'Real-time data with USGS gauge assimilation',
+      useCase: 'Establishes initial conditions for all other forecasts',
+      sourceUrls: ['https://water.noaa.gov/about/nwm'],
+    ),
+    'short_range': ForecastInfo(
+      name: 'Short Range',
+      purpose: 'Flash flood and emergency response',
+      duration: '18 hours',
+      frequency: 'Updated hourly',
+      type: 'Deterministic (single value)',
+      useCase:
+          'Emergency responders, forecasters dealing with rapidly evolving conditions',
+      sourceUrls: [
+        'https://registry.opendata.aws/noaa-nwm-pds/',
+        'https://onlinelibrary.wiley.com/doi/10.1111/1752-1688.13184',
+      ],
+    ),
+    'medium_range': ForecastInfo(
+      name: 'Medium Range',
+      purpose: 'Water resource management and planning',
+      duration: '10 days',
+      frequency: 'Updated 4 times per day (every 6 hours)',
+      type: 'Ensemble forecast (multiple members)',
+      useCase: 'Reservoir operators, water managers, agricultural planning',
+      sourceUrls: [
+        'https://onlinelibrary.wiley.com/doi/10.1111/1752-1688.13184',
+        'https://water.noaa.gov/about/nwm',
+      ],
+    ),
+    'long_range': ForecastInfo(
+      name: 'Long Range',
+      purpose: 'Seasonal planning and drought/flood outlook',
+      duration: '30 days',
+      frequency: 'Updated 4 times per day',
+      type: '4-member ensemble forecast',
+      useCase: 'Long-term water resource planning, drought monitoring',
+      sourceUrls: [
+        'https://onlinelibrary.wiley.com/doi/10.1111/1752-1688.13184',
+        'https://water.noaa.gov/about/nwm',
+      ],
+    ),
+    'medium_range_blend': ForecastInfo(
+      name: 'Medium Range Blend',
+      purpose: 'Enhanced 10-day forecast using advanced weather blending',
+      duration: '10 days',
+      frequency: 'Updated 4 times per day',
+      type: 'Deterministic (single value)',
+      useCase:
+          'Improved medium-range accuracy by combining multiple weather prediction models',
+      sourceUrls: [
+        'https://www.weather.gov/news/200318-nbm32',
+        'https://water.noaa.gov/about/nwm',
+        'https://vlab.noaa.gov/web/mdl/nbm',
+      ],
+    ),
+  };
+
+  /// Get forecast information by type
+  static ForecastInfo? getForecastInfo(String forecastType) {
+    return forecastDefinitions[forecastType];
+  }
+
+  /// Get forecasts in preferred display order
+  static List<String> getOrderedForecasts(List<String> availableForecasts) {
+    // Define preferred order for display
+    const preferredOrder = [
+      'analysis_assimilation',
+      'short_range',
+      'medium_range',
+      'medium_range_blend',
+      'long_range',
+    ];
+
+    final result = <String>[];
+
+    // Add forecasts in preferred order
+    for (final forecast in preferredOrder) {
+      if (availableForecasts.contains(forecast)) {
+        result.add(forecast);
+      }
+    }
+
+    // Add any remaining forecasts not in preferred order
+    for (final forecast in availableForecasts) {
+      if (!result.contains(forecast)) {
+        result.add(forecast);
+      }
+    }
+
+    return result;
+  }
+
+  /// Get forecast color for consistent styling
+  static Color getForecastColor(String forecastType) {
+    switch (forecastType) {
+      case 'analysis_assimilation':
+        return CupertinoColors.systemGreen;
+      case 'short_range':
+        return CupertinoColors.systemBlue;
+      case 'medium_range':
+        return CupertinoColors.systemOrange;
+      case 'medium_range_blend':
+        return CupertinoColors.systemPurple;
+      case 'long_range':
+        return CupertinoColors.systemRed;
+      default:
+        return CupertinoColors.systemGrey;
     }
   }
 }

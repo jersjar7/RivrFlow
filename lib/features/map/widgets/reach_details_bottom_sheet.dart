@@ -2,6 +2,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/forecast_service.dart';
 import '../../../core/services/error_service.dart';
 import '../../../core/models/reach_data.dart';
@@ -220,12 +221,12 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
             const SizedBox(height: 8),
             _buildInfoRow('Location', reach.formattedLocation),
           ],
-          const SizedBox(height: 8),
-          _buildInfoRow(
-            'Available Forecasts',
-            reach.availableForecasts.join(', '),
-          ),
 
+          // Available Forecasts Section
+          const SizedBox(height: 8),
+          _buildForecastsInfoRow(reach.availableForecasts),
+
+          // Return periods section
           if (reach.hasReturnPeriods) ...[
             const SizedBox(height: 8),
             _buildInfoRow(
@@ -238,6 +239,182 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
         ],
       ),
     );
+  }
+
+  Widget _buildForecastsInfoRow(List<String> availableForecasts) {
+    final orderedForecasts = AppConstants.getOrderedForecasts(
+      availableForecasts,
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            'Available Forecasts',
+            style: const TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.secondaryLabel,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Wrap(
+            children: [
+              for (int i = 0; i < orderedForecasts.length; i++) ...[
+                Builder(
+                  builder: (context) {
+                    final forecastType = orderedForecasts[i];
+                    final forecastInfo = AppConstants.getForecastInfo(
+                      forecastType,
+                    );
+                    if (forecastInfo == null) return const SizedBox.shrink();
+
+                    return GestureDetector(
+                      onTap: () => _showForecastInfo(forecastInfo),
+                      child: Text(
+                        forecastInfo.name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: CupertinoColors.link,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                if (i < orderedForecasts.length - 1)
+                  const Text(
+                    ', ',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showForecastInfo(ForecastInfo forecastInfo) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Text(forecastInfo.name),
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            _buildDialogInfoRow('Duration', forecastInfo.duration),
+            const SizedBox(height: 8),
+            _buildDialogInfoRow('Frequency', forecastInfo.frequency),
+            const SizedBox(height: 8),
+            _buildDialogInfoRow('Purpose', forecastInfo.purpose),
+            const SizedBox(height: 8),
+            _buildDialogInfoRow('Type', forecastInfo.type),
+            const SizedBox(height: 8),
+            _buildDialogInfoRow('Use Case', forecastInfo.useCase),
+            if (forecastInfo.sourceUrls.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildSourcesSection(forecastInfo.sourceUrls),
+            ],
+          ],
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Close'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourcesSection(List<String> sourceUrls) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Sources:',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: CupertinoColors.label,
+            ),
+          ),
+          const SizedBox(height: 4),
+          ...sourceUrls.map(
+            (url) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: GestureDetector(
+                onTap: () => _launchUrl(url),
+                child: Text(
+                  '• ${_getDisplayUrl(url)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: CupertinoColors.link,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchUrl(String urlString) async {
+    try {
+      final Uri url = Uri.parse(urlString);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        print('Could not launch $urlString');
+      }
+    } catch (e) {
+      print('Error launching URL: $e');
+    }
+  }
+
+  Widget _buildDialogInfoRow(String label, String value) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(fontSize: 14, color: CupertinoColors.label),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getDisplayUrl(String url) {
+    // Extract readable domain name from URL
+    try {
+      final uri = Uri.parse(url);
+      String domain = uri.host;
+
+      // Remove 'www.' prefix if present
+      if (domain.startsWith('www.')) {
+        domain = domain.substring(4);
+      }
+
+      return domain;
+    } catch (e) {
+      return url;
+    }
   }
 
   Widget _buildFlowInfo() {
@@ -414,6 +591,65 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     );
   }
 
+  Widget _buildNoFlowDataCard() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            CupertinoIcons.info_circle,
+            color: CupertinoColors.systemGrey,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Current flow data is not available for this stream.',
+              style: TextStyle(color: CupertinoColors.systemGrey, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoReturnPeriodCard() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemOrange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            CupertinoIcons.info_circle,
+            color: CupertinoColors.systemOrange,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Return period values are not available for this stream.',
+              style: TextStyle(
+                color: CupertinoColors.systemOrange,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Core service integration methods
   Future<void> _loadFullReachData() async {
     setState(() {
@@ -546,62 +782,6 @@ void showReachDetailsBottomSheet(
       selectedReach: selectedReach,
       onViewForecast: onViewForecast,
       onAddToFavorites: onAddToFavorites,
-    ),
-  );
-}
-
-Widget _buildNoFlowDataCard() {
-  return Container(
-    width: double.infinity,
-    margin: const EdgeInsets.only(top: 16),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: CupertinoColors.systemGrey.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        const Icon(
-          CupertinoIcons.info_circle,
-          color: CupertinoColors.systemGrey,
-          size: 16,
-        ),
-        const SizedBox(width: 8),
-        const Expanded(
-          child: Text(
-            'Current flow data is not available for this stream.',
-            style: TextStyle(color: CupertinoColors.systemGrey, fontSize: 14),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildNoReturnPeriodCard() {
-  return Container(
-    width: double.infinity,
-    margin: const EdgeInsets.only(top: 16),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: CupertinoColors.systemOrange.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        const Icon(
-          CupertinoIcons.info_circle,
-          color: CupertinoColors.systemOrange,
-          size: 16,
-        ),
-        const SizedBox(width: 8),
-        const Expanded(
-          child: Text(
-            'Return period values are not available for this stream.',
-            style: TextStyle(color: CupertinoColors.systemOrange, fontSize: 14),
-          ),
-        ),
-      ],
     ),
   );
 }
