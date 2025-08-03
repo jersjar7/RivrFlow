@@ -121,33 +121,40 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
   Widget _buildContent(ReachDataProvider reachProvider) {
     final reach = reachProvider.currentReach!;
 
-    return CustomScrollView(
-      slivers: [
-        // Station Header
-        SliverToBoxAdapter(child: _buildStationHeader(reach)),
+    return SafeArea(
+      bottom: false,
+      child: CustomScrollView(
+        slivers: [
+          // Station Header
+          SliverToBoxAdapter(child: _buildStationHeader(reach)),
 
-        // Hero Flow Status Card
-        SliverToBoxAdapter(
-          child: CurrentFlowStatusCard(
-            expanded: true,
-            onTap: () => _navigateToHydrograph('short_range'),
+          // Hero Flow Status Card
+          SliverToBoxAdapter(
+            child: CurrentFlowStatusCard(
+              expanded: true,
+              onTap: () => _navigateToHydrograph('short_range'),
+            ),
           ),
-        ),
 
-        // Forecast Categories Grid
-        SliverToBoxAdapter(
-          child: ForecastCategoryGrid(onCategoryTap: _navigateToForecastDetail),
-        ),
+          // Forecast Categories Grid
+          SliverToBoxAdapter(
+            child: ForecastCategoryGrid(
+              onCategoryTap: _navigateToForecastDetail,
+            ),
+          ),
 
-        // Chart Previews Section
-        SliverToBoxAdapter(child: _buildChartPreviewsSection(reachProvider)),
+          // Chart Previews Section
+          SliverToBoxAdapter(child: _buildChartPreviewsSection(reachProvider)),
 
-        // Station Metadata
-        SliverToBoxAdapter(child: _buildStationMetadata(reach, reachProvider)),
+          // Station Metadata
+          SliverToBoxAdapter(
+            child: _buildStationMetadata(reach, reachProvider),
+          ),
 
-        // Add some bottom padding
-        const SliverToBoxAdapter(child: SizedBox(height: 32)),
-      ],
+          // Add some bottom padding
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        ],
+      ),
     );
   }
 

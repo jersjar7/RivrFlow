@@ -183,11 +183,15 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
   }
 
   Widget _buildFlowIndicator(
-    double currentFlow,
-    Map<int, double> returnPeriods,
+    double currentFlow, // in CFS
+    Map<int, double> returnPeriods, // in CMS from API
   ) {
-    // Find appropriate scale based on return periods
-    final maxReturnPeriod = returnPeriods.values.reduce(
+    // Convert return periods from CMS to CFS for consistency
+    final returnPeriodsCfs = returnPeriods.map(
+      (year, cms) => MapEntry(year, cms * 35.3147), // 1 CMS = 35.3147 CFS
+    );
+
+    final maxReturnPeriod = returnPeriodsCfs.values.reduce(
       (a, b) => a > b ? a : b,
     );
     final scale = maxReturnPeriod * 1.1; // 10% padding
@@ -212,6 +216,7 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
             children: [
               // Current flow marker
               Positioned(
+                // Now we're comparing CFS to CFS ✅
                 left:
                     (currentFlow /
                             scale *
