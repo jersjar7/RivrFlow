@@ -348,20 +348,26 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
             ),
           ),
           const SizedBox(height: 4),
-          ...sourceUrls.map(
-            (url) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: GestureDetector(
-                onTap: () => _launchUrl(url),
-                child: Text(
-                  '• ${_getDisplayUrl(url)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: CupertinoColors.link,
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
-              ),
+          Center(
+            child: Column(
+              children: sourceUrls
+                  .map(
+                    (url) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: GestureDetector(
+                        onTap: () => _launchUrl(url),
+                        child: Text(
+                          _getDisplayUrl(url),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: CupertinoColors.link,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ],
