@@ -7,6 +7,7 @@ import 'package:rivrflow/features/auth/providers/auth_provider.dart';
 import 'package:rivrflow/core/providers/reach_data_provider.dart';
 import 'firebase_options.dart';
 import 'features/auth/presentation/pages/auth_coordinator.dart';
+import 'features/map/map_page.dart';
 
 // Add this import at the top with your other imports
 import 'core/services/noaa_api_service.dart';
@@ -372,6 +373,10 @@ class RivrFlowApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         home: AuthCoordinator(onAuthSuccess: (context) => const HomePage()),
+        routes: {
+          '/map': (context) => const MapPage(),
+          '/forecast': (context) => const ForecastPlaceholderPage(),
+        },
         debugShowCheckedModeBanner: false,
       ),
     );
@@ -455,6 +460,14 @@ class HomePage extends StatelessWidget {
 
                   const SizedBox(height: 48),
 
+                  // Map button (Phase 4 feature)
+                  CupertinoButton.filled(
+                    onPressed: () => Navigator.of(context).pushNamed('/map'),
+                    child: const Text('Open River Map'),
+                  ),
+
+                  const SizedBox(height: 24),
+
                   // Status indicators
                   _buildStatusCard(
                     'Authentication',
@@ -475,30 +488,6 @@ class HomePage extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 48),
-
-                  // Coming soon button
-                  CupertinoButton.filled(
-                    onPressed: () {
-                      showCupertinoDialog(
-                        context: context,
-                        builder: (context) => CupertinoAlertDialog(
-                          title: const Text('Coming Soon'),
-                          content: const Text(
-                            'Favorites and map features are being built!',
-                          ),
-                          actions: [
-                            CupertinoDialogAction(
-                              child: const Text('OK'),
-                              onPressed: () => Navigator.of(context).pop(),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    child: const Text('View Favorites'),
-                  ),
-
-                  const SizedBox(height: 12),
 
                   // Updated Test API button with ReachDataProvider
                   Consumer<ReachDataProvider>(
@@ -605,6 +594,77 @@ class HomePage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Placeholder forecast page for Phase 4
+/// Will be replaced with actual forecast page in Phase 5
+class ForecastPlaceholderPage extends StatelessWidget {
+  const ForecastPlaceholderPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Get reachId from navigation arguments
+    final reachId = ModalRoute.of(context)?.settings.arguments as String?;
+
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(middle: Text('Forecast')),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  CupertinoIcons.chart_bar,
+                  size: 80,
+                  color: CupertinoColors.systemBlue,
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Forecast Page',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 16),
+                if (reachId != null) ...[
+                  const Text(
+                    'Selected Reach:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: CupertinoColors.systemGrey,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    reachId,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: CupertinoColors.systemBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                const Text(
+                  'Phase 5: Core Forecast Visualization\nComing Soon!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: CupertinoColors.systemGrey,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                CupertinoButton.filled(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Back to Map'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
