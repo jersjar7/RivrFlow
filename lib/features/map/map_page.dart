@@ -2,6 +2,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
 import '../../core/config.dart';
 import 'services/map_vector_tiles_service.dart';
 import 'services/map_reach_selection_service.dart';
@@ -21,6 +22,7 @@ class _MapPageState extends State<MapPage> {
 
   bool _isLoading = true;
   String? _errorMessage;
+  MapboxMap? _mapboxMap;
 
   @override
   void initState() {
@@ -47,7 +49,21 @@ class _MapPageState extends State<MapPage> {
     }
 
     return Stack(
-      children: [_buildMap(), if (_isLoading) _buildLoadingOverlay()],
+      children: [
+        _buildMap(),
+
+        // Add search bar at bottom using SafeArea
+        Positioned(
+          bottom: 30,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            child: CompactMapSearchBar(onTap: () => _showSearchModal()),
+          ),
+        ),
+
+        if (_isLoading) _buildLoadingOverlay(),
+      ],
     );
   }
 
@@ -127,6 +143,8 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
+    _mapboxMap = mapboxMap;
+
     try {
       print('🗺️ Map created, initializing...');
 
@@ -156,6 +174,17 @@ class _MapPageState extends State<MapPage> {
         _errorMessage = 'Failed to load river data: ${e.toString()}';
       });
     }
+  }
+
+  void _showSearchModal() {
+    showMapSearchModal(
+      context,
+      mapboxMap: _mapboxMap,
+      onPlaceSelected: (place) {
+        print('🎯 Selected place: ${place.shortName}');
+        // Optionally show a confirmation or perform additional actions
+      },
+    );
   }
 
   Future<void> _onMapTap(MapContentGestureContext context) async {
