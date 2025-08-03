@@ -15,6 +15,7 @@ class SearchedPlace {
   final double latitude;
   final String? category;
   final String? address;
+  final List<String> context;
 
   const SearchedPlace({
     required this.placeName,
@@ -23,10 +24,28 @@ class SearchedPlace {
     required this.latitude,
     this.category,
     this.address,
+    this.context = const [],
   });
 
   factory SearchedPlace.fromJson(Map<String, dynamic> json) {
     final coordinates = json['center'] as List;
+    final context = <String>[];
+
+    // Extract context (region/state, country, etc.) for better display
+    if (json['context'] != null) {
+      for (final ctx in json['context']) {
+        final text = ctx['text'] as String;
+        final id = ctx['id'] as String;
+
+        // Include relevant context like region (state), country, etc.
+        if (id.startsWith('region') ||
+            id.startsWith('country') ||
+            id.startsWith('district')) {
+          context.add(text);
+        }
+      }
+    }
+
     return SearchedPlace(
       placeName: json['place_name'] as String,
       shortName: json['text'] as String,
@@ -34,7 +53,26 @@ class SearchedPlace {
       latitude: (coordinates[1] as num).toDouble(),
       category: json['properties']?['category'] as String?,
       address: json['properties']?['address'] as String?,
+      context: context,
     );
+  }
+
+  /// Get formatted location context (e.g., "Tennessee, United States")
+  String get locationContext {
+    if (context.isEmpty) return '';
+    return context.join(', ');
+  }
+
+  /// Get display subtitle combining address and context
+  String get displaySubtitle {
+    final parts = <String>[];
+    if (address != null && address!.isNotEmpty) {
+      parts.add(address!);
+    }
+    if (locationContext.isNotEmpty) {
+      parts.add(locationContext);
+    }
+    return parts.join(' • ');
   }
 
   IconData get categoryIcon {
@@ -67,20 +105,27 @@ class MapSearchService {
   static Future<List<SearchedPlace>> searchPlaces({
     required String query,
     int limit = 8,
+    bool usOnly = true, // Filter to US only by default
   }) async {
     if (query.trim().isEmpty) return [];
 
     try {
-      final uri =
-          Uri.parse(
-            '${AppConfig.mapboxSearchApiUrl}${Uri.encodeComponent(query)}.json',
-          ).replace(
-            queryParameters: {
-              'access_token': AppConfig.mapboxPublicToken,
-              'limit': limit.toString(),
-              'autocomplete': 'true',
-            },
-          );
+      final queryParams = {
+        'access_token': AppConfig.mapboxPublicToken,
+        'limit': limit.toString(),
+        'autocomplete': 'true',
+        'types':
+            'country,region,place,district,locality,neighborhood,address,poi', // Include more place types
+      };
+
+      // Add country filter for US-only results
+      if (usOnly) {
+        queryParams['country'] = 'US';
+      }
+
+      final uri = Uri.parse(
+        '${AppConfig.mapboxSearchApiUrl}${Uri.encodeComponent(query)}.json',
+      ).replace(queryParameters: queryParams);
 
       final response = await http.get(uri).timeout(AppConfig.httpTimeout);
 
@@ -210,7 +255,10 @@ class _MapSearchModalState extends State<MapSearchModal> {
     setState(() => _isSearching = true);
 
     try {
-      final results = await MapSearchService.searchPlaces(query: query);
+      final results = await MapSearchService.searchPlaces(
+        query: query,
+        usOnly: true, // Filter to US only
+      );
       if (mounted) {
         setState(() {
           _searchResults = results;
@@ -246,14 +294,30 @@ class _MapSearchModalState extends State<MapSearchModal> {
   }
 
   Future<void> _flyToPlace(SearchedPlace place) async {
+    if (widget.mapboxMap == null) {
+      print('❌ MapboxMap is null, cannot fly to place');
+      return;
+    }
+
     try {
+      print(
+        '🎯 Flying to: ${place.shortName} at ${place.latitude}, ${place.longitude}',
+      );
+
       await widget.mapboxMap!.flyTo(
         CameraOptions(
-          center: Point(coordinates: Position(place.longitude, place.latitude)),
+          center: Point(
+            coordinates: Position(
+              place.longitude, // longitude first
+              place.latitude, // latitude second
+            ),
+          ),
           zoom: 12.0,
         ),
-        MapAnimationOptions(duration: 2000),
+        MapAnimationOptions(duration: 2000, startDelay: 0),
       );
+
+      print('✅ Successfully flew to: ${place.shortName}');
     } catch (e) {
       print('❌ Error flying to place: $e');
     }
@@ -448,14 +512,14 @@ class _MapSearchModalState extends State<MapSearchModal> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: place.address != null
+        subtitle: place.displaySubtitle.isNotEmpty
             ? Text(
-                place.address!,
+                place.displaySubtitle,
                 style: const TextStyle(
                   fontSize: 14,
                   color: CupertinoColors.secondaryLabel,
                 ),
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               )
             : null,
