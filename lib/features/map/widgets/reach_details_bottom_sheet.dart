@@ -334,57 +334,86 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
   }
 
   Widget _buildSourcesSection(List<String> sourceUrls) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Sources:',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: CupertinoColors.label,
-            ),
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start, // Keep "Sources:" left-aligned
+      children: [
+        const Text(
+          'Sources:',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: CupertinoColors.label,
           ),
-          const SizedBox(height: 4),
-          Center(
-            child: Column(
-              children: sourceUrls
-                  .map(
-                    (url) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: GestureDetector(
-                        onTap: () => _launchUrl(url),
-                        child: Text(
-                          _getDisplayUrl(url),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: CupertinoColors.link,
-                            decoration: TextDecoration.underline,
-                          ),
+        ),
+        const SizedBox(height: 4),
+        // Center only the links section
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: sourceUrls
+                .map(
+                  (url) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _launchUrl(url),
+                      minimumSize: Size(0, 0),
+                      child: Text(
+                        _getDisplayUrl(url),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: CupertinoColors.link,
+                          decoration: TextDecoration.underline,
                         ),
                       ),
                     ),
-                  )
-                  .toList(),
-            ),
+                  ),
+                )
+                .toList(),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Future<void> _launchUrl(String urlString) async {
     try {
+      print('Attempting to launch URL: $urlString'); // Debug log
       final Uri url = Uri.parse(urlString);
+
       if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
+        print('canLaunchUrl returned true, launching...'); // Debug log
+        await launchUrl(
+          url,
+          mode: LaunchMode.externalApplication,
+          // Add these parameters for better iOS compatibility
+          webViewConfiguration: const WebViewConfiguration(),
+        );
+        print('URL launched successfully'); // Debug log
       } else {
-        print('Could not launch $urlString');
+        print('canLaunchUrl returned false for: $urlString'); // Debug log
+        // Try launching anyway as a fallback
+        await launchUrl(url, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      print('Error launching URL: $e');
+      print('Error launching URL: $e'); // Debug log
+      // Show user-friendly error
+      if (mounted) {
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Unable to Open Link'),
+            content: const Text('Could not open the link in your browser.'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 

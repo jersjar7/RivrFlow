@@ -122,7 +122,7 @@ class AppConstants {
       name: 'Long Range',
       purpose: 'Seasonal planning and drought/flood outlook',
       duration: '30 days',
-      frequency: 'Updated 4 times per day',
+      frequency: 'Updated 4 times per day (every 6 hours)',
       type: '4-member ensemble forecast',
       useCase: 'Long-term water resource planning, drought monitoring',
       sourceUrls: [
@@ -134,7 +134,7 @@ class AppConstants {
       name: 'Medium Range Blend',
       purpose: 'Enhanced 10-day forecast using advanced weather blending',
       duration: '10 days',
-      frequency: 'Updated 4 times per day',
+      frequency: 'Updated 4 times per day (every 6 hours)',
       type: 'Deterministic (single value)',
       useCase:
           'Improved medium-range accuracy by combining multiple weather prediction models',
