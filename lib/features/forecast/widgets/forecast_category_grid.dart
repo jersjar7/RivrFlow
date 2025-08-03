@@ -45,13 +45,21 @@ class ForecastCategoryGrid extends StatelessWidget {
     final categories = _getForecastCategories();
 
     return Column(
-      children: categories.map((category) {
+      children: categories.asMap().entries.map((entry) {
+        final index = entry.key;
+        final category = entry.value;
         final isAvailable = availableTypes.contains(category.type);
         final isLoading = reachProvider.isLoading;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: _buildCategoryCard(context, category, isAvailable, isLoading),
+          child: _buildCategoryCard(
+            context,
+            category,
+            isAvailable,
+            isLoading,
+            index, // Pass the index for opacity calculation
+          ),
         );
       }).toList(),
     );
@@ -62,8 +70,24 @@ class ForecastCategoryGrid extends StatelessWidget {
     ForecastCategory category,
     bool isAvailable,
     bool isLoading,
+    int index, // Add index parameter
   ) {
     final opacity = isAvailable ? 1.0 : 0.5;
+
+    // Calculate gradient opacity based on index (1.0, 0.8, 0.6)
+    final gradientOpacity = isAvailable ? (1.0 - (index * 0.2)) : 0.5;
+
+    // Use the same blue gradient for all cards, but with varying opacity
+    final baseGradientColors = [
+      CupertinoColors.systemIndigo,
+      CupertinoColors.systemBlue,
+    ];
+
+    final gradientColors = isAvailable
+        ? baseGradientColors
+              .map((color) => color.withOpacity(gradientOpacity))
+              .toList()
+        : _getDisabledColors();
 
     return GestureDetector(
       onTap: isAvailable && !isLoading
@@ -79,9 +103,7 @@ class ForecastCategoryGrid extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: isAvailable
-                  ? category.gradientColors
-                  : _getDisabledColors(),
+              colors: gradientColors,
             ),
             boxShadow: [
               BoxShadow(
@@ -235,8 +257,8 @@ class ForecastCategoryGrid extends StatelessWidget {
         description: 'Hourly forecast for immediate planning',
         icon: CupertinoIcons.clock,
         gradientColors: [
-          CupertinoColors.systemGreen,
-          CupertinoColors.systemMint,
+          CupertinoColors.systemBlue,
+          CupertinoColors.systemTeal,
         ],
       ),
       ForecastCategory(
@@ -246,8 +268,8 @@ class ForecastCategoryGrid extends StatelessWidget {
         description: 'Daily forecasts for trip planning',
         icon: CupertinoIcons.calendar,
         gradientColors: [
-          CupertinoColors.systemYellow,
-          CupertinoColors.systemOrange,
+          CupertinoColors.systemBlue,
+          CupertinoColors.systemTeal,
         ],
       ),
       ForecastCategory(
@@ -256,7 +278,10 @@ class ForecastCategoryGrid extends StatelessWidget {
         timeRange: '10-30 days',
         description: 'Extended outlook and trends',
         icon: CupertinoIcons.chart_bar,
-        gradientColors: [CupertinoColors.systemRed, CupertinoColors.systemPink],
+        gradientColors: [
+          CupertinoColors.systemBlue,
+          CupertinoColors.systemTeal,
+        ],
       ),
     ];
   }
