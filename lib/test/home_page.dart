@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/services/forecast_service.dart';
+import 'package:rivrflow/core/services/noaa_api_service.dart';
 import 'package:rivrflow/features/auth/providers/auth_provider.dart';
 
 class HomePage extends StatelessWidget {
