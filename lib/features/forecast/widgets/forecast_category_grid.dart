@@ -77,7 +77,7 @@ class ForecastCategoryGrid extends StatelessWidget {
     // Calculate gradient opacity based on index (1.0, 0.8, 0.6)
     final gradientOpacity = isAvailable ? (1.0 - (index * 0.2)) : 0.5;
 
-    // Use the same blue gradient for all cards, but with varying opacity
+    // Use the same gradient for all cards, but with varying opacity
     final baseGradientColors = [
       CupertinoColors.systemIndigo,
       CupertinoColors.systemBlue,
@@ -107,7 +107,7 @@ class ForecastCategoryGrid extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: CupertinoColors.systemGrey.withOpacity(0.2),
+                color: CupertinoColors.systemGrey.withOpacity(0.4),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -184,7 +184,7 @@ class ForecastCategoryGrid extends StatelessWidget {
                           Text(
                             isAvailable
                                 ? category.description
-                                : 'Not available',
+                                : 'Not available at this moment',
                             style: TextStyle(
                               color: CupertinoColors.white.withOpacity(0.7),
                               fontSize: 12,
@@ -208,8 +208,8 @@ class ForecastCategoryGrid extends StatelessWidget {
                           )
                         else if (isAvailable)
                           Container(
-                            width: 10,
-                            height: 10,
+                            width: 12,
+                            height: 12,
                             decoration: const BoxDecoration(
                               color: CupertinoColors.systemGreen,
                               shape: BoxShape.circle,
@@ -217,11 +217,11 @@ class ForecastCategoryGrid extends StatelessWidget {
                           )
                         else
                           Container(
-                            width: 10,
-                            height: 10,
+                            width: 12,
+                            height: 12,
                             decoration: BoxDecoration(
-                              color: CupertinoColors.systemGrey.withOpacity(
-                                0.6,
+                              color: CupertinoColors.systemGrey6.withOpacity(
+                                0.9,
                               ),
                               shape: BoxShape.circle,
                             ),
@@ -287,7 +287,7 @@ class ForecastCategoryGrid extends StatelessWidget {
   }
 
   List<Color> _getDisabledColors() {
-    return [CupertinoColors.systemGrey3, CupertinoColors.systemGrey4];
+    return [CupertinoColors.systemGrey, CupertinoColors.systemGrey2];
   }
 }
 

@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:rivrflow/core/services/forecast_service.dart';
 import 'package:rivrflow/features/auth/providers/auth_provider.dart';
 import 'package:rivrflow/core/providers/reach_data_provider.dart';
+import 'package:rivrflow/features/forecast/pages/hydrograph_page.dart';
 import 'package:rivrflow/features/forecast/pages/reach_overview_page.dart';
+import 'package:rivrflow/features/forecast/pages/short_range_detail_page.dart';
 import 'firebase_options.dart';
 import 'features/auth/presentation/pages/auth_coordinator.dart';
 import 'features/map/map_page.dart';
@@ -377,7 +379,7 @@ class RivrFlowApp extends StatelessWidget {
         routes: {
           '/map': (context) => const MapPage(),
           '/forecast': (context) => const ForecastPlaceholderPage(),
-          // '/short-range-detail': (context) => const ShortRangeDetailPage(),
+          '/short-range-detail': (context) => const ShortRangeDetailPage(),
           // '/hydrograph': (context) => const HydrographPage(),
         },
         onGenerateRoute: (settings) {
@@ -390,22 +392,22 @@ class RivrFlowApp extends StatelessWidget {
                     ReachOverviewPage(reachId: args?['reachId'] as String?),
                 settings: settings,
               );
-            // case '/short-range-detail':
-            //   final args = settings.arguments as Map<String, dynamic>?;
-            //   return CupertinoPageRoute(
-            //     builder: (context) =>
-            //         ShortRangeDetailPage(reachId: args?['reachId'] as String?),
-            //     settings: settings,
-            //   );
-            // case '/hydrograph':
-            //   final args = settings.arguments as Map<String, dynamic>?;
-            //   return CupertinoPageRoute(
-            //     builder: (context) => HydrographPage(
-            //       reachId: args?['reachId'] as String?,
-            //       forecastType: args?['forecastType'] as String?,
-            //     ),
-            //     settings: settings,
-            //   );
+            case '/short-range-detail':
+              final args = settings.arguments as Map<String, dynamic>?;
+              return CupertinoPageRoute(
+                builder: (context) =>
+                    ShortRangeDetailPage(reachId: args?['reachId'] as String?),
+                settings: settings,
+              );
+            case '/hydrograph':
+              final args = settings.arguments as Map<String, dynamic>?;
+              return CupertinoPageRoute(
+                builder: (context) => HydrographPage(
+                  reachId: args?['reachId'] as String?,
+                  forecastType: args?['forecastType'] as String?,
+                ),
+                settings: settings,
+              );
             default:
               return null;
           }
