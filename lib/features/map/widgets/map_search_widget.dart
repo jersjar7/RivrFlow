@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../../core/config.dart';
+import '../../../core/services/cache_service.dart';
 
 /// Simplified place search for Rivrflow using existing patterns
 class SearchedPlace {
@@ -54,6 +55,18 @@ class SearchedPlace {
       category: json['properties']?['category'] as String?,
       address: json['properties']?['address'] as String?,
       context: context,
+    );
+  }
+
+  factory SearchedPlace.fromCacheData(Map<String, dynamic> data) {
+    return SearchedPlace(
+      placeName: data['placeName'] as String,
+      shortName: data['shortName'] as String,
+      longitude: (data['longitude'] as num).toDouble(),
+      latitude: (data['latitude'] as num).toDouble(),
+      category: data['category'] as String?,
+      address: data['address'] as String?,
+      context: (data['context'] as List?)?.cast<String>() ?? <String>[],
     );
   }
 
@@ -224,6 +237,8 @@ class _MapSearchModalState extends State<MapSearchModal> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
+    // Load cached recent searches
+    _loadRecentSearches();
   }
 
   @override
@@ -232,6 +247,23 @@ class _MapSearchModalState extends State<MapSearchModal> {
     _focusNode.dispose();
     _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadRecentSearches() async {
+    try {
+      final cachedSearches = await CacheService().getRecentSearches();
+      final recentPlaces = cachedSearches
+          .map((data) => SearchedPlace.fromCacheData(data))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _recentSearches = recentPlaces;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading recent searches: $e');
+    }
   }
 
   void _onSearchTextChanged() {
@@ -275,12 +307,35 @@ class _MapSearchModalState extends State<MapSearchModal> {
     }
   }
 
-  void _selectPlace(SearchedPlace place) {
-    // Add to recent searches
-    _recentSearches.removeWhere((p) => p.placeName == place.placeName);
-    _recentSearches.insert(0, place);
-    if (_recentSearches.length > 5) {
-      _recentSearches = _recentSearches.take(5).toList();
+  void _selectPlace(SearchedPlace place) async {
+    try {
+      // Save to cache
+      final searchData = {
+        'placeName': place.placeName,
+        'shortName': place.shortName,
+        'longitude': place.longitude,
+        'latitude': place.latitude,
+        'category': place.category,
+        'address': place.address,
+        'context': place.context,
+      };
+
+      await CacheService().addRecentSearch(searchData);
+
+      // Update UI list
+      _recentSearches.removeWhere((p) => p.placeName == place.placeName);
+      _recentSearches.insert(0, place);
+      if (_recentSearches.length > 5) {
+        _recentSearches = _recentSearches.take(5).toList();
+      }
+    } catch (e) {
+      print('❌ Error saving recent search: $e');
+      // Still update UI even if cache fails
+      _recentSearches.removeWhere((p) => p.placeName == place.placeName);
+      _recentSearches.insert(0, place);
+      if (_recentSearches.length > 5) {
+        _recentSearches = _recentSearches.take(5).toList();
+      }
     }
 
     // Fly to location if map is available
