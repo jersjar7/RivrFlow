@@ -326,7 +326,7 @@ class _MapSearchModalState extends State<MapSearchModal> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
+      height: MediaQuery.of(context).size.height * 0.7,
       decoration: const BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.only(
@@ -334,14 +334,12 @@ class _MapSearchModalState extends State<MapSearchModal> {
           topRight: Radius.circular(20),
         ),
       ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildSearchBar(),
-            Expanded(child: _buildResults()),
-          ],
-        ),
+      child: Column(
+        children: [
+          _buildHeader(),
+          _buildSearchBar(),
+          Expanded(child: _buildResults()),
+        ],
       ),
     );
   }

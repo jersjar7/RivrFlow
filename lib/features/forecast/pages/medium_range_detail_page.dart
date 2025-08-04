@@ -105,7 +105,7 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
           title: 'Medium Range Forecast',
           timeFrameOptions: TimeFrameSelector.mediumRangeOptions(),
           onChartTap: () => _navigateToHydrograph({'timeFrame': '7d'}),
-          showCurrentFlow: true,
+          showCurrentFlow: false,
           additionalContent: _buildMediumRangeSpecificContent(reachProvider),
         );
       },

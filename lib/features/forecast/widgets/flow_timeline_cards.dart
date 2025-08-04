@@ -82,7 +82,7 @@ class FlowTimelineCards extends StatelessWidget {
     final isCurrentTime = _isCurrentOrNearCurrent(dataPoint.validTime);
 
     return Container(
-      width: 120,
+      width: 100,
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground.resolveFrom(context),
         borderRadius: BorderRadius.circular(12),

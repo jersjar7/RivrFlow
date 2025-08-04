@@ -105,7 +105,7 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
           title: 'Long Range Forecast',
           timeFrameOptions: TimeFrameSelector.longRangeOptions(),
           onChartTap: () => _navigateToHydrograph({'timeFrame': '4w'}),
-          showCurrentFlow: true,
+          showCurrentFlow: false,
           additionalContent: _buildLongRangeSpecificContent(reachProvider),
         );
       },

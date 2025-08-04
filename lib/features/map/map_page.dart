@@ -2,6 +2,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:rivrflow/core/widgets/back_navigation.dart';
 import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
 import '../../core/config.dart';
 import '../../core/services/cache_service.dart';
@@ -51,7 +52,7 @@ class _MapPageState extends State<MapPage> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('River Map')),
+      // navigationBar: const CupertinoNavigationBar(middle: Text('River Map')),
       child: _buildMapContent(),
     );
   }
@@ -72,6 +73,17 @@ class _MapPageState extends State<MapPage> {
           right: 0,
           child: SafeArea(
             child: CompactMapSearchBar(onTap: () => _showSearchModal()),
+          ),
+        ),
+
+        // Floating back button positioned in top-left
+        Positioned(
+          top: 30,
+          left: 0,
+          child: FloatingBackButton(
+            backgroundColor: CupertinoColors.white.withValues(alpha: 0.95),
+            iconColor: CupertinoColors.systemBlue,
+            margin: EdgeInsets.only(top: 8, left: 16),
           ),
         ),
 

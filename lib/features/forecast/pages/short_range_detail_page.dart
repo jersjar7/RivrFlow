@@ -105,7 +105,7 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
           title: 'Short Range Forecast',
           timeFrameOptions: TimeFrameSelector.shortRangeOptions(),
           onChartTap: () => _navigateToHydrograph({'timeFrame': '24h'}),
-          showCurrentFlow: true,
+          showCurrentFlow: false,
           additionalContent: _buildShortRangeSpecificContent(reachProvider),
         );
       },
