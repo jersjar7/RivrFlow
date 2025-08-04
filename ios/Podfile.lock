@@ -1297,6 +1297,8 @@ PODS:
     - nanopb (~> 3.30910.0)
   - FirebaseSharedSwift (12.0.0)
   - Flutter (1.0.0)
+  - flutter_localization (0.0.1):
+    - Flutter
   - flutter_secure_storage (6.0.0):
     - Flutter
   - GoogleAdsOnDeviceConversion (2.1.0):
@@ -1490,6 +1492,7 @@ DEPENDENCIES:
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
+  - flutter_localization (from `.symlinks/plugins/flutter_localization/ios`)
   - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
   - local_auth_darwin (from `.symlinks/plugins/local_auth_darwin/darwin`)
   - mapbox_maps_flutter (from `.symlinks/plugins/mapbox_maps_flutter/ios`)
@@ -1544,6 +1547,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/firebase_messaging/ios"
   Flutter:
     :path: Flutter
+  flutter_localization:
+    :path: ".symlinks/plugins/flutter_localization/ios"
   flutter_secure_storage:
     :path: ".symlinks/plugins/flutter_secure_storage/ios"
   local_auth_darwin:
@@ -1581,6 +1586,7 @@ SPEC CHECKSUMS:
   FirebaseMessaging: af49f8d7c0a3d2a017d9302c80946f45a7777dde
   FirebaseSharedSwift: 59266c22ccfcef604d725c034c568fa666ea9bda
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
+  flutter_localization: f43b18844a2b3d2c71fd64f04ffd6b1e64dd54d4
   flutter_secure_storage: d33dac7ae2ea08509be337e775f6b59f1ff45f12
   GoogleAdsOnDeviceConversion: 2be6297a4f048459e0ae17fad9bfd2844e10cf64
   GoogleAppMeasurement: 8f6ab04ad6ae493b53fcf56bd26323fb2f1384f3

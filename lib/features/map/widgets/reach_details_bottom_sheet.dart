@@ -3,27 +3,29 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:rivrflow/features/map/widgets/components/return_periods_info_sheet.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/forecast_service.dart';
 import '../../../core/services/error_service.dart';
 import '../../../core/models/reach_data.dart';
+import '../../../core/providers/favorites_provider.dart'; // NEW: Import FavoritesProvider
 import '../../../core/constants.dart';
 import '../models/selected_reach.dart';
 
 /// Bottom sheet that shows reach details using core services
 /// Progressively loads data: immediate vector tile info → full NOAA data
+/// Now integrated with favorites system
 class ReachDetailsBottomSheet extends StatefulWidget {
   final SelectedReach selectedReach;
   final VoidCallback? onViewForecast;
-  final Function(String)? onAddToFavorites;
+  // NOTE: onAddToFavorites callback removed - now handled internally
 
   const ReachDetailsBottomSheet({
     super.key,
     required this.selectedReach,
     this.onViewForecast,
-    this.onAddToFavorites,
   });
 
   @override
@@ -42,6 +44,9 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
   // Current flow display
   double? _currentFlow;
   String? _flowCategory;
+
+  // NEW: Favorites loading state
+  bool _isTogglingFavorite = false;
 
   @override
   void initState() {
@@ -122,7 +127,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
           const SizedBox(width: 8),
 
-          // 🔧 Add close button
+          // Close button
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: () => Navigator.pop(context),
@@ -224,290 +229,68 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
             const SizedBox(height: 8),
             _buildInfoRow('Location', reach.formattedLocation),
           ],
-
-          // Available Forecasts Section
-          const SizedBox(height: 8),
-          _buildForecastsInfoRow(reach.availableForecasts),
-
-          // Return periods section
+          if (reach.availableForecasts.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow('Forecasts', reach.availableForecasts.join(', ')),
+          ],
           if (reach.hasReturnPeriods) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Text(
+                  'Return Periods',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const Spacer(),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _showReturnPeriodsInfo(reach),
+                  child: const Icon(
+                    CupertinoIcons.info_circle,
+                    color: CupertinoColors.activeBlue,
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
-            _buildReturnPeriodsInfoRow(reach.returnPeriods!),
+            _buildReturnPeriodsRow(reach),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildForecastsInfoRow(List<String> availableForecasts) {
-    final orderedForecasts = AppConstants.getOrderedForecasts(
-      availableForecasts,
-    );
+  Widget _buildReturnPeriodsRow(ReachData reach) {
+    final periods = reach.returnPeriods!;
+    final sortedYears = periods.keys.toList()..sort();
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: sortedYears.map((year) {
+        final value = periods[year]!;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemBlue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(4),
+          ),
           child: Text(
-            'Available Forecasts',
-            style: const TextStyle(
-              fontSize: 14,
-              color: CupertinoColors.secondaryLabel,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Wrap(
-            children: [
-              for (int i = 0; i < orderedForecasts.length; i++) ...[
-                Builder(
-                  builder: (context) {
-                    final forecastType = orderedForecasts[i];
-                    final forecastInfo = AppConstants.getForecastInfo(
-                      forecastType,
-                    );
-                    if (forecastInfo == null) return const SizedBox.shrink();
-
-                    return GestureDetector(
-                      onTap: () => _showForecastInfo(forecastInfo),
-                      child: Text(
-                        forecastInfo.name,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: CupertinoColors.link,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                if (i < orderedForecasts.length - 1)
-                  const Text(
-                    ', ',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showForecastInfo(ForecastInfo forecastInfo) {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text(forecastInfo.name),
-        content: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 16),
-            _buildDialogInfoRow('Duration', forecastInfo.duration),
-            const SizedBox(height: 8),
-            _buildDialogInfoRow('Frequency', forecastInfo.frequency),
-            const SizedBox(height: 8),
-            _buildDialogInfoRow('Purpose', forecastInfo.purpose),
-            const SizedBox(height: 8),
-            _buildDialogInfoRow('Type', forecastInfo.type),
-            const SizedBox(height: 8),
-            _buildDialogInfoRow('Use Case', forecastInfo.useCase),
-            if (forecastInfo.sourceUrls.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _buildSourcesSection(forecastInfo.sourceUrls),
-            ],
-          ],
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('Close'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSourcesSection(List<String> sourceUrls) {
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start, // Keep "Sources:" left-aligned
-      children: [
-        const Text(
-          'Sources:',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: CupertinoColors.label,
-          ),
-        ),
-        const SizedBox(height: 4),
-        // Center only the links section
-        Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: sourceUrls
-                .map(
-                  (url) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () => _launchUrl(url),
-                      minimumSize: Size(0, 0),
-                      child: Text(
-                        _getDisplayUrl(url),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: CupertinoColors.link,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _launchUrl(String urlString) async {
-    try {
-      print('Attempting to launch URL: $urlString'); // Debug log
-      final Uri url = Uri.parse(urlString);
-
-      if (await canLaunchUrl(url)) {
-        print('canLaunchUrl returned true, launching...'); // Debug log
-        await launchUrl(
-          url,
-          mode: LaunchMode.externalApplication,
-          // Add these parameters for better iOS compatibility
-          webViewConfiguration: const WebViewConfiguration(),
-        );
-        print('URL launched successfully'); // Debug log
-      } else {
-        print('canLaunchUrl returned false for: $urlString'); // Debug log
-        // Try launching anyway as a fallback
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      print('Error launching URL: $e'); // Debug log
-      // Show user-friendly error
-      if (mounted) {
-        showCupertinoDialog(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text('Unable to Open Link'),
-            content: const Text('Could not open the link in your browser.'),
-            actions: [
-              CupertinoDialogAction(
-                child: const Text('OK'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
+            '${year}yr: ${value.toStringAsFixed(0)} CMS',
+            style: const TextStyle(fontSize: 12),
           ),
         );
-      }
-    }
-  }
-
-  Widget _buildDialogInfoRow(String label, String value) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontSize: 14, color: CupertinoColors.label),
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            TextSpan(text: value),
-          ],
-        ),
-      ),
+      }).toList(),
     );
   }
 
-  String _getDisplayUrl(String url) {
-    // Extract readable domain name from URL
-    try {
-      final uri = Uri.parse(url);
-      String domain = uri.host;
-
-      // Remove 'www.' prefix if present
-      if (domain.startsWith('www.')) {
-        domain = domain.substring(4);
-      }
-
-      return domain;
-    } catch (e) {
-      return url;
-    }
-  }
-
-  Widget _buildReturnPeriodsInfoRow(Map<int, double> returnPeriods) {
-    // Sort and format the return period years
-    final sortedYears = returnPeriods.keys.toList()..sort();
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
-          child: const Text(
-            'Return Periods',
-            style: TextStyle(
-              fontSize: 14,
-              color: CupertinoColors.secondaryLabel,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Wrap(
-            children: [
-              // Display the years as comma-separated text (not clickable)
-              for (int i = 0; i < sortedYears.length; i++) ...[
-                Text(
-                  '${sortedYears[i]}yr',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (i < sortedYears.length - 1)
-                  const Text(
-                    ', ',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-              ],
-              // Add a space before the info icon
-              const SizedBox(width: 4),
-              // Only the info icon is clickable
-              GestureDetector(
-                onTap: () => _showReturnPeriodsInfo(returnPeriods),
-                child: const Icon(
-                  CupertinoIcons.info_circle,
-                  size: 16,
-                  color: CupertinoColors.systemBlue,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showReturnPeriodsInfo(Map<int, double> returnPeriods) {
+  void _showReturnPeriodsInfo(ReachData reach) {
     showCupertinoModalPopup(
       context: context,
-      builder: (context) =>
-          ReturnPeriodsInfoSheet(returnPeriods: returnPeriods),
+      builder: (context) => ReturnPeriodsInfoSheet(
+        returnPeriods: reach.returnPeriods!, // Pass the map directly
+      ),
     );
   }
 
@@ -607,95 +390,6 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     );
   }
 
-  Widget _buildActions() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          // View Forecast button (primary action)
-          Expanded(
-            flex: 2,
-            child: CupertinoButton.filled(
-              onPressed: () {
-                // Navigate to reach overview page
-                Navigator.pushNamed(
-                  context,
-                  '/reach-overview',
-                  arguments: {
-                    'reachId': widget
-                        .selectedReach
-                        .reachId, // 🔧 Fixed: use selectedReach.reachId
-                  },
-                );
-              },
-              child: const Text('View Forecast'),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          // Add to Favorites button
-          Expanded(
-            child: CupertinoButton(
-              color: CupertinoColors.systemGrey5,
-              onPressed: () =>
-                  widget.onAddToFavorites?.call(widget.selectedReach.reachId),
-              child: const Icon(
-                CupertinoIcons.heart,
-                color: CupertinoColors.systemGrey,
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          // More options
-          CupertinoButton(
-            color: CupertinoColors.systemGrey5,
-            onPressed: _showMoreOptions,
-            child: const Icon(
-              CupertinoIcons.ellipsis,
-              color: CupertinoColors.systemGrey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusWidget() {
-    if (_isLoadingFullData) {
-      return const CupertinoActivityIndicator(radius: 8);
-    }
-
-    // When done loading, just show nothing
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: CupertinoColors.secondaryLabel,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildNoFlowDataCard() {
     return Container(
       width: double.infinity,
@@ -752,6 +446,166 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           ),
         ],
       ),
+    );
+  }
+
+  // NEW: Updated actions with integrated favorites functionality
+  Widget _buildActions() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          // View Forecast button (primary action)
+          Expanded(
+            flex: 2,
+            child: CupertinoButton.filled(
+              onPressed: () {
+                // Navigate to reach overview page
+                Navigator.pushNamed(
+                  context,
+                  '/reach-overview',
+                  arguments: {'reachId': widget.selectedReach.reachId},
+                );
+              },
+              child: const Text('View Forecast'),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // NEW: Integrated heart button with FavoritesProvider
+          Expanded(
+            child: Consumer<FavoritesProvider>(
+              builder: (context, favoritesProvider, child) {
+                final isFavorited = favoritesProvider.isFavorite(
+                  widget.selectedReach.reachId,
+                );
+                final isRefreshing = favoritesProvider.isRefreshing(
+                  widget.selectedReach.reachId,
+                );
+
+                return CupertinoButton(
+                  color: isFavorited
+                      ? CupertinoColors.systemRed.withOpacity(0.1)
+                      : CupertinoColors.systemGrey5,
+                  onPressed: _isTogglingFavorite
+                      ? null
+                      : () => _toggleFavorite(favoritesProvider),
+                  child: _isTogglingFavorite || isRefreshing
+                      ? const CupertinoActivityIndicator(radius: 8)
+                      : Icon(
+                          isFavorited
+                              ? CupertinoIcons.heart_fill
+                              : CupertinoIcons.heart,
+                          color: isFavorited
+                              ? CupertinoColors.systemRed
+                              : CupertinoColors.systemGrey,
+                        ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // More options
+          CupertinoButton(
+            color: CupertinoColors.systemGrey5,
+            onPressed: _showMoreOptions,
+            child: const Icon(
+              CupertinoIcons.ellipsis,
+              color: CupertinoColors.systemGrey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // NEW: Handle favorite toggle with loading state and feedback
+  Future<void> _toggleFavorite(FavoritesProvider favoritesProvider) async {
+    final reachId = widget.selectedReach.reachId;
+    final isFavorited = favoritesProvider.isFavorite(reachId);
+
+    setState(() {
+      _isTogglingFavorite = true;
+    });
+
+    try {
+      bool success;
+      if (isFavorited) {
+        success = await favoritesProvider.removeFavorite(reachId);
+        if (success) {
+          _showFeedback('Removed from favorites');
+        }
+      } else {
+        success = await favoritesProvider.addFavorite(reachId);
+        if (success) {
+          _showFeedback('Added to favorites');
+        }
+      }
+
+      if (!success) {
+        _showFeedback('Failed to update favorites', isError: true);
+      }
+    } catch (e) {
+      print('BOTTOM_SHEET: Error toggling favorite: $e');
+      _showFeedback('Failed to update favorites', isError: true);
+    }
+
+    setState(() {
+      _isTogglingFavorite = false;
+    });
+  }
+
+  // NEW: Show user feedback for favorite actions
+  void _showFeedback(String message, {bool isError = false}) {
+    if (!mounted) return;
+
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusWidget() {
+    if (_isLoadingFullData) {
+      return const CupertinoActivityIndicator(radius: 8);
+    }
+
+    // When done loading, just show nothing
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.secondaryLabel,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
     );
   }
 
@@ -816,18 +670,17 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(context);
-              _shareReachLocation();
+              _shareLocation();
             },
             child: const Text('Share Location'),
           ),
-          if (_reachData != null)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(context);
-                _refreshData();
-              },
-              child: const Text('Refresh Data'),
-            ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _openInMaps();
+            },
+            child: const Text('Open in Maps'),
+          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           isDefaultAction: true,
@@ -838,49 +691,38 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     );
   }
 
-  void _copyReachInfo() {
-    final reachInfo = _buildReachInfoText();
-
-    Clipboard.setData(ClipboardData(text: reachInfo)).then((_) {
-      // Show confirmation to user
-      if (mounted) {
-        showCupertinoDialog(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text('Copied'),
-            content: const Text('Reach information copied to clipboard'),
-            actions: [
-              CupertinoDialogAction(
-                child: const Text('OK'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        );
-      }
-    });
-
-    print('BOTTOM_SHEET: Copied reach info to clipboard');
+  Future<void> _copyReachInfo() async {
+    try {
+      final text = _buildReachInfoText();
+      await Clipboard.setData(ClipboardData(text: text));
+      _showFeedback('Reach information copied to clipboard');
+    } catch (e) {
+      print('BOTTOM_SHEET: Error copying reach info: $e');
+    }
   }
 
-  void _shareReachLocation() async {
-    final locationText = _buildLocationShareText();
-
+  Future<void> _shareLocation() async {
     try {
-      final result = await SharePlus.instance.share(
-        ShareParams(
-          text: locationText,
-          subject: 'River Location: ${widget.selectedReach.displayName}',
-        ),
-      );
-
-      if (result.status == ShareResultStatus.success) {
-        print('BOTTOM_SHEET: Successfully shared location');
-      } else if (result.status == ShareResultStatus.dismissed) {
-        print('BOTTOM_SHEET: User dismissed share dialog');
-      }
+      final text = _buildLocationShareText();
+      await Share.share(text, subject: widget.selectedReach.displayName);
     } catch (e) {
       print('BOTTOM_SHEET: Error sharing location: $e');
+    }
+  }
+
+  Future<void> _openInMaps() async {
+    try {
+      final coords = widget.selectedReach.coordinatesString.split(', ');
+      if (coords.length == 2) {
+        final lat = coords[0];
+        final lng = coords[1];
+        final url = 'https://maps.google.com/?q=$lat,$lng';
+        if (await canLaunchUrl(Uri.parse(url))) {
+          await launchUrl(Uri.parse(url));
+        }
+      }
+    } catch (e) {
+      print('BOTTOM_SHEET: Error opening maps: $e');
     }
   }
 
@@ -977,44 +819,19 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
     return buffer.toString();
   }
-
-  Future<void> _refreshData() async {
-    // Force refresh using ForecastService
-    try {
-      final freshForecast = await _forecastService.refreshReachData(
-        widget.selectedReach.reachId,
-      );
-
-      setState(() {
-        _reachData = freshForecast.reach;
-        _currentFlow = _forecastService.getCurrentFlow(freshForecast);
-        _flowCategory = _forecastService.getFlowCategory(freshForecast);
-      });
-    } catch (error) {
-      final userMessage = ErrorService.handleError(
-        error,
-        context: 'refreshData',
-      );
-      setState(() {
-        _errorMessage = userMessage;
-      });
-    }
-  }
 }
 
-/// Helper function to show the bottom sheet
+/// Helper function to show the bottom sheet (updated signature)
 void showReachDetailsBottomSheet(
   BuildContext context,
   SelectedReach selectedReach, {
   VoidCallback? onViewForecast,
-  Function(String)? onAddToFavorites,
 }) {
   showCupertinoModalPopup(
     context: context,
     builder: (context) => ReachDetailsBottomSheet(
       selectedReach: selectedReach,
       onViewForecast: onViewForecast,
-      onAddToFavorites: onAddToFavorites,
     ),
   );
 }
