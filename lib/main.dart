@@ -2,16 +2,17 @@
 import 'package:flutter/cupertino.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/pages/navigation_error_page.dart';
 import 'package:rivrflow/features/auth/providers/auth_provider.dart';
 import 'package:rivrflow/core/providers/reach_data_provider.dart';
-import 'package:rivrflow/core/providers/favorites_provider.dart'; // NEW: Import FavoritesProvider
+import 'package:rivrflow/core/providers/favorites_provider.dart';
 import 'package:rivrflow/features/favorites/favorites_page.dart';
 import 'package:rivrflow/features/forecast/pages/reach_overview_page.dart';
 import 'package:rivrflow/features/forecast/pages/short_range_detail_page.dart';
 import 'package:rivrflow/features/forecast/pages/medium_range_detail_page.dart';
 import 'package:rivrflow/features/forecast/pages/long_range_detail_page.dart';
 import 'package:rivrflow/features/forecast/pages/hydrograph_page.dart';
-import 'package:rivrflow/features/favorites/pages/image_selection_page.dart'; // NEW: Import ImageSelectionPage
+import 'package:rivrflow/features/favorites/pages/image_selection_page.dart';
 import 'package:rivrflow/test/home_page.dart';
 import 'firebase_options.dart';
 import 'features/auth/presentation/pages/auth_coordinator.dart';
@@ -57,7 +58,16 @@ class RivrFlowApp extends StatelessWidget {
         routes: {
           '/favorites': (context) => const FavoritesPage(),
           '/map': (context) => const MapPage(),
-          '/forecast': (context) => const ForecastPlaceholderPage(),
+          '/forecast': (context) {
+            final reachId =
+                ModalRoute.of(context)?.settings.arguments as String?;
+            if (reachId == null) {
+              return const NavigationErrorPage.missingArguments(
+                routeName: 'forecast',
+              );
+            }
+            return ReachOverviewPage(reachId: reachId);
+          },
           '/test-home': (context) =>
               const HomePage(), // Keep test home for development
         },
@@ -66,49 +76,106 @@ class RivrFlowApp extends StatelessWidget {
           switch (settings.name) {
             case '/reach-overview':
               final args = settings.arguments as Map<String, dynamic>?;
+              final reachId = args?['reachId'] as String?;
+              if (reachId == null) {
+                return CupertinoPageRoute(
+                  builder: (context) =>
+                      const NavigationErrorPage.missingArguments(
+                        routeName: 'reach overview',
+                      ),
+                  settings: settings,
+                );
+              }
               return CupertinoPageRoute(
-                builder: (context) =>
-                    ReachOverviewPage(reachId: args?['reachId'] as String?),
+                builder: (context) => ReachOverviewPage(reachId: reachId),
                 settings: settings,
               );
+
             case '/short-range-detail':
               final args = settings.arguments as Map<String, dynamic>?;
+              final reachId = args?['reachId'] as String?;
+              if (reachId == null) {
+                return CupertinoPageRoute(
+                  builder: (context) =>
+                      const NavigationErrorPage.missingArguments(
+                        routeName: 'short range detail',
+                      ),
+                  settings: settings,
+                );
+              }
               return CupertinoPageRoute(
-                builder: (context) =>
-                    ShortRangeDetailPage(reachId: args?['reachId'] as String?),
+                builder: (context) => ShortRangeDetailPage(reachId: reachId),
                 settings: settings,
               );
+
             case '/medium-range-detail':
               final args = settings.arguments as Map<String, dynamic>?;
+              final reachId = args?['reachId'] as String?;
+              if (reachId == null) {
+                return CupertinoPageRoute(
+                  builder: (context) =>
+                      const NavigationErrorPage.missingArguments(
+                        routeName: 'medium range detail',
+                      ),
+                  settings: settings,
+                );
+              }
               return CupertinoPageRoute(
-                builder: (context) =>
-                    MediumRangeDetailPage(reachId: args?['reachId'] as String?),
+                builder: (context) => MediumRangeDetailPage(reachId: reachId),
                 settings: settings,
               );
+
             case '/long-range-detail':
               final args = settings.arguments as Map<String, dynamic>?;
+              final reachId = args?['reachId'] as String?;
+              if (reachId == null) {
+                return CupertinoPageRoute(
+                  builder: (context) =>
+                      const NavigationErrorPage.missingArguments(
+                        routeName: 'long range detail',
+                      ),
+                  settings: settings,
+                );
+              }
               return CupertinoPageRoute(
-                builder: (context) =>
-                    LongRangeDetailPage(reachId: args?['reachId'] as String?),
+                builder: (context) => LongRangeDetailPage(reachId: reachId),
                 settings: settings,
               );
+
             case '/hydrograph':
               final args = settings.arguments as Map<String, dynamic>?;
+              final reachId = args?['reachId'] as String?;
+              final forecastType = args?['forecastType'] as String?;
+
+              if (reachId == null || forecastType == null) {
+                return CupertinoPageRoute(
+                  builder: (context) =>
+                      const NavigationErrorPage.invalidArguments(
+                        expected: 'reachId (String) and forecastType (String)',
+                        routeName: 'hydrograph',
+                      ),
+                  settings: settings,
+                );
+              }
+
               return CupertinoPageRoute(
                 builder: (context) => HydrographPage(
-                  reachId: args?['reachId'] as String?,
-                  forecastType: args?['forecastType'] as String?,
+                  reachId: reachId,
+                  forecastType: forecastType,
                   timeFrame: args?['timeFrame'] as String?,
                   title: args?['title'] as String?,
                 ),
                 settings: settings,
               );
+
             case '/image-selection':
               final reachId = settings.arguments as String?;
               if (reachId == null) {
                 return CupertinoPageRoute(
-                  builder: (context) => const _ErrorPage(
-                    message: 'Invalid navigation: missing reach ID',
+                  builder: (context) => const NavigationErrorPage(
+                    message: 'No river selected for image customization.',
+                    title: 'Selection Required',
+                    icon: CupertinoIcons.photo,
                   ),
                   settings: settings,
                 );
@@ -117,98 +184,26 @@ class RivrFlowApp extends StatelessWidget {
                 builder: (context) => ImageSelectionPage(reachId: reachId),
                 settings: settings,
               );
+
             default:
-              return null;
+              return CupertinoPageRoute(
+                builder: (context) => NavigationErrorPage.pageNotFound(
+                  routeName: settings.name ?? 'unknown',
+                ),
+                settings: settings,
+              );
           }
         },
+        // Handle completely unknown routes
+        onUnknownRoute: (settings) {
+          return CupertinoPageRoute(
+            builder: (context) => NavigationErrorPage.pageNotFound(
+              routeName: settings.name ?? 'unknown',
+            ),
+            settings: settings,
+          );
+        },
         debugShowCheckedModeBanner: false,
-      ),
-    );
-  }
-}
-
-/// Simple error page for navigation errors
-class _ErrorPage extends StatelessWidget {
-  final String message;
-
-  const _ErrorPage({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('Error')),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                CupertinoIcons.exclamationmark_triangle,
-                size: 64,
-                color: CupertinoColors.systemRed,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Navigation Error',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: CupertinoColors.secondaryLabel,
-                ),
-              ),
-              const SizedBox(height: 32),
-              CupertinoButton.filled(
-                onPressed: () => Navigator.of(
-                  context,
-                ).pushNamedAndRemoveUntil('/favorites', (route) => false),
-                child: const Text('Go Home'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Placeholder page for forecast route
-class ForecastPlaceholderPage extends StatelessWidget {
-  const ForecastPlaceholderPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('Forecast')),
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.chart_bar,
-              size: 64,
-              color: CupertinoColors.systemBlue,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Forecast Page',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Coming soon...',
-              style: TextStyle(color: CupertinoColors.secondaryLabel),
-            ),
-          ],
-        ),
       ),
     );
   }
