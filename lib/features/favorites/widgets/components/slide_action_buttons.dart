@@ -114,7 +114,7 @@ class SlideActionButtons extends StatelessWidget {
   }) {
     return SizedBox(
       width: width,
-      height: 140, // Match card height exactly
+      height: 210, // Match card height exactly
       child: CupertinoButton(
         padding: EdgeInsets.zero,
         onPressed: onPressed,

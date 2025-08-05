@@ -40,7 +40,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
   void initState() {
     super.initState();
     _slideController = AnimationController(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     // Animation will be set up in build method when we have screen width
@@ -103,7 +103,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
   Widget _buildCardContent(bool isRefreshing) {
     return Container(
       width: double.infinity,
-      height: 140, // ADD FIXED HEIGHT
+      height: 210, // ADD FIXED HEIGHT
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.circular(12),
