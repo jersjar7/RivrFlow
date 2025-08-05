@@ -284,9 +284,8 @@ class _MapPageState extends State<MapPage> {
 
       final markerId = 'heart_$reachId';
 
-      // Create heart marker annotation
-      final heartAnnotation = PointAnnotation(
-        id: markerId,
+      // Create heart marker annotation OPTIONS (not PointAnnotation)
+      final heartAnnotationOptions = PointAnnotationOptions(
         geometry: Point(
           coordinates: Position(reachData.longitude, reachData.latitude),
         ),
@@ -297,12 +296,10 @@ class _MapPageState extends State<MapPage> {
         textHaloWidth: 2.0,
       );
 
-      // Add marker to map
-      await _mapboxMap!.annotations.createPointAnnotationManager().then((
-        manager,
-      ) async {
-        await manager.create(heartAnnotation as PointAnnotationOptions);
-      });
+      // Add marker to map using the correct API
+      final annotationManager = await _mapboxMap!.annotations
+          .createPointAnnotationManager();
+      await annotationManager.create(heartAnnotationOptions);
 
       _heartMarkers[reachId] = markerId;
       print('✅ Added heart marker for reach: $reachId');

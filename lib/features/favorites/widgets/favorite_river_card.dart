@@ -1,5 +1,6 @@
 // lib/features/favorites/widgets/favorite_river_card.dart
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/favorite_river.dart';
@@ -44,7 +45,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
     _slideAnimation =
         Tween<Offset>(
           begin: Offset.zero,
-          end: const Offset(-0.3, 0), // Slide left to reveal actions
+          end: const Offset(-0.45, 0), // Slide left further to reveal actions
         ).animate(
           CurvedAnimation(parent: _slideController, curve: Curves.easeInOut),
         );
@@ -97,7 +98,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
   Widget _buildCardContent(bool isRefreshing) {
     return Container(
       width: double.infinity,
-      height: 140,
+      height: 140, // ADD FIXED HEIGHT
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.circular(12),
@@ -309,7 +310,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
 
           // Action buttons on the right
           Container(
-            width: 200,
+            width: 150, // Increased width for better text display
             height: double.infinity,
             decoration: BoxDecoration(
               color: CupertinoColors.systemGrey6,
@@ -330,8 +331,8 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
                       decoration: const BoxDecoration(
                         color: CupertinoColors.systemBlue,
                         borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(12),
-                          bottomLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
                         ),
                       ),
                       child: const Column(
@@ -347,7 +348,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
                             'Image',
                             style: TextStyle(
                               color: CupertinoColors.white,
-                              fontSize: 12,
+                              fontSize: 11, // Slightly smaller text
                             ),
                           ),
                         ],
@@ -366,7 +367,14 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
                     },
                     child: Container(
                       height: double.infinity,
-                      color: CupertinoColors.systemOrange,
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemOrange,
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                      ),
+                      // color: CupertinoColors.systemOrange,
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -380,7 +388,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
                             'Rename',
                             style: TextStyle(
                               color: CupertinoColors.white,
-                              fontSize: 12,
+                              fontSize: 11, // Slightly smaller text
                             ),
                           ),
                         ],
@@ -419,7 +427,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
                             'Delete',
                             style: TextStyle(
                               color: CupertinoColors.white,
-                              fontSize: 12,
+                              fontSize: 11, // Slightly smaller text
                             ),
                           ),
                         ],
@@ -458,13 +466,15 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
   }
 
   void _handlePanUpdate(DragUpdateDetails details) {
-    if (details.delta.dx < -5 && !_isSliding) {
+    if (details.delta.dx < -3 && !_isSliding) {
+      // More sensitive swipe detection
       // Swiping left - show actions
       setState(() {
         _isSliding = true;
       });
       _slideController.forward();
-    } else if (details.delta.dx > 5 && _isSliding) {
+    } else if (details.delta.dx > 3 && _isSliding) {
+      // More sensitive swipe detection
       // Swiping right - hide actions
       _closeSlide();
     }
