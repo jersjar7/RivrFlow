@@ -136,7 +136,7 @@ class _ImageSelectionPageState extends State<ImageSelectionPage> {
                       _categories[i].icon,
                       size: 16,
                       color: _selectedCategoryIndex == i
-                          ? CupertinoColors.white
+                          ? CupertinoColors.activeBlue
                           : CupertinoColors.activeBlue,
                     ),
                     const SizedBox(width: 4),
@@ -146,7 +146,7 @@ class _ImageSelectionPageState extends State<ImageSelectionPage> {
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: _selectedCategoryIndex == i
-                            ? CupertinoColors.white
+                            ? CupertinoColors.activeBlue
                             : CupertinoColors.activeBlue,
                       ),
                     ),
