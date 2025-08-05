@@ -267,9 +267,4 @@ class ForecastService {
       'dataSource': forecast.getDataSource(forecastType),
     };
   }
-
-  /// Clean up resources
-  void dispose() {
-    _apiService.dispose();
-  }
 }

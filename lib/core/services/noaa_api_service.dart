@@ -274,11 +274,6 @@ class NoaaApiService {
         break;
     }
   }
-
-  /// Clean up resources
-  void dispose() {
-    _client.close();
-  }
 }
 
 /// Custom exception for API errors

@@ -491,7 +491,6 @@ class _MapPageState extends State<MapPage> {
   @override
   void dispose() {
     _vectorTilesService.dispose();
-    _forecastService.dispose();
     super.dispose();
   }
 }

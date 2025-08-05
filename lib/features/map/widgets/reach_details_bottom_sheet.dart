@@ -239,7 +239,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
               children: [
                 const Text(
                   'Return Periods',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(fontWeight: FontWeight.w500),
                 ),
                 const Spacer(),
                 CupertinoButton(
@@ -277,7 +277,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
-            '${year}yr: ${value.toStringAsFixed(0)} CMS',
+            '$year-year: ${value.toStringAsFixed(0)} CMS',
             style: const TextStyle(fontSize: 12),
           ),
         );

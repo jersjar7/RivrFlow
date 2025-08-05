@@ -170,10 +170,4 @@ class ReachDataProvider with ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
-
-  @override
-  void dispose() {
-    _forecastService.dispose();
-    super.dispose();
-  }
 }
