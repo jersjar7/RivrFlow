@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:rivrflow/core/models/reach_data.dart';
-import 'package:rivrflow/core/widgets/back_navigation.dart';
+import 'package:rivrflow/core/widgets/navigation_button.dart';
 import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
 import '../../core/config.dart';
 import '../../core/services/cache_service.dart';

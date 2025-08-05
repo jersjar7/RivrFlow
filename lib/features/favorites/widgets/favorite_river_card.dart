@@ -97,6 +97,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
   Widget _buildCardContent(bool isRefreshing) {
     return Container(
       width: double.infinity,
+      height: 140,
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.circular(12),

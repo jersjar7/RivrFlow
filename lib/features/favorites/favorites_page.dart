@@ -197,33 +197,39 @@ class _FavoritesPageState extends State<FavoritesPage> {
       shouldShowSearch: favoritesProvider.shouldShowSearch,
       onSearchChanged: (query) => setState(() => _searchQuery = query),
       searchPlaceholder: 'Search your rivers...',
-      child: CustomScrollView(
-        slivers: [
-          // Pull-to-refresh
-          CupertinoSliverRefreshControl(
-            onRefresh: () => _handleRefresh(favoritesProvider),
-          ),
-
-          // Error message (if any)
-          if (favoritesProvider.errorMessage != null)
-            SliverToBoxAdapter(
-              child: _buildErrorBanner(favoritesProvider.errorMessage!),
+      child: SafeArea(
+        top: true,
+        child: CustomScrollView(
+          slivers: [
+            // Pull-to-refresh
+            CupertinoSliverRefreshControl(
+              onRefresh: () => _handleRefresh(favoritesProvider),
             ),
 
-          // Search results info (when searching)
-          if (_searchQuery.isNotEmpty)
+            // Error message (if any)
+            if (favoritesProvider.errorMessage != null)
+              SliverToBoxAdapter(
+                child: _buildErrorBanner(favoritesProvider.errorMessage!),
+              ),
+
+            // Search results info (when searching)
+            if (_searchQuery.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _buildSearchResultsHeader(filteredFavorites.length),
+              ),
+
+            // Favorites list
             SliverToBoxAdapter(
-              child: _buildSearchResultsHeader(filteredFavorites.length),
+              child: _buildReorderableList(
+                filteredFavorites,
+                favoritesProvider,
+              ),
             ),
 
-          // Favorites list
-          SliverToBoxAdapter(
-            child: _buildReorderableList(filteredFavorites, favoritesProvider),
-          ),
-
-          // Bottom padding
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
-        ],
+            // Bottom padding
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
+        ),
       ),
     );
   }
