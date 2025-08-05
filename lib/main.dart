@@ -13,10 +13,10 @@ import 'package:rivrflow/features/forecast/pages/medium_range_detail_page.dart';
 import 'package:rivrflow/features/forecast/pages/long_range_detail_page.dart';
 import 'package:rivrflow/features/forecast/pages/hydrograph_page.dart';
 import 'package:rivrflow/features/favorites/pages/image_selection_page.dart';
+import 'package:rivrflow/features/map/widgets/map_with_favorites.dart';
 import 'package:rivrflow/test/home_page.dart';
 import 'firebase_options.dart';
 import 'features/auth/presentation/pages/auth_coordinator.dart';
-import 'features/map/map_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 Future<void> main() async {
@@ -57,7 +57,7 @@ class RivrFlowApp extends StatelessWidget {
         ),
         routes: {
           '/favorites': (context) => const FavoritesPage(),
-          '/map': (context) => const MapPage(),
+          '/map': (context) => const MapWithFavorites(),
           '/forecast': (context) {
             final reachId =
                 ModalRoute.of(context)?.settings.arguments as String?;

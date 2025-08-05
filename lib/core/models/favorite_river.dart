@@ -12,6 +12,10 @@ class FavoriteRiver {
   final double? lastKnownFlow; // Cached flow value for offline display
   final DateTime? lastUpdated; // When flow was last refreshed
 
+  // Cached coordinates for efficient map marker positioning
+  final double? latitude; // Cached reach latitude
+  final double? longitude; // Cached reach longitude
+
   const FavoriteRiver({
     required this.reachId,
     this.customName,
@@ -20,6 +24,8 @@ class FavoriteRiver {
     required this.displayOrder,
     this.lastKnownFlow,
     this.lastUpdated,
+    this.latitude,
+    this.longitude,
   });
 
   /// Create from JSON (for SharedPreferences loading)
@@ -34,6 +40,8 @@ class FavoriteRiver {
       lastUpdated: json['lastUpdated'] != null
           ? DateTime.parse(json['lastUpdated'] as String)
           : null,
+      latitude: json['latitude'] as double?,
+      longitude: json['longitude'] as double?,
     );
   }
 
@@ -47,6 +55,8 @@ class FavoriteRiver {
       'displayOrder': displayOrder,
       'lastKnownFlow': lastKnownFlow,
       'lastUpdated': lastUpdated?.toIso8601String(),
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 
@@ -59,6 +69,8 @@ class FavoriteRiver {
     int? displayOrder,
     double? lastKnownFlow,
     DateTime? lastUpdated,
+    double? latitude,
+    double? longitude,
   }) {
     return FavoriteRiver(
       reachId: reachId ?? this.reachId,
@@ -68,7 +80,14 @@ class FavoriteRiver {
       displayOrder: displayOrder ?? this.displayOrder,
       lastKnownFlow: lastKnownFlow ?? this.lastKnownFlow,
       lastUpdated: lastUpdated ?? this.lastUpdated,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
+  }
+
+  /// Check if coordinates are cached and available for map markers
+  bool get hasCoordinates {
+    return latitude != null && longitude != null;
   }
 
   /// Get display name with enhanced priority logic:
@@ -111,6 +130,6 @@ class FavoriteRiver {
 
   @override
   String toString() {
-    return 'FavoriteRiver{reachId: $reachId, customName: $customName, riverName: $riverName, displayOrder: $displayOrder}';
+    return 'FavoriteRiver{reachId: $reachId, customName: $customName, riverName: $riverName, displayOrder: $displayOrder, hasCoords: $hasCoordinates}';
   }
 }

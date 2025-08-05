@@ -55,8 +55,13 @@ class FavoritesService {
     }
   }
 
-  /// Add a new favorite river
-  Future<bool> addFavorite(String reachId, {String? customName}) async {
+  /// Add a new favorite river with coordinates
+  Future<bool> addFavorite(
+    String reachId, {
+    String? customName,
+    double? latitude,
+    double? longitude,
+  }) async {
     try {
       print('FAVORITES_SERVICE: Adding favorite: $reachId');
       final favorites = await loadFavorites();
@@ -67,7 +72,7 @@ class FavoritesService {
         return false;
       }
 
-      // Create new favorite with next display order
+      // Create new favorite with next display order and coordinates
       final maxOrder = favorites.isEmpty
           ? -1
           : favorites
@@ -78,13 +83,17 @@ class FavoritesService {
         reachId: reachId,
         customName: customName,
         displayOrder: maxOrder + 1,
+        latitude: latitude,
+        longitude: longitude,
       );
 
       favorites.add(newFavorite);
       final success = await saveFavorites(favorites);
 
       if (success) {
-        print('FAVORITES_SERVICE: ✅ Added favorite: $reachId');
+        print(
+          'FAVORITES_SERVICE: ✅ Added favorite: $reachId (coords: ${latitude != null && longitude != null})',
+        );
       }
       return success;
     } catch (e) {
@@ -154,14 +163,16 @@ class FavoritesService {
     }
   }
 
-  /// Update a favorite's properties (name, image, flow data)
+  /// Update a favorite's properties (name, image, flow data, coordinates)
   Future<bool> updateFavorite(
     String reachId, {
     String? customName,
-    String? riverName, // ← ADDED: NOAA river name
+    String? riverName,
     String? customImageAsset,
     double? lastKnownFlow,
     DateTime? lastUpdated,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       print('FAVORITES_SERVICE: Updating favorite: $reachId');
@@ -175,10 +186,12 @@ class FavoritesService {
 
       favorites[index] = favorites[index].copyWith(
         customName: customName,
-        riverName: riverName, // ← ADDED
+        riverName: riverName,
         customImageAsset: customImageAsset,
         lastKnownFlow: lastKnownFlow,
         lastUpdated: lastUpdated,
+        latitude: latitude,
+        longitude: longitude,
       );
 
       final success = await saveFavorites(favorites);

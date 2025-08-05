@@ -13,6 +13,7 @@ class FavoritesProvider with ChangeNotifier {
 
   // Current state
   List<FavoriteRiver> _favorites = [];
+  Set<String> _favoriteReachIds = {}; // O(1) lookup for isFavorite()
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -30,15 +31,25 @@ class FavoritesProvider with ChangeNotifier {
   /// Check if a specific favorite is being refreshed
   bool isRefreshing(String reachId) => _refreshingReachIds.contains(reachId);
 
-  /// Check if a reach is favorited
+  /// Check if a reach is favorited - O(1) lookup
   bool isFavorite(String reachId) {
-    return _favorites.any((f) => f.reachId == reachId);
+    return _favoriteReachIds.contains(reachId);
   }
 
-  /// Get favorite locations for map heart markers
-  List<Map<String, dynamic>> getFavoriteLocations() {
-    // This will need ReachData to get lat/lng - handled in integration
-    return _favorites.map((f) => {'reachId': f.reachId}).toList();
+  /// Get favorites that have coordinates for map markers
+  List<FavoriteRiver> getFavoritesWithCoordinates() {
+    return _favorites.where((f) => f.hasCoordinates).toList();
+  }
+
+  /// Compare favorites lists and return what changed for efficient marker updates
+  Map<String, dynamic> diffFavorites(List<FavoriteRiver> oldFavorites) {
+    final oldReachIds = oldFavorites.map((f) => f.reachId).toSet();
+    final newReachIds = _favorites.map((f) => f.reachId).toSet();
+
+    return {
+      'added': newReachIds.difference(oldReachIds).toList(),
+      'removed': oldReachIds.difference(newReachIds).toList(),
+    };
   }
 
   /// Initialize favorites and start background refresh
@@ -64,10 +75,11 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  /// Load favorites from storage
+  /// Load favorites from storage and update lookup set
   Future<void> _loadFavoritesFromStorage() async {
     try {
       _favorites = await _favoritesService.loadFavorites();
+      _updateFavoriteReachIds(); // Update lookup set
       print(
         'FAVORITES_PROVIDER: ✅ Loaded ${_favorites.length} favorites from storage',
       );
@@ -78,21 +90,44 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  /// Add a new favorite river
+  /// Update the lookup set when favorites list changes
+  void _updateFavoriteReachIds() {
+    _favoriteReachIds = _favorites.map((f) => f.reachId).toSet();
+  }
+
+  /// Add a new favorite river with coordinates from API
   Future<bool> addFavorite(String reachId, {String? customName}) async {
     print('FAVORITES_PROVIDER: Adding favorite: $reachId');
 
     try {
-      // Check if already exists
+      // Check if already exists using O(1) lookup
       if (isFavorite(reachId)) {
         print('FAVORITES_PROVIDER: ⚠️ Reach $reachId already favorited');
         return false;
       }
 
-      // Add to storage
+      // Fetch coordinates from API
+      double? latitude, longitude;
+      try {
+        final forecast = await _forecastService.loadCompleteReachData(reachId);
+        latitude = forecast.reach.latitude;
+        longitude = forecast.reach.longitude;
+        print(
+          'FAVORITES_PROVIDER: ✅ Got coordinates for $reachId: $latitude, $longitude',
+        );
+      } catch (e) {
+        print(
+          'FAVORITES_PROVIDER: ⚠️ Could not get coordinates for $reachId: $e',
+        );
+        // Continue without coordinates - can be added later
+      }
+
+      // Add to storage with coordinates
       final success = await _favoritesService.addFavorite(
         reachId,
         customName: customName,
+        latitude: latitude,
+        longitude: longitude,
       );
       if (!success) return false;
 
@@ -147,6 +182,7 @@ class FavoritesProvider with ChangeNotifier {
       reorderedFavorites.insert(newIndex, item);
 
       _favorites = reorderedFavorites;
+      _updateFavoriteReachIds(); // Update lookup set
       notifyListeners();
 
       // Persist the reordering
@@ -171,7 +207,7 @@ class FavoritesProvider with ChangeNotifier {
   Future<bool> updateFavorite(
     String reachId, {
     String? customName,
-    String? riverName, // ← ADDED: NOAA river name
+    String? riverName,
     String? customImageAsset,
   }) async {
     print('FAVORITES_PROVIDER: Updating favorite: $reachId');
@@ -180,7 +216,7 @@ class FavoritesProvider with ChangeNotifier {
       final success = await _favoritesService.updateFavorite(
         reachId,
         customName: customName,
-        riverName: riverName, // ← ADDED
+        riverName: riverName,
         customImageAsset: customImageAsset,
       );
 
@@ -242,25 +278,40 @@ class FavoritesProvider with ChangeNotifier {
       // Use existing ForecastService to get fresh data
       final forecast = await _forecastService.loadCompleteReachData(reachId);
       final currentFlow = _forecastService.getCurrentFlow(forecast);
+      final riverName = forecast.reach.riverName;
 
-      // Extract river name from reach data
-      final riverName = forecast.reach.riverName; // ← ADDED
+      // Also get coordinates if not cached yet
+      final currentFavorite = _favorites.firstWhere(
+        (f) => f.reachId == reachId,
+      );
+      double? latitude = currentFavorite.latitude;
+      double? longitude = currentFavorite.longitude;
 
-      // Update the favorite with fresh flow data AND river name
+      if (!currentFavorite.hasCoordinates) {
+        latitude = forecast.reach.latitude;
+        longitude = forecast.reach.longitude;
+        print('FAVORITES_PROVIDER: ✅ Got missing coordinates for $reachId');
+      }
+
+      // Update the favorite with fresh flow data, river name, and coordinates
       await _favoritesService.updateFavorite(
         reachId,
-        riverName: riverName, // ← ADDED
+        riverName: riverName,
         lastKnownFlow: currentFlow,
         lastUpdated: DateTime.now(),
+        latitude: latitude,
+        longitude: longitude,
       );
 
       // Update local list
       final index = _favorites.indexWhere((f) => f.reachId == reachId);
       if (index != -1) {
         _favorites[index] = _favorites[index].copyWith(
-          riverName: riverName, // ← ADDED
+          riverName: riverName,
           lastKnownFlow: currentFlow,
           lastUpdated: DateTime.now(),
+          latitude: latitude,
+          longitude: longitude,
         );
       }
     } catch (e) {
@@ -302,6 +353,7 @@ class FavoritesProvider with ChangeNotifier {
   Future<void> clearAllFavorites() async {
     await _favoritesService.clearAllFavorites();
     _favorites.clear();
+    _favoriteReachIds.clear(); // Clear lookup set
     _refreshingReachIds.clear();
     _clearError();
     notifyListeners();
