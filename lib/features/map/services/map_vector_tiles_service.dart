@@ -107,17 +107,17 @@ class MapVectorTilesService {
   Future<void> _addStyledLayers() async {
     try {
       // Add the main debug layer
-      await _mapboxMap!.style.addLayer(
-        LineLayer(
-          id: 'streams2-debug-correct',
-          sourceId: AppConfig.vectorSourceId,
-          sourceLayer: AppConfig.vectorSourceLayer, // 'streams2-7jgd8p'
-          lineColor: 0xFFFF0000, // Bright red for debug
-          lineWidth: 5.0, // Very thick so it's visible
-          lineOpacity: 1.0, // Full opacity
-        ),
-      );
-      print('✅ Added debug layer: streams2-debug-correct');
+      // await _mapboxMap!.style.addLayer(
+      //   LineLayer(
+      //     id: 'streams2-debug-correct',
+      //     sourceId: AppConfig.vectorSourceId,
+      //     sourceLayer: AppConfig.vectorSourceLayer, // 'streams2-7jgd8p'
+      //     lineColor: 0xFFFF0000, // Bright red for debug
+      //     lineWidth: 5.0, // Very thick so it's visible
+      //     lineOpacity: 1.0, // Full opacity
+      //   ),
+      // );
+      // print('✅ Added debug layer: streams2-debug-correct');
 
       // Add stream order layers with proper styling and filters
       await _mapboxMap!.style.addLayer(

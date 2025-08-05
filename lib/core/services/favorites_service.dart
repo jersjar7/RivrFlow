@@ -158,6 +158,7 @@ class FavoritesService {
   Future<bool> updateFavorite(
     String reachId, {
     String? customName,
+    String? riverName, // ← ADDED: NOAA river name
     String? customImageAsset,
     double? lastKnownFlow,
     DateTime? lastUpdated,
@@ -174,6 +175,7 @@ class FavoritesService {
 
       favorites[index] = favorites[index].copyWith(
         customName: customName,
+        riverName: riverName, // ← ADDED
         customImageAsset: customImageAsset,
         lastKnownFlow: lastKnownFlow,
         lastUpdated: lastUpdated,

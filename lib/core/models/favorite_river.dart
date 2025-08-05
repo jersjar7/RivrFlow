@@ -5,6 +5,7 @@
 class FavoriteRiver {
   final String reachId; // Links to existing ReachData
   final String? customName; // User override for display name
+  final String? riverName; // NOAA river name (cached from API)
   final String?
   customImageAsset; // Asset path like 'assets/images/rivers/mountain/river1.webp'
   final int displayOrder; // For user reordering (0 = first)
@@ -14,6 +15,7 @@ class FavoriteRiver {
   const FavoriteRiver({
     required this.reachId,
     this.customName,
+    this.riverName,
     this.customImageAsset,
     required this.displayOrder,
     this.lastKnownFlow,
@@ -25,6 +27,7 @@ class FavoriteRiver {
     return FavoriteRiver(
       reachId: json['reachId'] as String,
       customName: json['customName'] as String?,
+      riverName: json['riverName'] as String?,
       customImageAsset: json['customImageAsset'] as String?,
       displayOrder: json['displayOrder'] as int,
       lastKnownFlow: json['lastKnownFlow'] as double?,
@@ -39,6 +42,7 @@ class FavoriteRiver {
     return {
       'reachId': reachId,
       'customName': customName,
+      'riverName': riverName,
       'customImageAsset': customImageAsset,
       'displayOrder': displayOrder,
       'lastKnownFlow': lastKnownFlow,
@@ -50,6 +54,7 @@ class FavoriteRiver {
   FavoriteRiver copyWith({
     String? reachId,
     String? customName,
+    String? riverName,
     String? customImageAsset,
     int? displayOrder,
     double? lastKnownFlow,
@@ -58,6 +63,7 @@ class FavoriteRiver {
     return FavoriteRiver(
       reachId: reachId ?? this.reachId,
       customName: customName ?? this.customName,
+      riverName: riverName ?? this.riverName,
       customImageAsset: customImageAsset ?? this.customImageAsset,
       displayOrder: displayOrder ?? this.displayOrder,
       lastKnownFlow: lastKnownFlow ?? this.lastKnownFlow,
@@ -65,8 +71,22 @@ class FavoriteRiver {
     );
   }
 
-  /// Get display name (custom name or fallback to reach ID)
-  String get displayName => customName ?? 'Reach $reachId';
+  /// Get display name with enhanced priority logic:
+  /// 1. Custom name (if user renamed it)
+  /// 2. NOAA river name (from API)
+  /// 3. Fallback to station ID
+  String get displayName {
+    // 1. Custom name (highest priority)
+    if (customName != null && customName!.isNotEmpty) {
+      return customName!;
+    }
+    // 2. NOAA river name
+    if (riverName != null && riverName!.isNotEmpty) {
+      return riverName!;
+    }
+    // 3. Fallback to station ID
+    return 'Station $reachId';
+  }
 
   /// Check if flow data is stale (older than 2 hours)
   bool get isFlowDataStale {
@@ -91,6 +111,6 @@ class FavoriteRiver {
 
   @override
   String toString() {
-    return 'FavoriteRiver{reachId: $reachId, customName: $customName, displayOrder: $displayOrder}';
+    return 'FavoriteRiver{reachId: $reachId, customName: $customName, riverName: $riverName, displayOrder: $displayOrder}';
   }
 }

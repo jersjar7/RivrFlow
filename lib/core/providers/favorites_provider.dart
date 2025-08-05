@@ -171,6 +171,7 @@ class FavoritesProvider with ChangeNotifier {
   Future<bool> updateFavorite(
     String reachId, {
     String? customName,
+    String? riverName, // ← ADDED: NOAA river name
     String? customImageAsset,
   }) async {
     print('FAVORITES_PROVIDER: Updating favorite: $reachId');
@@ -179,6 +180,7 @@ class FavoritesProvider with ChangeNotifier {
       final success = await _favoritesService.updateFavorite(
         reachId,
         customName: customName,
+        riverName: riverName, // ← ADDED
         customImageAsset: customImageAsset,
       );
 
@@ -241,9 +243,13 @@ class FavoritesProvider with ChangeNotifier {
       final forecast = await _forecastService.loadCompleteReachData(reachId);
       final currentFlow = _forecastService.getCurrentFlow(forecast);
 
-      // Update the favorite with fresh flow data
+      // Extract river name from reach data
+      final riverName = forecast.reach.riverName; // ← ADDED
+
+      // Update the favorite with fresh flow data AND river name
       await _favoritesService.updateFavorite(
         reachId,
+        riverName: riverName, // ← ADDED
         lastKnownFlow: currentFlow,
         lastUpdated: DateTime.now(),
       );
@@ -252,6 +258,7 @@ class FavoritesProvider with ChangeNotifier {
       final index = _favorites.indexWhere((f) => f.reachId == reachId);
       if (index != -1) {
         _favorites[index] = _favorites[index].copyWith(
+          riverName: riverName, // ← ADDED
           lastKnownFlow: currentFlow,
           lastUpdated: DateTime.now(),
         );
