@@ -20,6 +20,7 @@ class FavoritesPage extends StatefulWidget {
 class _FavoritesPageState extends State<FavoritesPage> {
   String _searchQuery = '';
   bool _isRefreshing = false;
+  bool _showSearch = false; // New state for search visibility
 
   @override
   void initState() {
@@ -39,59 +40,49 @@ class _FavoritesPageState extends State<FavoritesPage> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: _buildNavigationBar(),
-      child: Consumer<FavoritesProvider>(
-        builder: (context, favoritesProvider, child) {
-          if (favoritesProvider.isLoading) {
-            return _buildLoadingState();
-          }
+      child: Stack(
+        children: [
+          // Main content
+          Consumer<FavoritesProvider>(
+            builder: (context, favoritesProvider, child) {
+              if (favoritesProvider.isLoading) {
+                return _buildLoadingState();
+              }
 
-          if (favoritesProvider.isEmpty) {
-            return _buildEmptyState();
-          }
+              if (favoritesProvider.isEmpty) {
+                return _buildEmptyState();
+              }
 
-          return _buildFavoritesList(favoritesProvider);
-        },
+              return _buildFavoritesList(favoritesProvider);
+            },
+          ),
+
+          // Floating action button
+          _buildFloatingActionButton(),
+        ],
       ),
     );
   }
 
   CupertinoNavigationBar _buildNavigationBar() {
     return CupertinoNavigationBar(
-      middle: const Text('My Rivers'),
-      trailing: Consumer<FavoritesProvider>(
-        builder: (context, favoritesProvider, child) {
-          if (favoritesProvider.isEmpty) {
-            return CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _navigateToMap,
-              child: const Icon(CupertinoIcons.add),
-            );
-          }
+      // No middle title anymore
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: _showSettingsMenu,
+        child: const Icon(CupertinoIcons.ellipsis),
+      ),
+    );
+  }
 
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Search toggle button (only when 4+ favorites)
-              if (favoritesProvider.shouldShowSearch)
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: _toggleSearch,
-                  child: Icon(
-                    _searchQuery.isNotEmpty
-                        ? CupertinoIcons.search_circle_fill
-                        : CupertinoIcons.search,
-                  ),
-                ),
-
-              // Add new favorite button
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _navigateToMap,
-                child: const Icon(CupertinoIcons.add),
-              ),
-            ],
-          );
-        },
+  Widget _buildFloatingActionButton() {
+    return Positioned(
+      bottom: 20,
+      right: 20,
+      child: FloatingActionButton(
+        onPressed: _navigateToMap,
+        backgroundColor: CupertinoColors.systemBlue,
+        child: const Icon(CupertinoIcons.add, color: CupertinoColors.white),
       ),
     );
   }
@@ -113,77 +104,89 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Empty state illustration
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemBlue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(60),
-              ),
-              child: const Icon(
-                CupertinoIcons.heart,
-                size: 60,
-                color: CupertinoColors.systemBlue,
+    return SafeArea(
+      child: Column(
+        children: [
+          // App title header
+          _buildAppHeader(),
+
+          // Empty state content
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Empty state illustration
+                    Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemBlue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(60),
+                      ),
+                      child: const Icon(
+                        CupertinoIcons.heart,
+                        size: 60,
+                        color: CupertinoColors.systemBlue,
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Title
+                    const Text(
+                      'No Favorite Rivers Yet',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                        color: CupertinoColors.label,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Description
+                    const Text(
+                      'Discover rivers on the map and add them to your favorites for quick access to flow forecasts.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: CupertinoColors.secondaryLabel,
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // Call to action button
+                    CupertinoButton.filled(
+                      onPressed: _navigateToMap,
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(CupertinoIcons.map, size: 18),
+                          SizedBox(width: 8),
+                          Text('Explore Rivers'),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Secondary action
+                    CupertinoButton(
+                      onPressed: _showHelpDialog,
+                      child: const Text('How do I add favorites?'),
+                    ),
+                  ],
+                ),
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            // Title
-            const Text(
-              'No Favorite Rivers Yet',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: CupertinoColors.label,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 12),
-
-            // Description
-            const Text(
-              'Discover rivers on the map and add them to your favorites for quick access to flow forecasts.',
-              style: TextStyle(
-                fontSize: 16,
-                color: CupertinoColors.secondaryLabel,
-                height: 1.4,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 32),
-
-            // Call to action button
-            CupertinoButton.filled(
-              onPressed: _navigateToMap,
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(CupertinoIcons.map, size: 18),
-                  SizedBox(width: 8),
-                  Text('Explore Rivers'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Secondary action
-            CupertinoButton(
-              onPressed: _showHelpDialog,
-              child: const Text('How do I add favorites?'),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -193,43 +196,105 @@ class _FavoritesPageState extends State<FavoritesPage> {
         ? favoritesProvider.favorites
         : favoritesProvider.filterFavorites(_searchQuery);
 
-    return PullDownSearchWrapper(
-      shouldShowSearch: favoritesProvider.shouldShowSearch,
-      onSearchChanged: (query) => setState(() => _searchQuery = query),
-      searchPlaceholder: 'Search your rivers...',
-      child: SafeArea(
-        top: true,
-        child: CustomScrollView(
-          slivers: [
-            // Pull-to-refresh
-            CupertinoSliverRefreshControl(
-              onRefresh: () => _handleRefresh(favoritesProvider),
+    return SafeArea(
+      top: true,
+      child: Column(
+        children: [
+          // App header
+          _buildAppHeader(),
+
+          // Search bar (conditional)
+          if (favoritesProvider.shouldShowSearch && _showSearch)
+            _buildSearchBar(),
+
+          // Favorites list
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                // Pull-to-refresh
+                CupertinoSliverRefreshControl(
+                  onRefresh: () => _handleRefresh(favoritesProvider),
+                ),
+
+                // Error message (if any)
+                if (favoritesProvider.errorMessage != null)
+                  SliverToBoxAdapter(
+                    child: _buildErrorBanner(favoritesProvider.errorMessage!),
+                  ),
+
+                // Search results info (when searching)
+                if (_searchQuery.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _buildSearchResultsHeader(filteredFavorites.length),
+                  ),
+
+                // Favorites list
+                SliverToBoxAdapter(
+                  child: _buildReorderableList(
+                    filteredFavorites,
+                    favoritesProvider,
+                  ),
+                ),
+
+                // Bottom padding for floating action button
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            // Error message (if any)
-            if (favoritesProvider.errorMessage != null)
-              SliverToBoxAdapter(
-                child: _buildErrorBanner(favoritesProvider.errorMessage!),
-              ),
-
-            // Search results info (when searching)
-            if (_searchQuery.isNotEmpty)
-              SliverToBoxAdapter(
-                child: _buildSearchResultsHeader(filteredFavorites.length),
-              ),
-
-            // Favorites list
-            SliverToBoxAdapter(
-              child: _buildReorderableList(
-                filteredFavorites,
-                favoritesProvider,
-              ),
+  Widget _buildAppHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(32, 16, 32, 16),
+      child: Row(
+        children: [
+          // App title
+          const Text(
+            'RivrFlow',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: CupertinoColors.label,
             ),
+          ),
 
-            // Bottom padding
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ],
-        ),
+          const Spacer(),
+
+          // Search toggle button (only when 4+ favorites and not empty state)
+          Consumer<FavoritesProvider>(
+            builder: (context, favoritesProvider, child) {
+              if (favoritesProvider.shouldShowSearch &&
+                  !favoritesProvider.isEmpty) {
+                return CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _toggleSearch,
+                  child: Icon(
+                    _showSearch
+                        ? CupertinoIcons.xmark_circle_fill
+                        : CupertinoIcons.search,
+                    color: CupertinoColors.systemBlue,
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: CupertinoSearchTextField(
+        placeholder: 'Search your rivers...',
+        onChanged: (value) => setState(() => _searchQuery = value),
+        onSuffixTap: () => setState(() => _searchQuery = ''),
       ),
     );
   }
@@ -402,8 +467,98 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   void _toggleSearch() {
-    // This could expand search bar or focus existing one
-    // Implementation depends on your search bar design choice
+    setState(() {
+      _showSearch = !_showSearch;
+      if (!_showSearch) {
+        _searchQuery = ''; // Clear search when hiding
+      }
+    });
+  }
+
+  void _showSettingsMenu() {
+    showCupertinoModalPopup(
+      context: context,
+      barrierColor: CupertinoColors.black.withOpacity(0.3),
+      builder: (context) => _buildDropdownMenu(),
+    );
+  }
+
+  Widget _buildDropdownMenu() {
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topRight,
+        child: Container(
+          margin: const EdgeInsets.only(top: 50, right: 16),
+          width: 250,
+          decoration: BoxDecoration(
+            color: const Color(0xFF2C2C2E), // Dark modal background
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildMenuOption('Notifications', CupertinoIcons.bell, () {
+                Navigator.pop(context);
+                // TODO: Navigate to notifications settings
+              }),
+              _buildMenuDivider(),
+              _buildMenuOption('CFS', CupertinoIcons.drop, () {
+                Navigator.pop(context);
+                // TODO: Navigate to CFS settings
+              }),
+              _buildMenuDivider(),
+              _buildMenuOption('CMS', CupertinoIcons.graph_square, () {
+                Navigator.pop(context);
+                // TODO: Navigate to CMS settings
+              }),
+              _buildMenuDivider(),
+              _buildMenuOption('App Theme', CupertinoIcons.moon, () {
+                Navigator.pop(context);
+                // TODO: Navigate to app theme settings
+              }),
+              _buildMenuDivider(),
+              _buildMenuOption('Sponsors', CupertinoIcons.heart_fill, () {
+                Navigator.pop(context);
+                // TODO: Navigate to sponsors page
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuOption(String title, IconData icon, VoidCallback onTap) {
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: CupertinoColors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const Spacer(),
+            Icon(icon, color: CupertinoColors.white, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuDivider() {
+    return Container(
+      height: 1,
+      color: CupertinoColors.separator.withOpacity(0.3),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+    );
   }
 
   void _navigateToMap() {
@@ -469,7 +624,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
       builder: (context) => CupertinoAlertDialog(
         title: const Text('Adding Favorites'),
         content: const Text(
-          '1. Tap "Explore Rivers" to open the map\n'
+          '1. Tap the + button to open the map\n'
           '2. Find a river you\'re interested in\n'
           '3. Tap the river to view details\n'
           '4. Tap the heart button to add it to favorites\n\n'
