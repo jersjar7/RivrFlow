@@ -1,10 +1,11 @@
 // lib/features/favorites/widgets/favorite_river_card.dart
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/favorite_river.dart';
 import '../../../core/providers/favorites_provider.dart';
+import 'components/slide_action_buttons.dart';
+import 'components/slide_action_constants.dart';
 
 /// Individual favorite river card with Cupertino design
 /// Supports slide actions, loading states, and tap navigation
@@ -42,13 +43,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    _slideAnimation =
-        Tween<Offset>(
-          begin: Offset.zero,
-          end: const Offset(-0.45, 0), // Slide left further to reveal actions
-        ).animate(
-          CurvedAnimation(parent: _slideController, curve: Curves.easeInOut),
-        );
+    // Animation will be set up in build method when we have screen width
   }
 
   @override
@@ -59,6 +54,16 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
 
   @override
   Widget build(BuildContext context) {
+    // Calculate slide offset based on screen width
+    final screenWidth = MediaQuery.of(context).size.width;
+    final slideOffset = SlideActionConstants.getSlideOffset(screenWidth);
+
+    // Set up slide animation with calculated offset
+    _slideAnimation =
+        Tween<Offset>(begin: Offset.zero, end: Offset(slideOffset, 0)).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeInOut),
+        );
+
     return Consumer<FavoritesProvider>(
       builder: (context, favoritesProvider, child) {
         final isRefreshing = favoritesProvider.isRefreshing(
@@ -302,143 +307,18 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
     );
   }
 
+  // Simplified action buttons using the new component
   Widget _buildActionButtons(FavoritesProvider favoritesProvider) {
-    return Positioned.fill(
-      child: Row(
-        children: [
-          const Spacer(),
-
-          // Action buttons on the right
-          Container(
-            width: 150, // Increased width for better text display
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemGrey6,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                // Change Image button
-                Expanded(
-                  child: CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: () {
-                      _closeSlide();
-                      widget.onChangeImage?.call();
-                    },
-                    child: Container(
-                      height: double.infinity,
-                      decoration: const BoxDecoration(
-                        color: CupertinoColors.systemBlue,
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
-                        ),
-                      ),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            CupertinoIcons.photo,
-                            color: CupertinoColors.white,
-                            size: 20,
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Image',
-                            style: TextStyle(
-                              color: CupertinoColors.white,
-                              fontSize: 11, // Slightly smaller text
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Rename button
-                Expanded(
-                  child: CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: () {
-                      _closeSlide();
-                      widget.onRename?.call();
-                    },
-                    child: Container(
-                      height: double.infinity,
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.systemOrange,
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
-                        ),
-                      ),
-                      // color: CupertinoColors.systemOrange,
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            CupertinoIcons.pencil,
-                            color: CupertinoColors.white,
-                            size: 20,
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Rename',
-                            style: TextStyle(
-                              color: CupertinoColors.white,
-                              fontSize: 11, // Slightly smaller text
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Delete button
-                Expanded(
-                  child: CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: () {
-                      _closeSlide();
-                      _confirmDelete(favoritesProvider);
-                    },
-                    child: Container(
-                      height: double.infinity,
-                      decoration: const BoxDecoration(
-                        color: CupertinoColors.systemRed,
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
-                        ),
-                      ),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            CupertinoIcons.trash,
-                            color: CupertinoColors.white,
-                            size: 20,
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Delete',
-                            style: TextStyle(
-                              color: CupertinoColors.white,
-                              fontSize: 11, // Slightly smaller text
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+    return Positioned(
+      right: 0,
+      top: 0,
+      bottom: 0,
+      child: SlideActionButtons(
+        favorite: widget.favorite,
+        favoritesProvider: favoritesProvider,
+        onCloseSlide: _closeSlide,
+        onChangeImage: widget.onChangeImage,
+        onRename: widget.onRename,
       ),
     );
   }
@@ -499,31 +379,5 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
       });
       _slideController.reverse();
     }
-  }
-
-  void _confirmDelete(FavoritesProvider favoritesProvider) {
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Remove Favorite'),
-        content: Text(
-          'Remove "${widget.favorite.displayName}" from your favorites?',
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () async {
-              Navigator.pop(context);
-              await favoritesProvider.removeFavorite(widget.favorite.reachId);
-            },
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
   }
 }
