@@ -76,8 +76,9 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
           margin: const EdgeInsets.symmetric(horizontal: 19, vertical: 6),
           child: GestureDetector(
             onTap: _isSliding ? null : widget.onTap,
-            onLongPress: widget.isReorderable ? _handleLongPress : null,
-            // KEY FIX: Disable pan gestures when reordering to avoid conflicts
+            // CRITICAL FIX: Remove onLongPress when reorderable - let ReorderableListView handle it
+            onLongPress: widget.isReorderable ? null : _handleLongPress,
+            // Disable pan gestures when reorderable to avoid conflicts
             onPanStart: widget.isReorderable ? null : _handlePanStart,
             onPanUpdate: widget.isReorderable ? null : _handlePanUpdate,
             onPanEnd: widget.isReorderable ? null : _handlePanEnd,

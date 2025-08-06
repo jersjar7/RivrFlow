@@ -2,6 +2,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:rivrflow/features/favorites/widgets/favorite_river_card.dart';
 import 'package:rivrflow/features/favorites/widgets/favorites_search_bar.dart';
@@ -373,14 +374,20 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
     return ReorderableListView.builder(
       shrinkWrap: true,
-      // Better physics for drag behavior
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: favorites.length,
       onReorder: (oldIndex, newIndex) =>
           _handleReorder(oldIndex, newIndex, favoritesProvider),
       proxyDecorator: _proxyDecorator,
-      // Padding to prevent edge issues during drag
+      // Add padding to prevent edge issues
       padding: const EdgeInsets.only(bottom: 20),
+      // Add this to provide haptic feedback when drag starts
+      onReorderStart: (index) {
+        HapticFeedback.mediumImpact(); // Haptic feedback when drag begins
+      },
+      onReorderEnd: (index) {
+        HapticFeedback.lightImpact(); // Lighter feedback when drag ends
+      },
       itemBuilder: (context, index) {
         final favorite = favorites[index];
         return FavoriteRiverCard(
@@ -389,8 +396,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
           onTap: () => _navigateToForecast(favorite.reachId),
           onRename: () => _showRenameDialog(favorite),
           onChangeImage: () => _navigateToImageSelection(favorite),
-          isReorderable:
-              _searchQuery.isEmpty, // Only allow reordering when not searching
+          isReorderable: _searchQuery.isEmpty,
         );
       },
     );
@@ -434,15 +440,18 @@ class _FavoritesPageState extends State<FavoritesPage> {
     return AnimatedBuilder(
       animation: animation,
       builder: (context, child) {
+        // Scale stays consistent during drag (smaller = "grabbed")
         return Transform.scale(
-          scale: 1.05,
+          scale: 0.95, // Slightly smaller to show "grabbed" state
           child: Container(
             decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
               boxShadow: [
+                // More pronounced shadow during drag
                 BoxShadow(
-                  color: CupertinoColors.black.withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+                  color: CupertinoColors.black.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
