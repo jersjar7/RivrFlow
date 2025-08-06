@@ -2,6 +2,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/utils/river_image_utility.dart';
 import '../../../core/models/favorite_river.dart';
 import '../../../core/providers/favorites_provider.dart';
 import 'components/slide_action_buttons.dart';
@@ -134,17 +135,45 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
   }
 
   Widget _buildBackground() {
+    // Priority: Custom image -> Random default image -> Gradient fallback
+
     if (widget.favorite.customImageAsset != null) {
+      // User has selected a custom image
       return Positioned.fill(
         child: Image.asset(
           widget.favorite.customImageAsset!,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildDefaultGradient(),
+          errorBuilder: (context, error, stackTrace) {
+            // If custom image fails, fall back to random default
+            return _buildDefaultImage();
+          },
         ),
       );
+    } else {
+      // No custom image, use random default
+      return _buildDefaultImage();
     }
+  }
 
-    return _buildDefaultGradient();
+  Widget _buildDefaultImage() {
+    // Get consistent random image for this river
+    final defaultImage = RiverImageUtility.getDefaultImageForRiver(
+      widget.favorite.reachId,
+    );
+
+    return Positioned.fill(
+      child: Image.asset(
+        defaultImage,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          // If default image fails, fall back to gradient
+          print(
+            'Failed to load default image: $defaultImage, using gradient fallback',
+          );
+          return _buildDefaultGradient();
+        },
+      ),
+    );
   }
 
   Widget _buildDefaultGradient() {
