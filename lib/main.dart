@@ -13,6 +13,9 @@ import 'package:rivrflow/features/forecast/pages/medium_range_detail_page.dart';
 import 'package:rivrflow/features/forecast/pages/long_range_detail_page.dart';
 import 'package:rivrflow/features/forecast/pages/hydrograph_page.dart';
 import 'package:rivrflow/features/favorites/pages/image_selection_page.dart';
+import 'package:rivrflow/features/settings/pages/notifications_settings_page.dart';
+import 'package:rivrflow/features/settings/pages/app_theme_settings_page.dart';
+import 'package:rivrflow/features/settings/pages/sponsors_page.dart';
 import 'package:rivrflow/features/map/widgets/map_with_favorites.dart';
 import 'package:rivrflow/test/home_page.dart';
 import 'firebase_options.dart';
@@ -68,6 +71,11 @@ class RivrFlowApp extends StatelessWidget {
             }
             return ReachOverviewPage(reachId: reachId);
           },
+          // Settings pages
+          '/notifications-settings': (context) =>
+              const NotificationsSettingsPage(),
+          '/app-theme-settings': (context) => const AppThemeSettingsPage(),
+          '/sponsors': (context) => const SponsorsPage(),
           '/test-home': (context) =>
               const HomePage(), // Keep test home for development
         },

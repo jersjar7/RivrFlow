@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivrflow/features/favorites/widgets/favorite_river_card.dart';
 import 'package:rivrflow/features/favorites/widgets/favorites_search_bar.dart';
+import 'package:rivrflow/features/settings/pages/app_theme_settings_page.dart';
+import 'package:rivrflow/features/settings/pages/notifications_settings_page.dart';
+import 'package:rivrflow/features/settings/pages/sponsors_page.dart';
 import '../../../core/providers/favorites_provider.dart';
 import '../../../core/models/favorite_river.dart';
 
@@ -77,7 +80,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   Widget _buildFloatingActionButton() {
     return Positioned(
-      bottom: 20,
+      bottom: 50,
       right: 20,
       child: FloatingActionButton(
         onPressed: _navigateToMap,
@@ -249,7 +252,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
   Widget _buildAppHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(32, 16, 32, 16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 32, 16),
       child: Row(
         children: [
           // App title
@@ -476,10 +479,15 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   void _showSettingsMenu() {
-    showCupertinoModalPopup(
+    showGeneralDialog(
       context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Settings Menu',
       barrierColor: CupertinoColors.black.withOpacity(0.3),
-      builder: (context) => _buildDropdownMenu(),
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return FadeTransition(opacity: animation, child: _buildDropdownMenu());
+      },
     );
   }
 
@@ -488,38 +496,45 @@ class _FavoritesPageState extends State<FavoritesPage> {
       child: Align(
         alignment: Alignment.topRight,
         child: Container(
-          margin: const EdgeInsets.only(top: 50, right: 16),
+          margin: const EdgeInsets.only(top: 30, right: 30),
           width: 250,
           decoration: BoxDecoration(
             color: const Color(0xFF2C2C2E), // Dark modal background
             borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: CupertinoColors.black.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildMenuOption('Notifications', CupertinoIcons.bell, () {
                 Navigator.pop(context);
-                // TODO: Navigate to notifications settings
+                Navigator.of(context).pushNamed('/notifications-settings');
               }),
               _buildMenuDivider(),
               _buildMenuOption('CFS', CupertinoIcons.drop, () {
                 Navigator.pop(context);
-                // TODO: Navigate to CFS settings
+                // TODO: Future implementation - user flow unit selection
               }),
               _buildMenuDivider(),
-              _buildMenuOption('CMS', CupertinoIcons.graph_square, () {
+              _buildMenuOption('CMS', CupertinoIcons.drop_triangle, () {
                 Navigator.pop(context);
-                // TODO: Navigate to CMS settings
+                // TODO: Future implementation - user flow unit selection
               }),
               _buildMenuDivider(),
               _buildMenuOption('App Theme', CupertinoIcons.moon, () {
                 Navigator.pop(context);
-                // TODO: Navigate to app theme settings
+                Navigator.of(context).pushNamed('/app-theme-settings');
               }),
               _buildMenuDivider(),
-              _buildMenuOption('Sponsors', CupertinoIcons.heart_fill, () {
+              _buildMenuOption('Sponsors', CupertinoIcons.creditcard, () {
                 Navigator.pop(context);
-                // TODO: Navigate to sponsors page
+                Navigator.of(context).pushNamed('/sponsors');
               }),
             ],
           ),
