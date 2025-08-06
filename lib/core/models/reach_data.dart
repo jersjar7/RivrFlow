@@ -31,6 +31,9 @@ class ReachData {
   final DateTime cachedAt;
   final DateTime? lastApiUpdate;
 
+  // Partial loading state
+  final bool isPartiallyLoaded;
+
   ReachData({
     required this.reachId,
     required this.riverName,
@@ -45,6 +48,7 @@ class ReachData {
     this.customName,
     required this.cachedAt,
     this.lastApiUpdate,
+    this.isPartiallyLoaded = false,
   });
 
   // Factory constructor from NOAA reaches API
@@ -71,6 +75,7 @@ class ReachData {
                   .toList()
             : null,
         cachedAt: DateTime.now(),
+        isPartiallyLoaded: false,
       );
     } catch (e) {
       throw FormatException('Failed to parse NOAA reaches API response: $e');
@@ -110,6 +115,7 @@ class ReachData {
         availableForecasts: [],
         returnPeriods: returnPeriods,
         cachedAt: DateTime.now(),
+        isPartiallyLoaded: true, // This is partial data
       );
     } catch (e) {
       throw FormatException('Failed to parse return period API response: $e');
@@ -151,6 +157,7 @@ class ReachData {
       lastApiUpdate: json['lastApiUpdate'] != null
           ? DateTime.parse(json['lastApiUpdate'] as String)
           : null,
+      isPartiallyLoaded: json['isPartiallyLoaded'] as bool? ?? false,
     );
   }
 
@@ -172,6 +179,7 @@ class ReachData {
       'customName': customName,
       'cachedAt': cachedAt.toIso8601String(),
       'lastApiUpdate': lastApiUpdate?.toIso8601String(),
+      'isPartiallyLoaded': isPartiallyLoaded,
     };
   }
 
@@ -193,6 +201,7 @@ class ReachData {
       customName: customName ?? other.customName,
       cachedAt: DateTime.now(),
       lastApiUpdate: other.lastApiUpdate ?? lastApiUpdate,
+      isPartiallyLoaded: false, // Merged data is complete
     );
   }
 
@@ -202,6 +211,7 @@ class ReachData {
     String? city,
     String? state,
     DateTime? lastApiUpdate,
+    bool? isPartiallyLoaded,
   }) {
     return ReachData(
       reachId: reachId,
@@ -217,17 +227,33 @@ class ReachData {
       customName: customName ?? this.customName,
       cachedAt: cachedAt,
       lastApiUpdate: lastApiUpdate ?? this.lastApiUpdate,
+      isPartiallyLoaded: isPartiallyLoaded ?? this.isPartiallyLoaded,
     );
   }
 
   // Helper methods
   String get displayName => customName ?? riverName;
   bool get hasCustomName => customName != null && customName!.isNotEmpty;
+
+  // Location formatting for subtitles
   String get formattedLocation =>
       city != null && state != null ? '$city, $state' : '';
 
+  // Location subtitle with coordinate fallback (fixes the subtitle issue)
+  String get formattedLocationSubtitle {
+    if (city != null && state != null) {
+      return '$city, $state';
+    }
+    // Fallback to coordinates if no city/state
+    return '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}';
+  }
+
   bool get hasReturnPeriods =>
       returnPeriods != null && returnPeriods!.isNotEmpty;
+
+  // Check if core location data is available
+  bool get hasLocationData =>
+      latitude != 0.0 && longitude != 0.0 && riverName != 'Unknown';
 
   bool isCacheStale({Duration maxAge = const Duration(days: 180)}) {
     return DateTime.now().difference(cachedAt) > maxAge;
@@ -283,7 +309,7 @@ class ReachData {
 
   @override
   String toString() {
-    return 'ReachData{reachId: $reachId, displayName: $displayName, location: $formattedLocation, hasReturnPeriods: $hasReturnPeriods}';
+    return 'ReachData{reachId: $reachId, displayName: $displayName, location: $formattedLocationSubtitle, hasReturnPeriods: $hasReturnPeriods, isPartial: $isPartiallyLoaded}';
   }
 }
 

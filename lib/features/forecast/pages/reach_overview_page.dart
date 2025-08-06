@@ -2,6 +2,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/models/reach_data.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/current_flow_status_card.dart';
 import '../widgets/forecast_category_grid.dart';
@@ -28,6 +29,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     });
   }
 
+  // Phased loading approach for better performance
   Future<void> _loadReachData() async {
     if (widget.reachId == null) return;
 
@@ -38,7 +40,16 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
 
     // Only load if we don't already have this reach loaded
     if (reachProvider.currentReach?.reachId != widget.reachId) {
-      await reachProvider.loadReach(widget.reachId!);
+      // PHASE 1: Load overview data first (fast - shows name, location, current flow)
+      final overviewSuccess = await reachProvider.loadOverviewData(
+        widget.reachId!,
+      );
+
+      if (overviewSuccess) {
+        // PHASE 2: Load supplementary data in background (adds return periods, flow categories)
+        // This runs after overview is displayed, so user sees immediate feedback
+        reachProvider.loadSupplementaryData(widget.reachId!);
+      }
     }
 
     if (mounted) {
@@ -100,53 +111,49 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
       ),
       child: Consumer<ReachDataProvider>(
         builder: (context, reachProvider, child) {
-          if (!_isInitialized && reachProvider.isLoading) {
-            return _buildLoadingState();
+          // Handle different loading phases
+          if (!_isInitialized && reachProvider.isLoadingOverview) {
+            return _buildInitialLoadingState();
           }
 
           if (reachProvider.errorMessage != null) {
             return _buildErrorState(reachProvider.errorMessage!);
           }
 
-          if (!reachProvider.hasData) {
+          if (!reachProvider.hasOverviewData) {
             return _buildEmptyState();
           }
 
-          return _buildContent(reachProvider);
+          // Progressive content display based on loading phase
+          return _buildProgressiveContent(reachProvider);
         },
       ),
     );
   }
 
-  Widget _buildContent(ReachDataProvider reachProvider) {
+  // Progressive content that shows data as it becomes available
+  Widget _buildProgressiveContent(ReachDataProvider reachProvider) {
     final reach = reachProvider.currentReach!;
 
     return SafeArea(
       bottom: false,
       child: CustomScrollView(
         slivers: [
-          // Station Header
-          SliverToBoxAdapter(child: _buildStationHeader(reach)),
+          // Station Header - Shows immediately after Phase 1
+          SliverToBoxAdapter(child: _buildStationHeader(reach, reachProvider)),
 
-          // Hero Flow Status Card
+          // Hero Flow Status Card - Shows immediately after Phase 1
+          SliverToBoxAdapter(child: _buildFlowStatusSection(reachProvider)),
+
+          // Forecast Categories Grid - Enhanced after Phase 2 (return periods loaded)
           SliverToBoxAdapter(
-            child: CurrentFlowStatusCard(
-              expanded: true,
-              onTap: () => _navigateToHydrograph('short_range'),
-            ),
+            child: _buildForecastCategoriesSection(reachProvider),
           ),
 
-          // Forecast Categories Grid
-          SliverToBoxAdapter(
-            child: ForecastCategoryGrid(
-              onCategoryTap: _navigateToForecastDetail,
-            ),
-          ),
-
-          // Chart Previews Section
+          // Chart Previews Section - Shows when forecast data is available
           SliverToBoxAdapter(child: _buildChartPreviewsSection(reachProvider)),
 
-          // Station Metadata
+          // Station Metadata - Enhanced progressively
           SliverToBoxAdapter(
             child: _buildStationMetadata(reach, reachProvider),
           ),
@@ -158,7 +165,8 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
-  Widget _buildStationHeader(reach) {
+  // IMPROVED: Uses cached formatter and shows loading states
+  Widget _buildStationHeader(ReachData reach, ReachDataProvider reachProvider) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -174,7 +182,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Main title
+          // Main title - Shows immediately
           Text(
             reach.displayName,
             style: const TextStyle(
@@ -186,15 +194,14 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
 
           const SizedBox(height: 8),
 
-          // Subtitle with location
-          if (reach.formattedLocation.isNotEmpty)
-            Text(
-              reach.formattedLocation,
-              style: const TextStyle(
-                fontSize: 16,
-                color: CupertinoColors.secondaryLabel,
-              ),
+          // NEW: Use cached formatted location (fixes subtitle issue)
+          Text(
+            reachProvider.getFormattedLocation(),
+            style: const TextStyle(
+              fontSize: 16,
+              color: CupertinoColors.secondaryLabel,
             ),
+          ),
 
           const SizedBox(height: 16),
 
@@ -224,6 +231,89 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
+  // NEW: Progressive flow status section with loading states
+  Widget _buildFlowStatusSection(ReachDataProvider reachProvider) {
+    return Column(
+      children: [
+        CurrentFlowStatusCard(
+          expanded: true,
+          onTap: () => _navigateToHydrograph('short_range'),
+        ),
+
+        // Show loading indicator for supplementary data
+        if (reachProvider.isLoadingSupplementary)
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CupertinoActivityIndicator(radius: 8),
+                const SizedBox(width: 12),
+                Text(
+                  'Loading return period data...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  // NEW: Progressive forecast categories with enhanced functionality after Phase 2
+  Widget _buildForecastCategoriesSection(ReachDataProvider reachProvider) {
+    if (reachProvider.loadingPhase == 'overview' &&
+        !reachProvider.hasSupplementaryData) {
+      // Show loading shimmer for forecast categories during Phase 2
+      return _buildForecastCategoriesShimmer();
+    }
+
+    return ForecastCategoryGrid(onCategoryTap: _navigateToForecastDetail);
+  }
+
+  // NEW: Loading shimmer for forecast categories
+  Widget _buildForecastCategoriesShimmer() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Forecast Categories',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: CupertinoColors.label,
+            ),
+          ),
+          const SizedBox(height: 16),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.5,
+            children: List.generate(4, (index) => _buildCategoryShimmer()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryShimmer() {
+    return Container(
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Center(child: CupertinoActivityIndicator(radius: 12)),
+    );
+  }
+
   Widget _buildInfoChip({
     required IconData icon,
     required String label,
@@ -232,7 +322,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -240,13 +330,17 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
         children: [
           Row(
             children: [
-              Icon(icon, size: 14, color: CupertinoColors.secondaryLabel),
+              Icon(
+                icon,
+                size: 14,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
               const SizedBox(width: 4),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
             ],
@@ -254,10 +348,10 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: CupertinoColors.label,
+              color: CupertinoColors.label.resolveFrom(context),
             ),
           ),
         ],
@@ -289,22 +383,28 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
 
         // Show chart previews for available forecast types
         ...availableTypes.take(3).map((forecastType) {
-          return ChartPreviewWidget(
-            forecastType: forecastType,
-            onTap: () => _navigateToHydrograph(forecastType),
-            height: 100,
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ChartPreviewWidget(
+              forecastType: forecastType,
+              onTap: () => _navigateToHydrograph(forecastType),
+              height: 120,
+            ),
           );
         }),
       ],
     );
   }
 
-  Widget _buildStationMetadata(reach, ReachDataProvider reachProvider) {
+  Widget _buildStationMetadata(
+    ReachData reach,
+    ReachDataProvider reachProvider,
+  ) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -331,11 +431,14 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
           if (reachProvider.hasEnsembleData())
             _buildMetadataRow('Ensemble Data', 'Available'),
 
-          if (reach.returnPeriods != null && reach.returnPeriods!.isNotEmpty)
+          // NEW: Progressive display - only show when return periods are loaded
+          if (reachProvider.hasSupplementaryData && reach.hasReturnPeriods)
             _buildMetadataRow(
               'Return Periods',
               '${reach.returnPeriods!.length} periods available',
-            ),
+            )
+          else if (reachProvider.isLoadingSupplementary)
+            _buildMetadataRow('Return Periods', 'Loading...'),
 
           _buildMetadataRow('Update Frequency', 'Every 6 hours'),
 
@@ -363,13 +466,15 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
         children: [
           Text(
             label,
-            style: const TextStyle(color: CupertinoColors.secondaryLabel),
+            style: TextStyle(
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w500,
-              color: CupertinoColors.label,
+              color: CupertinoColors.label.resolveFrom(context),
             ),
           ),
         ],
@@ -377,18 +482,27 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
-  Widget _buildLoadingState() {
-    return const Center(
+  // NEW: Better initial loading state
+  Widget _buildInitialLoadingState() {
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CupertinoActivityIndicator(radius: 20),
-          SizedBox(height: 16),
+          const CupertinoActivityIndicator(radius: 20),
+          const SizedBox(height: 16),
           Text(
-            'Loading river data...',
+            'Loading river overview...',
             style: TextStyle(
               fontSize: 16,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'This should only take a moment',
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
             ),
           ),
         ],
@@ -420,7 +534,9 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
             const SizedBox(height: 8),
             Text(
               error,
-              style: const TextStyle(color: CupertinoColors.secondaryLabel),
+              style: TextStyle(
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -435,19 +551,19 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
   }
 
   Widget _buildEmptyState() {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(32),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               CupertinoIcons.chart_bar,
               size: 48,
               color: CupertinoColors.secondaryLabel,
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               'No Forecast Data',
               style: TextStyle(
                 fontSize: 20,
@@ -455,10 +571,12 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
                 color: CupertinoColors.label,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'This reach currently has no forecast data available.',
-              style: TextStyle(color: CupertinoColors.secondaryLabel),
+              style: TextStyle(
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
               textAlign: TextAlign.center,
             ),
           ],

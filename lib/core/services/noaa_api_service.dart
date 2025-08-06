@@ -7,6 +7,7 @@ import 'error_service.dart';
 
 /// Service for fetching data from NOAA APIs
 /// Integrates with existing AppConfig and ErrorService
+/// With selective loading for better performance
 class NoaaApiService {
   static final NoaaApiService _instance = NoaaApiService._internal();
   factory NoaaApiService() => _instance;
@@ -14,15 +15,34 @@ class NoaaApiService {
 
   final http.Client _client = http.Client();
 
-  // STEP 2.1: Reach Info Fetching
+  // Different timeout durations for different request priorities
+  static const Duration _quickTimeout = Duration(
+    seconds: 10,
+  ); // For overview data
+  static const Duration _normalTimeout = Duration(
+    seconds: 20,
+  ); // For supplementary data
+  static const Duration _longTimeout = Duration(
+    seconds: 30,
+  ); // For complete data
+
+  // Reach Info Fetching (OPTIMIZED for overview)
   /// Fetch reach information from NOAA Reaches API
   /// Returns data in format expected by ReachData.fromNoaaApi()
-  Future<Map<String, dynamic>> fetchReachInfo(String reachId) async {
+  /// Now optimized with shorter timeout for overview loading
+  Future<Map<String, dynamic>> fetchReachInfo(
+    String reachId, {
+    bool isOverview = false,
+  }) async {
     try {
-      print('NOAA_API: Fetching reach info for: $reachId');
+      print(
+        'NOAA_API: Fetching reach info for: $reachId ${isOverview ? "(overview)" : ""}',
+      );
 
       final url = AppConfig.getReachUrl(reachId);
       print('NOAA_API: URL: $url');
+
+      final timeout = isOverview ? _quickTimeout : _normalTimeout;
 
       final response = await _client
           .get(
@@ -30,9 +50,11 @@ class NoaaApiService {
             headers: {
               'Content-Type': 'application/json',
               'User-Agent': 'RivrFlow/1.0',
+              // Priority header for overview requests
+              if (isOverview) 'X-Request-Priority': 'high',
             },
           )
-          .timeout(AppConfig.httpTimeout);
+          .timeout(timeout);
 
       print('NOAA_API: Response status: ${response.statusCode}');
 
@@ -57,7 +79,17 @@ class NoaaApiService {
     }
   }
 
-  // STEP 2.2: Return Period Fetching
+  // Fast current flow fetching for overview
+  /// Fetch only current flow data for overview display
+  /// Uses short-range forecast but with optimized timeout
+  Future<Map<String, dynamic>> fetchCurrentFlowOnly(String reachId) async {
+    print('NOAA_API: Fetching current flow only for: $reachId');
+
+    // Use existing forecast method but with quick timeout and priority
+    return await fetchForecast(reachId, 'short_range', isOverview: true);
+  }
+
+  // Return Period Fetching (handles failures gracefully)
   /// Fetch return period data from NWM API
   /// Returns array data in format expected by ReachData.fromReturnPeriodApi()
   Future<List<dynamic>> fetchReturnPeriods(String reachId) async {
@@ -75,7 +107,7 @@ class NoaaApiService {
               'User-Agent': 'RivrFlow/1.0',
             },
           )
-          .timeout(AppConfig.httpTimeout);
+          .timeout(_normalTimeout); // Use normal timeout for supplementary data
 
       print('NOAA_API: Return period response status: ${response.statusCode}');
 
@@ -134,18 +166,25 @@ class NoaaApiService {
     }
   }
 
-  // STEP 2.3: Forecast Fetching
+  // Forecast Fetching (OPTIMIZED with priority support)
   /// Fetch streamflow forecast data from NOAA API for a specific series
   /// Returns data in format expected by ForecastResponse.fromJson()
+  /// Now with priority handling for overview vs detailed loading
   Future<Map<String, dynamic>> fetchForecast(
     String reachId,
-    String series,
-  ) async {
+    String series, {
+    bool isOverview = false, // Priority flag for overview loading
+  }) async {
     try {
-      print('NOAA_API: Fetching $series forecast for: $reachId');
+      print(
+        'NOAA_API: Fetching $series forecast for: $reachId ${isOverview ? "(overview)" : ""}',
+      );
 
       final url = AppConfig.getForecastUrl(reachId, series);
       print('NOAA_API: Forecast URL: $url');
+
+      // Use appropriate timeout based on priority
+      final timeout = isOverview ? _quickTimeout : _normalTimeout;
 
       final response = await _client
           .get(
@@ -153,9 +192,11 @@ class NoaaApiService {
             headers: {
               'Content-Type': 'application/json',
               'User-Agent': 'RivrFlow/1.0',
+              // Priority header for overview requests
+              if (isOverview) 'X-Request-Priority': 'high',
             },
           )
-          .timeout(AppConfig.httpTimeout);
+          .timeout(timeout);
 
       print('NOAA_API: Forecast response status: ${response.statusCode}');
 
@@ -177,7 +218,35 @@ class NoaaApiService {
     }
   }
 
-  // STEP 2.4: Complete Forecast Fetching
+  // Optimized overview data fetching
+  /// Fetch minimal data needed for overview page: reach info + current flow
+  /// Optimized for speed with shorter timeouts and priority headers
+  Future<Map<String, dynamic>> fetchOverviewData(String reachId) async {
+    print('NOAA_API: Fetching overview data for reach: $reachId');
+
+    try {
+      // Fetch reach info and short-range forecast in parallel with overview priority
+      final futures = await Future.wait([
+        fetchReachInfo(reachId, isOverview: true),
+        fetchCurrentFlowOnly(reachId),
+      ]);
+
+      final reachInfo = futures[0];
+      final flowData = futures[1];
+
+      // Combine into overview response format
+      final overviewResponse = Map<String, dynamic>.from(flowData);
+      overviewResponse['reach'] = reachInfo;
+
+      print('NOAA_API: ✅ Successfully fetched overview data');
+      return overviewResponse;
+    } catch (e) {
+      print('NOAA_API: ❌ Error fetching overview data: $e');
+      rethrow;
+    }
+  }
+
+  // Complete Forecast Fetching (use longer timeout for complete data)
   /// Fetch all available forecast types for a reach
   /// Orchestrates multiple API calls to get complete forecast data
   /// Returns combined data with all available forecasts
@@ -189,17 +258,32 @@ class NoaaApiService {
     final forecastTypes = ['short_range', 'medium_range', 'long_range'];
     final results = <String, Map<String, dynamic>?>{};
 
-    // Fetch each forecast type
+    // Fetch each forecast type with longer timeout for complete data
     for (final forecastType in forecastTypes) {
       try {
         print('NOAA_API: Attempting to fetch $forecastType...');
-        final response = await fetchForecast(reachId, forecastType);
-        results[forecastType] = response;
+        // Use normal timeout for complete data loading
+        final response = await _client
+            .get(
+              Uri.parse(AppConfig.getForecastUrl(reachId, forecastType)),
+              headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'RivrFlow/1.0',
+              },
+            )
+            .timeout(_longTimeout); // Longer timeout for complete loading
 
-        // Use first successful response as base for reach info
-        combinedResponse ??= response;
-
-        print('NOAA_API: ✅ Successfully fetched $forecastType');
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          results[forecastType] = data;
+          combinedResponse ??= data;
+          print('NOAA_API: ✅ Successfully fetched $forecastType');
+        } else {
+          print(
+            'NOAA_API: ⚠️ Failed to fetch $forecastType: ${response.statusCode}',
+          );
+          results[forecastType] = null;
+        }
       } catch (e) {
         print('NOAA_API: ⚠️ Failed to fetch $forecastType: $e');
         results[forecastType] = null;

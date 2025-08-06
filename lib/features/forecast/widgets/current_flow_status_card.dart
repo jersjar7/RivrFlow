@@ -43,16 +43,20 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
   Widget build(BuildContext context) {
     return Consumer<ReachDataProvider>(
       builder: (context, reachProvider, child) {
-        if (reachProvider.isLoading) {
+        // Handle initial loading (no overview data yet)
+        if (reachProvider.isLoadingOverview ||
+            (!reachProvider.hasOverviewData && reachProvider.isLoading)) {
           return _buildLoadingCard();
         }
 
-        if (!reachProvider.hasData) {
+        // Handle no data state
+        if (!reachProvider.hasOverviewData) {
           return _buildEmptyCard();
         }
 
-        final currentFlow = reachProvider.getCurrentFlow();
-        final category = reachProvider.getFlowCategory();
+        // NEW: Use cached values instead of direct calls
+        final currentFlow = reachProvider.getCurrentFlow(); // Now cached!
+        final category = reachProvider.getFlowCategory(); // Now cached!
         final reach = reachProvider.currentReach;
 
         return GestureDetector(
@@ -88,17 +92,25 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
                         const SizedBox(height: 16),
                         _buildFlowValue(currentFlow),
                         const SizedBox(height: 16),
-                        if (reach?.returnPeriods != null &&
-                            reach!.returnPeriods!.isNotEmpty)
-                          _buildFlowIndicator(
-                            currentFlow!,
-                            reach.returnPeriods!,
-                          ),
+
+                        // NEW: Progressive flow indicator based on loading state
+                        _buildProgressiveFlowIndicator(
+                          currentFlow,
+                          reach,
+                          reachProvider,
+                        ),
+
                         const SizedBox(height: 12),
-                        _buildMetadata(reach),
+                        _buildMetadata(
+                          reach,
+                          reachProvider,
+                        ), // Pass provider for cached location
                         if (widget.expanded) ...[
                           const SizedBox(height: 16),
-                          _buildExpandedContent(reach),
+                          _buildExpandedContent(
+                            reach,
+                            reachProvider,
+                          ), // Pass provider
                         ] else
                           _buildExpandHint(),
                       ],
@@ -176,6 +188,95 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // NEW: Progressive flow indicator that handles loading states
+  Widget _buildProgressiveFlowIndicator(
+    double? currentFlow,
+    dynamic reach,
+    ReachDataProvider reachProvider,
+  ) {
+    // Show return period flow indicator if we have the data
+    if (reach?.returnPeriods != null &&
+        reach!.returnPeriods!.isNotEmpty &&
+        currentFlow != null) {
+      return _buildFlowIndicator(currentFlow, reach.returnPeriods!);
+    }
+
+    // Show loading state if we're loading supplementary data (return periods)
+    if (reachProvider.isLoadingSupplementary && currentFlow != null) {
+      return _buildFlowIndicatorLoading();
+    }
+
+    // Show basic indicator without return periods if we only have overview data
+    if (currentFlow != null && reachProvider.loadingPhase == 'overview') {
+      return _buildBasicFlowIndicator();
+    }
+
+    // No indicator if no flow data
+    return const SizedBox.shrink();
+  }
+
+  // NEW: Loading state for flow indicator
+  Widget _buildFlowIndicatorLoading() {
+    return Column(
+      children: [
+        Container(
+          height: 8,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: CupertinoColors.white.withOpacity(0.3),
+          ),
+          child: const Center(
+            child: SizedBox(
+              height: 4,
+              width: 40,
+              child: CupertinoActivityIndicator(
+                color: CupertinoColors.white,
+                radius: 6,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Loading flow categories...',
+          style: TextStyle(
+            color: CupertinoColors.white.withOpacity(0.7),
+            fontSize: 10,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // NEW: Basic flow indicator without return periods
+  Widget _buildBasicFlowIndicator() {
+    return Column(
+      children: [
+        Container(
+          height: 8,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            gradient: LinearGradient(
+              colors: [
+                CupertinoColors.systemBlue.withOpacity(0.5),
+                CupertinoColors.systemGreen.withOpacity(0.5),
+                CupertinoColors.systemOrange.withOpacity(0.5),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Flow categories loading...',
+          style: TextStyle(
+            color: CupertinoColors.white.withOpacity(0.7),
+            fontSize: 10,
           ),
         ),
       ],
@@ -268,7 +369,8 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
     );
   }
 
-  Widget _buildMetadata(reach) {
+  // IMPROVED: Use cached formatted location
+  Widget _buildMetadata(dynamic reach, ReachDataProvider reachProvider) {
     if (reach == null) return const SizedBox.shrink();
 
     return Row(
@@ -286,23 +388,34 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
             fontSize: 14,
           ),
         ),
-        if (reach.formattedLocation.isNotEmpty) ...[
-          const SizedBox(width: 8),
-          Text(
-            '• ${reach.formattedLocation}',
-            style: TextStyle(
-              color: CupertinoColors.white.withOpacity(0.7),
-              fontSize: 14,
-            ),
-          ),
-        ],
+
+        // NEW: Use cached formatted location (fixes subtitle issues)
+        Builder(
+          builder: (context) {
+            final formattedLocation = reachProvider.getFormattedLocation();
+            if (formattedLocation.isNotEmpty) {
+              return Row(
+                children: [
+                  const SizedBox(width: 8),
+                  Text(
+                    '• $formattedLocation',
+                    style: TextStyle(
+                      color: CupertinoColors.white.withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
       ],
     );
   }
 
-  Widget _buildExpandedContent(reach) {
-    if (reach?.returnPeriods == null) return const SizedBox.shrink();
-
+  // IMPROVED: Handle loading states for return periods
+  Widget _buildExpandedContent(dynamic reach, ReachDataProvider reachProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -355,10 +468,74 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
           firstChild: const SizedBox.shrink(),
           secondChild: Padding(
             padding: const EdgeInsets.only(top: 12),
-            child: _buildReturnPeriodTable(reach.returnPeriods!),
+            child: _buildReturnPeriodContent(reach, reachProvider),
           ),
         ),
       ],
+    );
+  }
+
+  // NEW: Progressive return period content
+  Widget _buildReturnPeriodContent(
+    dynamic reach,
+    ReachDataProvider reachProvider,
+  ) {
+    // Show return period table if we have the data
+    if (reach?.returnPeriods != null && reach!.returnPeriods!.isNotEmpty) {
+      return _buildReturnPeriodTable(reach.returnPeriods!);
+    }
+
+    // Show loading state if we're loading supplementary data
+    if (reachProvider.isLoadingSupplementary) {
+      return _buildReturnPeriodLoading();
+    }
+
+    // Show not available message
+    return _buildReturnPeriodNotAvailable();
+  }
+
+  // NEW: Loading state for return period table
+  Widget _buildReturnPeriodLoading() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: CupertinoColors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Center(
+        child: Column(
+          children: [
+            CupertinoActivityIndicator(
+              color: CupertinoColors.white,
+              radius: 12,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Loading return period data...',
+              style: TextStyle(color: CupertinoColors.white, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Not available state for return periods
+  Widget _buildReturnPeriodNotAvailable() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: CupertinoColors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        'Return period data is not available for this reach.',
+        style: TextStyle(
+          color: CupertinoColors.white.withOpacity(0.8),
+          fontSize: 14,
+        ),
+        textAlign: TextAlign.center,
+      ),
     );
   }
 

@@ -6,7 +6,7 @@ import 'reach_cache_service.dart';
 
 /// Simple service for loading complete forecast data
 /// Combines reach info, return periods, and all forecast types
-/// Now with caching for static reach data
+/// Now with phased loading for better performance
 class ForecastService {
   static final ForecastService _instance = ForecastService._internal();
   factory ForecastService() => _instance;
@@ -15,6 +15,152 @@ class ForecastService {
   final NoaaApiService _apiService = NoaaApiService();
   final ReachCacheService _cacheService = ReachCacheService();
 
+  // Cache computed values to avoid repeated calculations
+  final Map<String, double?> _currentFlowCache = {};
+  final Map<String, String> _flowCategoryCache = {};
+
+  // PHASE 1 - Load minimal data for overview page
+  /// Load only essential data for overview page: reach info + current flow
+  /// This is the fastest possible load - only what's needed immediately
+  Future<ForecastResponse> loadOverviewData(String reachId) async {
+    try {
+      print('FORECAST_SERVICE: Loading overview data for reach: $reachId');
+
+      // Step 1: Check cache for reach data first
+      final cachedReach = await _cacheService.get(reachId);
+
+      ReachData reach;
+      if (cachedReach != null) {
+        print('FORECAST_SERVICE: ✅ Using cached reach data');
+        reach = cachedReach;
+      } else {
+        print('FORECAST_SERVICE: Cache miss - fetching reach info only');
+
+        // Only fetch reach info (fastest API call)
+        final reachInfo = await _apiService.fetchReachInfo(reachId);
+        reach = ReachData.fromNoaaApi(reachInfo);
+
+        // Mark as partial since we don't have return periods yet
+        reach = reach.copyWith(isPartiallyLoaded: true);
+
+        // Cache the basic reach data
+        await _cacheService.store(reach);
+        print('FORECAST_SERVICE: ✅ Cached basic reach data');
+      }
+
+      // Step 2: Get only short-range forecast for current flow
+      final shortRangeData = await _apiService.fetchForecast(
+        reachId,
+        'short_range',
+      );
+      final forecastResponse = ForecastResponse.fromJson(shortRangeData);
+
+      final overviewResponse = ForecastResponse(
+        reach: reach,
+        analysisAssimilation: null, // Skip for overview
+        shortRange:
+            forecastResponse.shortRange, // Only need this for current flow
+        mediumRange: {}, // Empty for overview
+        longRange: {}, // Empty for overview
+        mediumRangeBlend: null, // Skip for overview
+      );
+
+      // Cache current flow value
+      final currentFlow = getCurrentFlow(overviewResponse);
+      if (currentFlow != null) {
+        _currentFlowCache[reachId] = currentFlow;
+      }
+
+      print('FORECAST_SERVICE: ✅ Overview data loaded successfully');
+      return overviewResponse;
+    } catch (e) {
+      print('FORECAST_SERVICE: ❌ Error loading overview data: $e');
+      rethrow;
+    }
+  }
+
+  // PHASE 2 - Add return periods and forecast summaries
+  /// Load supplementary data: return periods + other forecast summaries
+  /// Call this after overview data is displayed to enhance functionality
+  Future<ForecastResponse> loadSupplementaryData(
+    String reachId,
+    ForecastResponse existingData,
+  ) async {
+    try {
+      print('FORECAST_SERVICE: Loading supplementary data for reach: $reachId');
+
+      ReachData reach = existingData.reach;
+
+      // Only load return periods if we don't have them
+      if (!reach.hasReturnPeriods) {
+        try {
+          final returnPeriods = await _apiService.fetchReturnPeriods(reachId);
+          if (returnPeriods.isNotEmpty) {
+            final returnPeriodData = ReachData.fromReturnPeriodApi(
+              returnPeriods,
+            );
+            reach = reach.mergeWith(returnPeriodData);
+
+            // Update cache with complete data
+            await _cacheService.store(reach);
+            print('FORECAST_SERVICE: ✅ Added return period data');
+          }
+        } catch (e) {
+          print('FORECAST_SERVICE: ⚠️ Return periods failed, continuing: $e');
+          // Continue without return periods
+        }
+      }
+
+      // Load medium-range summary for forecast grid (don't need full data)
+      ForecastResponse enhancedResponse = existingData;
+      try {
+        final mediumRangeData = await _apiService.fetchForecast(
+          reachId,
+          'medium_range',
+        );
+        final mediumForecast = ForecastResponse.fromJson(mediumRangeData);
+
+        enhancedResponse = ForecastResponse(
+          reach: reach,
+          analysisAssimilation: existingData.analysisAssimilation,
+          shortRange: existingData.shortRange,
+          mediumRange: mediumForecast.mediumRange,
+          longRange: existingData.longRange,
+          mediumRangeBlend: existingData.mediumRangeBlend,
+        );
+      } catch (e) {
+        print(
+          'FORECAST_SERVICE: ⚠️ Medium range forecast failed, continuing: $e',
+        );
+        // Use existing data if medium range fails
+        enhancedResponse = ForecastResponse(
+          reach: reach,
+          analysisAssimilation: existingData.analysisAssimilation,
+          shortRange: existingData.shortRange,
+          mediumRange: existingData.mediumRange,
+          longRange: existingData.longRange,
+          mediumRangeBlend: existingData.mediumRangeBlend,
+        );
+      }
+
+      // Update cached flow category now that we have return periods
+      if (reach.hasReturnPeriods) {
+        final currentFlow = getCurrentFlow(enhancedResponse);
+        if (currentFlow != null) {
+          _flowCategoryCache[reachId] = reach.getFlowCategory(currentFlow);
+        }
+      }
+
+      print('FORECAST_SERVICE: ✅ Supplementary data loaded successfully');
+      return enhancedResponse;
+    } catch (e) {
+      print('FORECAST_SERVICE: ❌ Error loading supplementary data: $e');
+      // Return existing data if supplementary loading fails
+      return existingData;
+    }
+  }
+
+  // Keep for backwards compatibility and detail pages
   /// Load complete reach and forecast data
   /// Returns ForecastResponse with all available forecast types
   /// Uses cache for static reach data, always fetches fresh forecast data
@@ -84,6 +230,15 @@ class ForecastService {
         longRange: forecastResponse.longRange,
         mediumRangeBlend: forecastResponse.mediumRangeBlend,
       );
+
+      // Update caches
+      final currentFlow = getCurrentFlow(completeResponse);
+      if (currentFlow != null) {
+        _currentFlowCache[reachId] = currentFlow;
+        if (reach.hasReturnPeriods) {
+          _flowCategoryCache[reachId] = reach.getFlowCategory(currentFlow);
+        }
+      }
 
       print('FORECAST_SERVICE: ✅ Complete data loaded successfully');
       return completeResponse;
@@ -174,6 +329,11 @@ class ForecastService {
   Future<ForecastResponse> refreshReachData(String reachId) async {
     print('FORECAST_SERVICE: Force refreshing reach data for: $reachId');
     await _cacheService.forceRefresh(reachId);
+
+    // Clear computed caches too
+    _currentFlowCache.remove(reachId);
+    _flowCategoryCache.remove(reachId);
+
     return await loadCompleteReachData(reachId);
   }
 
@@ -187,8 +347,16 @@ class ForecastService {
     return await _cacheService.getCacheStats();
   }
 
-  /// Get current flow value for display
+  // Use cache first, then compute if needed
+  /// Get current flow value for display - now with caching
   double? getCurrentFlow(ForecastResponse forecast, {String? preferredType}) {
+    final reachId = forecast.reach.reachId;
+
+    // Check cache first
+    if (_currentFlowCache.containsKey(reachId)) {
+      return _currentFlowCache[reachId];
+    }
+
     // Priority order for current flow display
     final types = preferredType != null
         ? [preferredType, 'short_range', 'medium_range', 'long_range']
@@ -200,20 +368,36 @@ class ForecastService {
       if (flow != null && flow > -9000) {
         // Check for missing data sentinel values
         print('FORECAST_SERVICE: Using $type for current flow: $flow');
+
+        // Cache the result
+        _currentFlowCache[reachId] = flow;
         return flow;
       }
     }
 
     print('FORECAST_SERVICE: No current flow data available');
+    _currentFlowCache[reachId] = null; // Cache null result too
     return null;
   }
 
-  /// Get flow category with return period context
+  // Use cache first, then compute if needed
+  /// Get flow category with return period context - now with caching
   String getFlowCategory(ForecastResponse forecast, {String? preferredType}) {
+    final reachId = forecast.reach.reachId;
+
+    // Check cache first
+    if (_flowCategoryCache.containsKey(reachId)) {
+      return _flowCategoryCache[reachId]!;
+    }
+
     final flow = getCurrentFlow(forecast, preferredType: preferredType);
     if (flow == null) return 'Unknown';
 
-    return forecast.reach.getFlowCategory(flow);
+    final category = forecast.reach.getFlowCategory(flow);
+
+    // Cache the result
+    _flowCategoryCache[reachId] = category;
+    return category;
   }
 
   /// Get available forecast types
@@ -266,5 +450,12 @@ class ForecastService {
       'members': memberKeys,
       'dataSource': forecast.getDataSource(forecastType),
     };
+  }
+
+  // NEW: Clear all caches (useful for testing)
+  void clearComputedCaches() {
+    _currentFlowCache.clear();
+    _flowCategoryCache.clear();
+    print('FORECAST_SERVICE: Cleared computed value caches');
   }
 }
