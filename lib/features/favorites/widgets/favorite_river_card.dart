@@ -76,20 +76,19 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
           margin: const EdgeInsets.symmetric(horizontal: 19, vertical: 6),
           child: GestureDetector(
             onTap: _isSliding ? null : widget.onTap,
-            // CRITICAL FIX: Remove onLongPress when reorderable - let ReorderableListView handle it
+            // Remove onLongPress when reorderable - let ReorderableListView handle it
             onLongPress: widget.isReorderable ? null : _handleLongPress,
-            // Disable pan gestures when reorderable to avoid conflicts
-            onPanStart: widget.isReorderable ? null : _handlePanStart,
-            onPanUpdate: widget.isReorderable ? null : _handlePanUpdate,
-            onPanEnd: widget.isReorderable ? null : _handlePanEnd,
+            // RE-ENABLE pan gestures - they can coexist with reordering
+            onPanStart: _handlePanStart,
+            onPanUpdate: _handlePanUpdate,
+            onPanEnd: _handlePanEnd,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               transform: Matrix4.identity()..scale(_isPressed ? 0.98 : 1.0),
               child: Stack(
                 children: [
-                  // Action buttons (only show when not in reorderable mode)
-                  if (_isSliding && !widget.isReorderable)
-                    _buildActionButtons(favoritesProvider),
+                  // Action buttons (show when sliding)
+                  if (_isSliding) _buildActionButtons(favoritesProvider),
 
                   // Main card content
                   SlideTransition(
@@ -357,17 +356,22 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
   }
 
   void _handlePanUpdate(DragUpdateDetails details) {
-    if (details.delta.dx < -3 && !_isSliding) {
-      // More sensitive swipe detection
-      // Swiping left - show actions
-      setState(() {
-        _isSliding = true;
-      });
-      _slideController.forward();
-    } else if (details.delta.dx > 3 && _isSliding) {
-      // More sensitive swipe detection
-      // Swiping right - hide actions
-      _closeSlide();
+    // Only respond to horizontal gestures to avoid interfering with vertical reorder drags
+    final horizontalDelta = details.delta.dx.abs();
+    final verticalDelta = details.delta.dy.abs();
+
+    // Only trigger slide actions if the gesture is primarily horizontal
+    if (horizontalDelta > verticalDelta) {
+      if (details.delta.dx < -5 && !_isSliding) {
+        // More sensitive swipe detection - swiping left shows actions
+        setState(() {
+          _isSliding = true;
+        });
+        _slideController.forward();
+      } else if (details.delta.dx > 5 && _isSliding) {
+        // Swiping right hides actions
+        _closeSlide();
+      }
     }
   }
 

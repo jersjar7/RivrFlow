@@ -374,19 +374,19 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
     return ReorderableListView.builder(
       shrinkWrap: true,
-      physics: const AlwaysScrollableScrollPhysics(),
+      // Revert to original physics - works better with nested CustomScrollView
+      physics:
+          const NeverScrollableScrollPhysics(), // Let parent CustomScrollView handle scrolling
       itemCount: favorites.length,
       onReorder: (oldIndex, newIndex) =>
           _handleReorder(oldIndex, newIndex, favoritesProvider),
       proxyDecorator: _proxyDecorator,
-      // Add padding to prevent edge issues
       padding: const EdgeInsets.only(bottom: 20),
-      // Add this to provide haptic feedback when drag starts
       onReorderStart: (index) {
-        HapticFeedback.mediumImpact(); // Haptic feedback when drag begins
+        HapticFeedback.mediumImpact();
       },
       onReorderEnd: (index) {
-        HapticFeedback.lightImpact(); // Lighter feedback when drag ends
+        HapticFeedback.lightImpact();
       },
       itemBuilder: (context, index) {
         final favorite = favorites[index];

@@ -329,14 +329,8 @@ class _ImageSelectionPageState extends State<ImageSelectionPage> {
       );
 
       if (success && mounted) {
-        // Show success feedback
-        _showSuccessMessage();
-
-        // Navigate back after short delay
-        await Future.delayed(const Duration(milliseconds: 800));
-        if (mounted) {
-          Navigator.pop(context);
-        }
+        // Just navigate back immediately - the updated image will be visible in favorites
+        Navigator.of(context).pop();
       } else if (mounted) {
         _showErrorMessage('Failed to update image. Please try again.');
       }
@@ -351,27 +345,6 @@ class _ImageSelectionPageState extends State<ImageSelectionPage> {
         });
       }
     }
-  }
-
-  void _showSuccessMessage() {
-    showCupertinoDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const CupertinoAlertDialog(
-        content: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.checkmark_circle_fill,
-              color: CupertinoColors.systemGreen,
-              size: 24,
-            ),
-            SizedBox(width: 12),
-            Text('Image updated successfully!'),
-          ],
-        ),
-      ),
-    );
   }
 
   void _showErrorMessage(String message) {
