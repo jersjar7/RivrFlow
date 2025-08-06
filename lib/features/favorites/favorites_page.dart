@@ -81,7 +81,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
       right: 20,
       child: FloatingActionButton(
         onPressed: _navigateToMap,
-        backgroundColor: CupertinoColors.darkBackgroundGray,
+        backgroundColor: CupertinoColors.systemBlue,
         child: const Icon(CupertinoIcons.add, color: CupertinoColors.white),
       ),
     );
@@ -373,7 +373,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
     return ReorderableListView.builder(
       shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const ClampingScrollPhysics(), // Allow scrolling AND reordering
       itemCount: favorites.length,
       onReorder: (oldIndex, newIndex) =>
           _handleReorder(oldIndex, newIndex, favoritesProvider),

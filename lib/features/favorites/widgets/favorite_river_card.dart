@@ -1,6 +1,7 @@
 // lib/features/favorites/widgets/favorite_river_card.dart
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:rivrflow/core/utils/river_image_utility.dart';
 import '../../../core/models/favorite_river.dart';
@@ -125,9 +126,6 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
 
             // Content overlay
             _buildContentOverlay(isRefreshing),
-
-            // Reorder handle (if reorderable)
-            // if (widget.isReorderable) _buildReorderHandle(),
           ],
         ),
       ),
@@ -317,25 +315,6 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
     );
   }
 
-  // Widget _buildReorderHandle() {
-  //   return Positioned(
-  //     top: 8,
-  //     right: 8,
-  //     child: Container(
-  //       padding: const EdgeInsets.all(4),
-  //       decoration: BoxDecoration(
-  //         color: CupertinoColors.white.withOpacity(0.2),
-  //         borderRadius: BorderRadius.circular(4),
-  //       ),
-  //       child: Icon(
-  //         CupertinoIcons.bars,
-  //         color: CupertinoColors.white.withOpacity(0.8),
-  //         size: 16,
-  //       ),
-  //     ),
-  //   );
-  // }
-
   // Simplified action buttons using the new component
   Widget _buildActionButtons(FavoritesProvider favoritesProvider) {
     return Positioned(
@@ -396,9 +375,22 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
   }
 
   void _handleLongPress() {
-    // Provide haptic feedback for reordering
-    // The actual reordering is handled by ReorderableListView
-    // This just provides user feedback
+    // Provide haptic feedback when starting to reorder
+    HapticFeedback.mediumImpact();
+
+    // Optional: Add a subtle visual indicator that reorder mode is active
+    setState(() {
+      _isPressed = true;
+    });
+
+    // Reset after a short delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() {
+          _isPressed = false;
+        });
+      }
+    });
   }
 
   void _closeSlide() {
