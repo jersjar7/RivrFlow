@@ -81,7 +81,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
       right: 20,
       child: FloatingActionButton(
         onPressed: _navigateToMap,
-        backgroundColor: CupertinoColors.systemBlue,
+        backgroundColor: CupertinoColors.darkBackgroundGray,
         child: const Icon(CupertinoIcons.add, color: CupertinoColors.white),
       ),
     );
@@ -373,11 +373,14 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
     return ReorderableListView.builder(
       shrinkWrap: true,
-      physics: const ClampingScrollPhysics(), // Allow scrolling AND reordering
+      // Better physics for drag behavior
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: favorites.length,
       onReorder: (oldIndex, newIndex) =>
           _handleReorder(oldIndex, newIndex, favoritesProvider),
       proxyDecorator: _proxyDecorator,
+      // Padding to prevent edge issues during drag
+      padding: const EdgeInsets.only(bottom: 20),
       itemBuilder: (context, index) {
         final favorite = favorites[index];
         return FavoriteRiverCard(

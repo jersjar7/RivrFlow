@@ -77,16 +77,18 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
           child: GestureDetector(
             onTap: _isSliding ? null : widget.onTap,
             onLongPress: widget.isReorderable ? _handleLongPress : null,
-            onPanStart: _handlePanStart,
-            onPanUpdate: _handlePanUpdate,
-            onPanEnd: _handlePanEnd,
+            // KEY FIX: Disable pan gestures when reordering to avoid conflicts
+            onPanStart: widget.isReorderable ? null : _handlePanStart,
+            onPanUpdate: widget.isReorderable ? null : _handlePanUpdate,
+            onPanEnd: widget.isReorderable ? null : _handlePanEnd,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               transform: Matrix4.identity()..scale(_isPressed ? 0.98 : 1.0),
               child: Stack(
                 children: [
-                  // Action buttons (revealed when sliding)
-                  if (_isSliding) _buildActionButtons(favoritesProvider),
+                  // Action buttons (only show when not in reorderable mode)
+                  if (_isSliding && !widget.isReorderable)
+                    _buildActionButtons(favoritesProvider),
 
                   // Main card content
                   SlideTransition(
@@ -384,7 +386,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
     });
 
     // Reset after a short delay
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 150), () {
       if (mounted) {
         setState(() {
           _isPressed = false;
