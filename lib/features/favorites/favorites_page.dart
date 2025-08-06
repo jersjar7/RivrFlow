@@ -5,9 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rivrflow/features/favorites/widgets/favorite_river_card.dart';
 import 'package:rivrflow/features/favorites/widgets/favorites_search_bar.dart';
-import 'package:rivrflow/features/settings/pages/app_theme_settings_page.dart';
-import 'package:rivrflow/features/settings/pages/notifications_settings_page.dart';
-import 'package:rivrflow/features/settings/pages/sponsors_page.dart';
 import '../../../core/providers/favorites_provider.dart';
 import '../../../core/models/favorite_river.dart';
 
@@ -84,7 +81,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
       right: 20,
       child: FloatingActionButton(
         onPressed: _navigateToMap,
-        backgroundColor: CupertinoColors.systemBlue,
+        backgroundColor: CupertinoColors.darkBackgroundGray,
         child: const Icon(CupertinoIcons.add, color: CupertinoColors.white),
       ),
     );
@@ -206,9 +203,37 @@ class _FavoritesPageState extends State<FavoritesPage> {
           // App header
           _buildAppHeader(),
 
-          // Search bar (conditional)
-          if (favoritesProvider.shouldShowSearch && _showSearch)
-            _buildSearchBar(),
+          // Search bar (using custom FavoritesSearchBar)
+          Consumer<FavoritesProvider>(
+            builder: (context, favoritesProvider, child) {
+              if (favoritesProvider.shouldShowSearch) {
+                return FavoritesSearchBar(
+                  onSearchChanged: (query) {
+                    // Defer setState to avoid build-time conflicts
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() => _searchQuery = query);
+                      }
+                    });
+                  },
+                  isVisible: _showSearch,
+                  onCancel: () {
+                    // Defer setState to avoid build-time conflicts
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          _showSearch = false;
+                          _searchQuery = '';
+                        });
+                      }
+                    });
+                  },
+                  placeholder: 'Search your rivers...',
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
 
           // Favorites list
           Expanded(
@@ -287,17 +312,6 @@ class _FavoritesPageState extends State<FavoritesPage> {
             },
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: CupertinoSearchTextField(
-        placeholder: 'Search your rivers...',
-        onChanged: (value) => setState(() => _searchQuery = value),
-        onSuffixTap: () => setState(() => _searchQuery = ''),
       ),
     );
   }

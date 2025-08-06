@@ -71,7 +71,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
         );
 
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          margin: const EdgeInsets.symmetric(horizontal: 19, vertical: 6),
           child: GestureDetector(
             onTap: _isSliding ? null : widget.onTap,
             onLongPress: widget.isReorderable ? _handleLongPress : null,
@@ -103,7 +103,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
   Widget _buildCardContent(bool isRefreshing) {
     return Container(
       width: double.infinity,
-      height: 210, // ADD FIXED HEIGHT
+      height: 210,
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: BorderRadius.circular(12),
@@ -126,7 +126,7 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
             _buildContentOverlay(isRefreshing),
 
             // Reorder handle (if reorderable)
-            if (widget.isReorderable) _buildReorderHandle(),
+            // if (widget.isReorderable) _buildReorderHandle(),
           ],
         ),
       ),
@@ -288,24 +288,24 @@ class _FavoriteRiverCardState extends State<FavoriteRiverCard>
     );
   }
 
-  Widget _buildReorderHandle() {
-    return Positioned(
-      top: 8,
-      right: 8,
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: CupertinoColors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Icon(
-          CupertinoIcons.bars,
-          color: CupertinoColors.white.withOpacity(0.8),
-          size: 16,
-        ),
-      ),
-    );
-  }
+  // Widget _buildReorderHandle() {
+  //   return Positioned(
+  //     top: 8,
+  //     right: 8,
+  //     child: Container(
+  //       padding: const EdgeInsets.all(4),
+  //       decoration: BoxDecoration(
+  //         color: CupertinoColors.white.withOpacity(0.2),
+  //         borderRadius: BorderRadius.circular(4),
+  //       ),
+  //       child: Icon(
+  //         CupertinoIcons.bars,
+  //         color: CupertinoColors.white.withOpacity(0.8),
+  //         size: 16,
+  //       ),
+  //     ),
+  //   );
+  // }
 
   // Simplified action buttons using the new component
   Widget _buildActionButtons(FavoritesProvider favoritesProvider) {
