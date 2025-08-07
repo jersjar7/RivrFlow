@@ -8,26 +8,79 @@ import 'flow_values_usage_guide.dart';
 import 'flow_timeline_cards.dart';
 import 'chart_preview_widget.dart';
 
+/// Enhanced forecast detail template that provides a consistent structure
+/// while allowing each forecast type to use specialized widgets for optimal data display.
+///
+/// Specialized Timeline Widgets (to be developed):
+/// - Short Range: HorizontalFlowTimeline - Hour cards + flow wave modes for 18 hours
+/// - Medium Range: DailyFlowForecastWidgetWithHourly - Expandable daily rows for 10 days
+/// - Long Range: LongRangeCalendar - Calendar grid with day cells for 30 days
+
 class ForecastDetailTemplate extends StatefulWidget {
+  // Required parameters
   final String reachId;
   final String forecastType;
   final String title;
   final List<UsageGuideOption> usageGuideOptions;
+
+  // Existing optional parameters
   final VoidCallback? onChartTap;
   final Widget? additionalContent;
   final bool showCurrentFlow;
   final EdgeInsets? padding;
 
+  // NEW: Custom widget parameters for enhanced flexibility
+  final Widget? customHeaderWidget; // Optional custom header above usage guide
+  final Widget?
+  customTimelineWidget; // Replace FlowTimelineCards with specialized widget:
+  // - HorizontalFlowTimeline (short range)
+  // - DailyFlowForecastWidgetWithHourly (medium range)
+  // - LongRangeCalendar (long range)
+  final Widget?
+  customChartPreview; // Replace ChartPreviewWidget with custom widget
+  final Widget?
+  customSummaryWidget; // Replace forecast summary with custom widget
+
+  // NEW: Section visibility controls
+  final bool showTimelineSection; // Show/hide entire timeline section
+  final bool showChartSection; // Show/hide entire chart section
+  final bool showForecastSummary; // Show/hide forecast summary section
+
+  // NEW: Section titles customization
+  final String? timelineSectionTitle; // Custom title for timeline section:
+  // - "Hourly Timeline" (short range)
+  // - "10-Day Forecast" (medium range)
+  // - "Monthly Calendar" (long range)
+  final String? chartSectionTitle; // Custom title for chart section
+
   const ForecastDetailTemplate({
     super.key,
+    // Required
     required this.reachId,
     required this.forecastType,
     required this.title,
     required this.usageGuideOptions,
+
+    // Existing optional
     this.onChartTap,
     this.additionalContent,
     this.showCurrentFlow = true,
     this.padding,
+
+    // NEW: Custom widgets
+    this.customHeaderWidget,
+    this.customTimelineWidget,
+    this.customChartPreview,
+    this.customSummaryWidget,
+
+    // NEW: Section visibility
+    this.showTimelineSection = true,
+    this.showChartSection = true,
+    this.showForecastSummary = true,
+
+    // NEW: Section titles
+    this.timelineSectionTitle,
+    this.chartSectionTitle,
   });
 
   @override
@@ -79,7 +132,6 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
       arguments: {
         'reachId': widget.reachId,
         'forecastType': widget.forecastType,
-        // Removed timeFrame since we're not filtering data anymore
       },
     );
   }
@@ -136,7 +188,22 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
             ),
           ),
 
-        // Flow Values Usage Guide (no section header needed - widget provides its own title)
+        // NEW: Custom Header Widget (if provided)
+        if (widget.customHeaderWidget != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding:
+                  widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  widget.customHeaderWidget!,
+                ],
+              ),
+            ),
+          ),
+
+        // Flow Values Usage Guide (always shown - core feature)
         SliverToBoxAdapter(
           child: Padding(
             padding:
@@ -155,58 +222,70 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
           ),
         ),
 
-        // Flow Timeline Cards
-        SliverToBoxAdapter(
-          child: Padding(
-            padding:
-                widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 24),
-                _buildSectionHeader('Flow Timeline'),
-                const SizedBox(height: 12),
-                FlowTimelineCards(
-                  forecastType: widget.forecastType,
-                  // Removed timeFrame parameter - showing all available data
-                  reachId: widget.reachId,
-                ),
-              ],
+        // Timeline Section (customizable or hideable)
+        // This section will use specialized widgets for each forecast type:
+        // - Short Range: HorizontalFlowTimeline (hour cards + flow wave modes)
+        // - Medium Range: DailyFlowForecastWidgetWithHourly (expandable daily rows)
+        // - Long Range: LongRangeCalendar (calendar grid with day cells)
+        if (widget.showTimelineSection)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding:
+                  widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(_getTimelineSectionTitle()),
+                  const SizedBox(height: 12),
+                  // Use custom timeline widget if provided, otherwise default
+                  widget.customTimelineWidget ??
+                      FlowTimelineCards(
+                        forecastType: widget.forecastType,
+                        reachId: widget.reachId,
+                      ),
+                ],
+              ),
             ),
           ),
-        ),
 
-        // Chart Preview Section
-        SliverToBoxAdapter(
-          child: Padding(
-            padding:
-                widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 24),
-                _buildSectionHeader('Flow Chart'),
-                const SizedBox(height: 12),
-                ChartPreviewWidget(
-                  forecastType: widget.forecastType,
-                  onTap: widget.onChartTap ?? _navigateToHydrograph,
-                  height: 200,
-                  showTitle: false,
-                ),
-              ],
+        // Chart Preview Section (customizable or hideable)
+        if (widget.showChartSection)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding:
+                  widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(widget.chartSectionTitle ?? 'Flow Chart'),
+                  const SizedBox(height: 12),
+                  // Use custom chart preview if provided, otherwise default
+                  widget.customChartPreview ??
+                      ChartPreviewWidget(
+                        forecastType: widget.forecastType,
+                        onTap: widget.onChartTap ?? _navigateToHydrograph,
+                        height: 200,
+                        showTitle: false,
+                      ),
+                ],
+              ),
             ),
           ),
-        ),
 
-        // Forecast Summary Metrics
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: widget.padding ?? const EdgeInsets.all(16),
-            child: _buildForecastSummary(reachProvider),
+        // Forecast Summary Section (customizable or hideable)
+        if (widget.showForecastSummary)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: widget.padding ?? const EdgeInsets.all(16),
+              child:
+                  widget.customSummaryWidget ??
+                  _buildForecastSummary(reachProvider),
+            ),
           ),
-        ),
 
-        // Additional Content (if provided)
+        // Additional Content (if provided) - always at the end
         if (widget.additionalContent != null)
           SliverToBoxAdapter(child: widget.additionalContent!),
 
@@ -225,6 +304,24 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
         color: CupertinoColors.label,
       ),
     );
+  }
+
+  String _getTimelineSectionTitle() {
+    // Use custom title if provided, otherwise smart defaults based on forecast type
+    if (widget.timelineSectionTitle != null) {
+      return widget.timelineSectionTitle!;
+    }
+
+    switch (widget.forecastType) {
+      case 'short_range':
+        return 'Hourly Timeline';
+      case 'medium_range':
+        return 'Daily Forecast';
+      case 'long_range':
+        return 'Monthly Calendar';
+      default:
+        return 'Flow Timeline';
+    }
   }
 
   Widget _buildForecastSummary(ReachDataProvider reachProvider) {

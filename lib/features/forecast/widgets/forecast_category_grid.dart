@@ -263,7 +263,7 @@ class ForecastCategoryGrid extends StatelessWidget {
       ),
       ForecastCategory(
         type: 'medium_range',
-        displayName: '10-Day',
+        displayName: 'Daily',
         timeRange: '1-10 days',
         description: 'Daily forecasts for trip planning',
         icon: CupertinoIcons.calendar,
@@ -275,7 +275,7 @@ class ForecastCategoryGrid extends StatelessWidget {
       ForecastCategory(
         type: 'long_range',
         displayName: 'Extended',
-        timeRange: '10-30 days',
+        timeRange: '1-30 days',
         description: 'Extended outlook and trends',
         icon: CupertinoIcons.chart_bar,
         gradientColors: [
