@@ -155,6 +155,74 @@ class MapSearchService {
       return [];
     }
   }
+
+  /// Convert coordinates to city, state using Mapbox Geocoding API
+  static Future<Map<String, String?>> reverseGeocode(
+    double latitude,
+    double longitude,
+  ) async {
+    try {
+      print('MAPBOX: Reverse geocoding $latitude, $longitude');
+
+      final queryParams = {
+        'access_token': AppConfig.mapboxPublicToken,
+        'types': 'place,region', // Only get city and state level info
+      };
+
+      // Mapbox reverse geocoding URL: longitude,latitude (note order!)
+      final uri = Uri.parse(
+        '${AppConfig.mapboxSearchApiUrl}$longitude,$latitude.json',
+      ).replace(queryParameters: queryParams);
+
+      final response = await http.get(uri).timeout(AppConfig.httpTimeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final features = data['features'] as List;
+
+        if (features.isNotEmpty) {
+          String? city, state;
+
+          // Look through all features to find city and state
+          for (final feature in features) {
+            final placeType = feature['place_type'] as List?;
+            final text = feature['text'] as String?;
+            final properties = feature['properties'] as Map?;
+
+            if (placeType != null && text != null) {
+              // City/locality
+              if (placeType.contains('place') && city == null) {
+                city = text;
+              }
+              // State/region
+              else if (placeType.contains('region') && state == null) {
+                // Try to get short code (e.g. "UT" from "Utah")
+                final shortCode = properties?['short_code'] as String?;
+                if (shortCode != null && shortCode.contains('-')) {
+                  state = shortCode
+                      .split('-')
+                      .last
+                      .toUpperCase(); // "US-UT" -> "UT"
+                } else {
+                  state = text; // Fall back to full name
+                }
+              }
+            }
+          }
+
+          print('MAPBOX: ✅ Reverse geocoded to: $city, $state');
+          return {'city': city, 'state': state};
+        }
+      } else {
+        print('MAPBOX: API error ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('MAPBOX: ❌ Reverse geocoding failed: $e');
+    }
+
+    // Return null values on failure
+    return {'city': null, 'state': null};
+  }
 }
 
 /// Compact search bar for map overlay (like your existing bottom sheet pattern)

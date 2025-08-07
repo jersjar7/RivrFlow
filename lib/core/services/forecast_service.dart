@@ -1,5 +1,7 @@
 // lib/core/services/forecast_service.dart
 
+import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
+
 import '../models/reach_data.dart';
 import 'noaa_api_service.dart';
 import 'reach_cache_service.dart';
@@ -37,32 +39,55 @@ class ForecastService {
         print('FORECAST_SERVICE: Cache miss - fetching reach info only');
 
         // Only fetch reach info (fastest API call)
-        final reachInfo = await _apiService.fetchReachInfo(reachId);
+        final reachInfo = await _apiService.fetchReachInfo(
+          reachId,
+          isOverview: true,
+        );
         reach = ReachData.fromNoaaApi(reachInfo);
 
-        // Mark as partial since we don't have return periods yet
-        reach = reach.copyWith(isPartiallyLoaded: true);
+        // Add reverse geocoding if city/state is missing
+        if (reach.city == null || reach.state == null) {
+          print('FORECAST_SERVICE: Adding location name via reverse geocoding');
+          try {
+            final locationData = await MapSearchService.reverseGeocode(
+              reach.latitude,
+              reach.longitude,
+            );
 
-        // Cache the basic reach data
+            // Update reach with city/state
+            reach = reach.copyWith(
+              city: locationData['city'],
+              state: locationData['state'],
+              isPartiallyLoaded:
+                  true, // Still partial since no return periods yet
+            );
+
+            print(
+              'FORECAST_SERVICE: ✅ Enhanced with location: ${reach.city}, ${reach.state}',
+            );
+          } catch (e) {
+            print('FORECAST_SERVICE: ⚠️ Reverse geocoding failed: $e');
+            // Continue without city/state - coordinates will be shown as fallback
+            reach = reach.copyWith(isPartiallyLoaded: true);
+          }
+        }
+
+        // Cache the enhanced reach data
         await _cacheService.store(reach);
-        print('FORECAST_SERVICE: ✅ Cached basic reach data');
+        print('FORECAST_SERVICE: ✅ Cached enhanced reach data');
       }
 
       // Step 2: Get only short-range forecast for current flow
-      final shortRangeData = await _apiService.fetchForecast(
-        reachId,
-        'short_range',
-      );
+      final shortRangeData = await _apiService.fetchCurrentFlowOnly(reachId);
       final forecastResponse = ForecastResponse.fromJson(shortRangeData);
 
       final overviewResponse = ForecastResponse(
-        reach: reach,
-        analysisAssimilation: null, // Skip for overview
-        shortRange:
-            forecastResponse.shortRange, // Only need this for current flow
-        mediumRange: {}, // Empty for overview
-        longRange: {}, // Empty for overview
-        mediumRangeBlend: null, // Skip for overview
+        reach: reach, // Now has city/state!
+        analysisAssimilation: null,
+        shortRange: forecastResponse.shortRange,
+        mediumRange: {},
+        longRange: {},
+        mediumRangeBlend: null,
       );
 
       // Cache current flow value
@@ -71,7 +96,7 @@ class ForecastService {
         _currentFlowCache[reachId] = currentFlow;
       }
 
-      print('FORECAST_SERVICE: ✅ Overview data loaded successfully');
+      print('FORECAST_SERVICE: ✅ Overview data loaded with location name');
       return overviewResponse;
     } catch (e) {
       print('FORECAST_SERVICE: ❌ Error loading overview data: $e');

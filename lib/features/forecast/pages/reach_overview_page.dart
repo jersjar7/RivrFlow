@@ -37,6 +37,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
       context,
       listen: false,
     );
+    await reachProvider.refreshCurrentReach(); // This clears cache
 
     // Only load if we don't already have this reach loaded
     if (reachProvider.currentReach?.reachId != widget.reachId) {
@@ -165,7 +166,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
-  // IMPROVED: Uses cached formatter and shows loading states
+  // Uses cached formatter and shows loading states
   Widget _buildStationHeader(ReachData reach, ReachDataProvider reachProvider) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -194,7 +195,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
 
           const SizedBox(height: 8),
 
-          // NEW: Use cached formatted location (fixes subtitle issue)
+          // Use cached formatted location (fixes subtitle issue)
           Text(
             reachProvider.getFormattedLocation(),
             style: const TextStyle(
@@ -231,7 +232,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
-  // NEW: Progressive flow status section with loading states
+  // Progressive flow status section with loading states
   Widget _buildFlowStatusSection(ReachDataProvider reachProvider) {
     return Column(
       children: [
@@ -263,7 +264,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
-  // NEW: Progressive forecast categories with enhanced functionality after Phase 2
+  // Progressive forecast categories with enhanced functionality after Phase 2
   Widget _buildForecastCategoriesSection(ReachDataProvider reachProvider) {
     if (reachProvider.loadingPhase == 'overview' &&
         !reachProvider.hasSupplementaryData) {
@@ -274,7 +275,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     return ForecastCategoryGrid(onCategoryTap: _navigateToForecastDetail);
   }
 
-  // NEW: Loading shimmer for forecast categories
+  // Loading shimmer for forecast categories
   Widget _buildForecastCategoriesShimmer() {
     return Container(
       padding: const EdgeInsets.all(16),
