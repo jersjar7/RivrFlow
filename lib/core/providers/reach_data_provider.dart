@@ -1,6 +1,7 @@
 // lib/core/providers/reach_data_provider.dart
 
 import 'package:flutter/foundation.dart';
+import 'package:rivrflow/features/forecast/widgets/horizontal_flow_timeline.dart';
 import '../models/reach_data.dart';
 import '../services/forecast_service.dart';
 
@@ -350,6 +351,12 @@ class ReachDataProvider with ChangeNotifier {
         'availableForecastTypes': _availableForecastTypesCache.length,
       },
     };
+  }
+
+  /// Get hourly data for short-range forecast with calculated trends
+  List<HourlyFlowDataPoint> getShortRangeHourlyData() {
+    if (_currentForecast == null) return [];
+    return _forecastService.getShortRangeHourlyData(_currentForecast!);
   }
 
   // Update all computed caches when data changes

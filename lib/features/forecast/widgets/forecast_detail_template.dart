@@ -2,10 +2,10 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/features/forecast/widgets/horizontal_flow_timeline.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import 'current_flow_status_card.dart';
 import 'flow_values_usage_guide.dart';
-import 'flow_timeline_cards.dart';
 import 'chart_preview_widget.dart';
 
 /// Enhanced forecast detail template that provides a consistent structure
@@ -240,10 +240,7 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
                   const SizedBox(height: 12),
                   // Use custom timeline widget if provided, otherwise default
                   widget.customTimelineWidget ??
-                      FlowTimelineCards(
-                        forecastType: widget.forecastType,
-                        reachId: widget.reachId,
-                      ),
+                      HorizontalFlowTimeline(reachId: widget.reachId),
                 ],
               ),
             ),

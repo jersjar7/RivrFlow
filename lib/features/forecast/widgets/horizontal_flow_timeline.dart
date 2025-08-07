@@ -200,7 +200,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _formatLocalTime(dataPoint.validTime),
+                  isCurrentHour ? 'Now' : _formatLocalTime(dataPoint.validTime),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -313,63 +313,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   List<HourlyFlowDataPoint> _extractShortRangeData(
     ReachDataProvider reachProvider,
   ) {
-    // TODO: This method should be implemented in core data services as:
-    // reachProvider.getShortRangeHourlyData(reachId)
-    //
-    // Expected method signature:
-    // List<HourlyFlowDataPoint> getShortRangeHourlyData(String reachId) {
-    //   // Extract 18 hours of hourly data from short range forecast
-    //   // Convert forecast data to HourlyFlowDataPoint objects
-    //   // Calculate trends between consecutive hours
-    //   // Handle time zone conversions
-    //   // Return list of 18 hourly data points
-    // }
-
-    return _generateMockShortRangeData(); // Temporary mock data
-  }
-
-  // Temporary mock data generation (remove when core service method is available)
-  List<HourlyFlowDataPoint> _generateMockShortRangeData() {
-    final now = DateTime.now();
-    final List<HourlyFlowDataPoint> mockData = [];
-
-    for (int i = 0; i < 18; i++) {
-      // 18 hours for short range
-      final time = now.add(Duration(hours: i));
-      final baseFlow = 155.0;
-      final variation = math.sin(i * 0.3) * 50 + math.cos(i * 0.1) * 20;
-      final noise = (math.Random().nextDouble() - 0.5) * 10;
-      final flow = (baseFlow + variation + noise).clamp(50.0, 400.0);
-
-      FlowTrend? trend;
-      double? trendPercentage;
-
-      if (i > 0) {
-        final previousFlow = mockData.last.flow;
-        final change = flow - previousFlow;
-        final changePercent = (change / previousFlow) * 100;
-
-        if (change.abs() > 5) {
-          trend = change > 0 ? FlowTrend.rising : FlowTrend.falling;
-          trendPercentage = changePercent.abs();
-        } else {
-          trend = FlowTrend.stable;
-          trendPercentage = 0.0;
-        }
-      }
-
-      mockData.add(
-        HourlyFlowDataPoint(
-          validTime: time,
-          flow: flow,
-          trend: trend,
-          trendPercentage: trendPercentage,
-          confidence: 0.95 - (i * 0.02), // Decreasing confidence over time
-        ),
-      );
-    }
-
-    return mockData;
+    return reachProvider.getShortRangeHourlyData();
   }
 
   String _getFlowCategory(double flow, ReachDataProvider reachProvider) {
@@ -409,18 +353,17 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     }
   }
 
-  bool _isCurrentOrNearCurrentHour(DateTime forecastTime) {
+  bool _isCurrentOrNearCurrentHour(DateTime dataTime) {
     final now = DateTime.now();
     final currentHour = DateTime(now.year, now.month, now.day, now.hour);
-    final forecastHour = DateTime(
-      forecastTime.year,
-      forecastTime.month,
-      forecastTime.day,
-      forecastTime.hour,
+    final dataHour = DateTime(
+      dataTime.year,
+      dataTime.month,
+      dataTime.day,
+      dataTime.hour,
     );
 
-    return forecastHour == currentHour ||
-        forecastHour == currentHour.add(const Duration(hours: 1));
+    return dataHour == currentHour; // Only match exact hour bucket
   }
 
   String _formatLocalTime(DateTime forecastTime) {
@@ -473,9 +416,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   Color _getTrendColor(FlowTrend trend) {
     switch (trend) {
       case FlowTrend.rising:
-        return CupertinoColors.systemRed;
+        return CupertinoColors.systemGreen;
       case FlowTrend.falling:
-        return CupertinoColors.systemBlue;
+        return CupertinoColors.systemRed;
       case FlowTrend.stable:
         return CupertinoColors.systemGrey;
     }

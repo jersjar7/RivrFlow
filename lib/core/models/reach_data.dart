@@ -384,6 +384,45 @@ class ForecastSeries {
     return closest?.flow;
   }
 
+  // Get flow for current hour bucket (not just closest time)
+  double? getCurrentHourFlow() {
+    if (data.isEmpty) return null;
+
+    final now = DateTime.now();
+    final currentHour = DateTime(now.year, now.month, now.day, now.hour);
+
+    // First, try to find exact current hour match
+    for (final point in data) {
+      final pointHour = DateTime(
+        point.validTime.toLocal().year,
+        point.validTime.toLocal().month,
+        point.validTime.toLocal().day,
+        point.validTime.toLocal().hour,
+      );
+
+      if (pointHour == currentHour) {
+        return point.flow;
+      }
+    }
+
+    // If no current hour found, look for next future hour
+    for (final point in data) {
+      final pointHour = DateTime(
+        point.validTime.toLocal().year,
+        point.validTime.toLocal().month,
+        point.validTime.toLocal().day,
+        point.validTime.toLocal().hour,
+      );
+
+      if (pointHour.isAfter(currentHour)) {
+        return point.flow;
+      }
+    }
+
+    // Fallback to closest time if no current/future hour found
+    return getFlowAt(DateTime.now().toUtc());
+  }
+
   @override
   String toString() =>
       'ForecastSeries{referenceTime: $referenceTime, units: $units, points: ${data.length}}';
@@ -644,6 +683,12 @@ class ForecastResponse {
     final forecast = getPrimaryForecast(forecastType);
     if (forecast == null || forecast.isEmpty) return null;
 
+    // For short_range, use current hour logic instead of closest time
+    if (forecastType.toLowerCase() == 'short_range') {
+      return forecast.getCurrentHourFlow();
+    }
+
+    // For other forecast types, use existing closest time logic
     return forecast.getFlowAt(DateTime.now().toUtc());
   }
 

@@ -1,5 +1,6 @@
 // lib/core/services/forecast_service.dart
 
+import 'package:rivrflow/features/forecast/widgets/horizontal_flow_timeline.dart';
 import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
 
 import '../models/reach_data.dart';
@@ -520,6 +521,67 @@ class ForecastService {
       'members': memberKeys,
       'dataSource': forecast.getDataSource(forecastType),
     };
+  }
+
+  /// Extract hourly data points for short-range forecast with trends
+  /// Filters out past hours - only shows current hour and future
+  List<HourlyFlowDataPoint> getShortRangeHourlyData(ForecastResponse forecast) {
+    if (forecast.shortRange == null || forecast.shortRange!.isEmpty) {
+      return [];
+    }
+
+    final shortRange = forecast.shortRange!;
+    final now = DateTime.now();
+    final currentHour = DateTime(now.year, now.month, now.day, now.hour);
+
+    // Filter out past hours - only include current hour and future
+    final futureData = shortRange.data.where((point) {
+      final pointHour = DateTime(
+        point.validTime.toLocal().year,
+        point.validTime.toLocal().month,
+        point.validTime.toLocal().day,
+        point.validTime.toLocal().hour,
+      );
+      return pointHour.isAtSameMomentAs(currentHour) ||
+          pointHour.isAfter(currentHour);
+    }).toList();
+
+    final List<HourlyFlowDataPoint> hourlyData = [];
+
+    for (int i = 0; i < futureData.length; i++) {
+      final point = futureData[i];
+
+      // Calculate trend from previous hour
+      FlowTrend? trend;
+      double? trendPercentage;
+
+      if (i > 0) {
+        final previousFlow = futureData[i - 1].flow;
+        final change = point.flow - previousFlow;
+        final changePercent = (change / previousFlow) * 100;
+
+        if (change.abs() > 5) {
+          // 5 CFS threshold for trend detection
+          trend = change > 0 ? FlowTrend.rising : FlowTrend.falling;
+          trendPercentage = changePercent.abs();
+        } else {
+          trend = FlowTrend.stable;
+          trendPercentage = 0.0;
+        }
+      }
+
+      hourlyData.add(
+        HourlyFlowDataPoint(
+          validTime: point.validTime.toLocal(), // Convert UTC to local time
+          flow: point.flow,
+          trend: trend,
+          trendPercentage: trendPercentage,
+          confidence: 0.95 - (i * 0.02), // Decreasing confidence over time
+        ),
+      );
+    }
+
+    return hourlyData;
   }
 
   // NEW: Clear all caches (useful for testing)
