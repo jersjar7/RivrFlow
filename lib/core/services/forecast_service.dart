@@ -35,26 +35,106 @@ class ForecastService {
       if (cachedReach != null) {
         print('FORECAST_SERVICE: ✅ Using cached reach data');
         reach = cachedReach;
-      } else {
-        print('FORECAST_SERVICE: Cache miss - fetching reach info only');
-
-        // Only fetch reach info (fastest API call)
-        final reachInfo = await _apiService.fetchReachInfo(
-          reachId,
-          isOverview: true,
+        print(
+          '🐛 DEBUG: Cached reach has city=${reach.city}, state=${reach.state}',
         );
-        reach = ReachData.fromNoaaApi(reachInfo);
 
-        // Add reverse geocoding if city/state is missing
+        // ⭐ KEY FIX: Check if cached reach needs geocoding
         if (reach.city == null || reach.state == null) {
-          print('FORECAST_SERVICE: Adding location name via reverse geocoding');
+          print(
+            '🐛 DEBUG: Cached reach needs geocoding - adding location data',
+          );
+          print(
+            'FORECAST_SERVICE: Adding location to cached reach via reverse geocoding',
+          );
+
           try {
+            print(
+              '🐛 DEBUG: About to call MapSearchService.reverseGeocode for cached reach',
+            );
+            print(
+              '🐛 DEBUG: Geocoding coordinates: lat=${reach.latitude}, lng=${reach.longitude}',
+            );
+
             final locationData = await MapSearchService.reverseGeocode(
               reach.latitude,
               reach.longitude,
             );
 
-            // Update reach with city/state
+            print('🐛 DEBUG: Geocoding returned: $locationData');
+            print('🐛 DEBUG: City from geocoding: ${locationData['city']}');
+            print('🐛 DEBUG: State from geocoding: ${locationData['state']}');
+
+            // Update cached reach with city/state
+            reach = reach.copyWith(
+              city: locationData['city'],
+              state: locationData['state'],
+            );
+
+            print(
+              '🐛 DEBUG: Updated cached reach: city=${reach.city}, state=${reach.state}',
+            );
+            print(
+              'FORECAST_SERVICE: ✅ Enhanced cached reach with location: ${reach.city}, ${reach.state}',
+            );
+
+            // Re-cache the updated reach data
+            await _cacheService.store(reach);
+            print(
+              'FORECAST_SERVICE: ✅ Re-cached reach data with location info',
+            );
+          } catch (e) {
+            print('🐛 DEBUG: Exception in geocoding cached reach: $e');
+            print(
+              'FORECAST_SERVICE: ⚠️ Reverse geocoding failed for cached reach: $e',
+            );
+          }
+        } else {
+          print(
+            '🐛 DEBUG: Cached reach already has location: city=${reach.city}, state=${reach.state}',
+          );
+        }
+      } else {
+        print('FORECAST_SERVICE: Cache miss - fetching reach info only');
+
+        // Step 2: Fetch reach info from NOAA API
+        final reachInfo = await _apiService.fetchReachInfo(
+          reachId,
+          isOverview: true,
+        );
+
+        // Step 3: Create initial reach data from API response
+        reach = ReachData.fromNoaaApi(reachInfo);
+        print(
+          '🐛 DEBUG: Reach from NOAA API: city=${reach.city}, state=${reach.state}',
+        );
+        print('🐛 DEBUG: Coordinates: ${reach.latitude}, ${reach.longitude}');
+
+        // Step 4: IMMEDIATELY do reverse geocoding BEFORE any caching
+        if (reach.city == null || reach.state == null) {
+          print('🐛 DEBUG: New reach needs geocoding - missing city/state');
+          print(
+            'FORECAST_SERVICE: Performing reverse geocoding for complete location data',
+          );
+
+          try {
+            print(
+              '🐛 DEBUG: About to call MapSearchService.reverseGeocode for new reach',
+            );
+            print(
+              '🐛 DEBUG: Geocoding coordinates: lat=${reach.latitude}, lng=${reach.longitude}',
+            );
+
+            final locationData = await MapSearchService.reverseGeocode(
+              reach.latitude,
+              reach.longitude,
+            );
+
+            print('🐛 DEBUG: Geocoding returned: $locationData');
+            print('🐛 DEBUG: City from geocoding: ${locationData['city']}');
+            print('🐛 DEBUG: State from geocoding: ${locationData['state']}');
+
+            // Update reach with city/state BEFORE caching
             reach = reach.copyWith(
               city: locationData['city'],
               state: locationData['state'],
@@ -63,40 +143,49 @@ class ForecastService {
             );
 
             print(
+              '🐛 DEBUG: Reach AFTER geocoding: city=${reach.city}, state=${reach.state}',
+            );
+            print(
               'FORECAST_SERVICE: ✅ Enhanced with location: ${reach.city}, ${reach.state}',
             );
           } catch (e) {
+            print('🐛 DEBUG: Exception in geocoding new reach: $e');
             print('FORECAST_SERVICE: ⚠️ Reverse geocoding failed: $e');
-            // Continue without city/state - coordinates will be shown as fallback
             reach = reach.copyWith(isPartiallyLoaded: true);
           }
+        } else {
+          print(
+            '🐛 DEBUG: New reach already has location: city=${reach.city}, state=${reach.state}',
+          );
         }
 
-        // Cache the enhanced reach data
+        // Step 5: Now cache the reach data with city/state already populated
         await _cacheService.store(reach);
-        print('FORECAST_SERVICE: ✅ Cached enhanced reach data');
+        print('FORECAST_SERVICE: ✅ Cached reach data with location info');
+        print(
+          '🐛 DEBUG: Final reach before caching: city=${reach.city}, state=${reach.state}',
+        );
       }
 
-      // Step 2: Get only short-range forecast for current flow
+      // Step 6: Get only short-range forecast for current flow
       final shortRangeData = await _apiService.fetchCurrentFlowOnly(reachId);
       final forecastResponse = ForecastResponse.fromJson(shortRangeData);
 
       final overviewResponse = ForecastResponse(
-        reach: reach, // Now has city/state!
-        analysisAssimilation: null,
+        reach:
+            reach, // Now guaranteed to have city/state if geocoding succeeded!
         shortRange: forecastResponse.shortRange,
-        mediumRange: {},
-        longRange: {},
-        mediumRangeBlend: null,
+        analysisAssimilation: forecastResponse.analysisAssimilation,
+        mediumRange: {}, // Empty map - not loaded yet
+        longRange: {}, // Empty map - not loaded yet
+        mediumRangeBlend: null, // This is nullable, so null is OK
       );
 
-      // Cache current flow value
-      final currentFlow = getCurrentFlow(overviewResponse);
-      if (currentFlow != null) {
-        _currentFlowCache[reachId] = currentFlow;
-      }
+      print('FORECAST_SERVICE: ✅ Overview data loaded successfully');
+      print(
+        '🐛 DEBUG: Final response reach: city=${overviewResponse.reach.city}, state=${overviewResponse.reach.state}',
+      );
 
-      print('FORECAST_SERVICE: ✅ Overview data loaded with location name');
       return overviewResponse;
     } catch (e) {
       print('FORECAST_SERVICE: ❌ Error loading overview data: $e');

@@ -13,6 +13,7 @@ import 'package:rivrflow/features/forecast/pages/medium_range_detail_page.dart';
 import 'package:rivrflow/features/forecast/pages/long_range_detail_page.dart';
 import 'package:rivrflow/features/forecast/pages/hydrograph_page.dart';
 import 'package:rivrflow/features/favorites/pages/image_selection_page.dart';
+import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
 import 'package:rivrflow/features/settings/pages/notifications_settings_page.dart';
 import 'package:rivrflow/features/settings/pages/app_theme_settings_page.dart';
 import 'package:rivrflow/features/settings/pages/sponsors_page.dart';
@@ -29,6 +30,29 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(const RivrFlowApp());
+
+  await testGeocodingDirectly();
+}
+
+Future<void> testGeocodingDirectly() async {
+  print('🧪 TESTING: Starting direct geocoding test');
+
+  try {
+    // Test with your Sevier River coordinates
+    final result = await MapSearchService.reverseGeocode(39.3817, -112.0470);
+
+    print('🧪 TESTING: Direct geocoding result: $result');
+    print('🧪 TESTING: City: ${result['city']}');
+    print('🧪 TESTING: State: ${result['state']}');
+
+    if (result['city'] != null && result['state'] != null) {
+      print('🧪 TESTING: ✅ Geocoding is working correctly!');
+    } else {
+      print('🧪 TESTING: ❌ Geocoding returned null values');
+    }
+  } catch (e) {
+    print('🧪 TESTING: ❌ Geocoding failed with exception: $e');
+  }
 }
 
 class RivrFlowApp extends StatelessWidget {
