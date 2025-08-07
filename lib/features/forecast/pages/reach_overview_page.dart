@@ -103,7 +103,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('River Forecast'),
+        middle: const Text('Flow Forecast Overview'),
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _handleRefresh,
@@ -159,6 +159,9 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
             child: _buildStationMetadata(reach, reachProvider),
           ),
 
+          // Technical Info Section - Coordinates and Reach ID at bottom
+          SliverToBoxAdapter(child: _buildTechnicalInfoSection(reach)),
+
           // Add some bottom padding
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
@@ -202,30 +205,6 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
               fontSize: 16,
               color: CupertinoColors.secondaryLabel,
             ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Coordinates and basic info
-          Row(
-            children: [
-              Expanded(
-                child: _buildInfoChip(
-                  icon: CupertinoIcons.location,
-                  label: 'Coordinates',
-                  value:
-                      '${reach.latitude.toStringAsFixed(4)}, ${reach.longitude.toStringAsFixed(4)}',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildInfoChip(
-                  icon: CupertinoIcons.number,
-                  label: 'Reach ID',
-                  value: reach.reachId,
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -454,6 +433,33 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
               'Downstream Reaches',
               reach.downstreamReaches!.length.toString(),
             ),
+        ],
+      ),
+    );
+  }
+
+  // NEW: Technical info section with coordinates and reach ID at the bottom
+  Widget _buildTechnicalInfoSection(ReachData reach) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildInfoChip(
+              icon: CupertinoIcons.location,
+              label: 'Coordinates',
+              value:
+                  '${reach.latitude.toStringAsFixed(4)}, ${reach.longitude.toStringAsFixed(4)}',
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildInfoChip(
+              icon: CupertinoIcons.number,
+              label: 'Reach ID',
+              value: reach.reachId,
+            ),
+          ),
         ],
       ),
     );

@@ -252,7 +252,7 @@ class ForecastCategoryGrid extends StatelessWidget {
     return [
       ForecastCategory(
         type: 'short_range',
-        displayName: 'Short Range',
+        displayName: 'Hourly',
         timeRange: 'Next 18 hours',
         description: 'Hourly forecast for immediate planning',
         icon: CupertinoIcons.clock,
@@ -263,7 +263,7 @@ class ForecastCategoryGrid extends StatelessWidget {
       ),
       ForecastCategory(
         type: 'medium_range',
-        displayName: 'Medium Range',
+        displayName: '10-Day',
         timeRange: '1-10 days',
         description: 'Daily forecasts for trip planning',
         icon: CupertinoIcons.calendar,
@@ -274,7 +274,7 @@ class ForecastCategoryGrid extends StatelessWidget {
       ),
       ForecastCategory(
         type: 'long_range',
-        displayName: 'Long Range',
+        displayName: 'Extended',
         timeRange: '10-30 days',
         description: 'Extended outlook and trends',
         icon: CupertinoIcons.chart_bar,
