@@ -6,7 +6,6 @@ import '../../../core/providers/reach_data_provider.dart';
 
 class FlowTimelineCards extends StatelessWidget {
   final String forecastType;
-  final String timeFrame;
   final String reachId;
   final double height;
   final EdgeInsets? padding;
@@ -14,7 +13,6 @@ class FlowTimelineCards extends StatelessWidget {
   const FlowTimelineCards({
     super.key,
     required this.forecastType,
-    required this.timeFrame,
     required this.reachId,
     this.height = 140,
     this.padding,
@@ -263,19 +261,19 @@ class FlowTimelineCards extends StatelessWidget {
         color: CupertinoColors.systemGrey6,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Center(
+      child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               CupertinoIcons.exclamationmark_circle,
               size: 32,
               color: CupertinoColors.systemOrange,
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
-              'No $timeFrame data available',
-              style: const TextStyle(
+              'No forecast data available',
+              style: TextStyle(
                 fontSize: 14,
                 color: CupertinoColors.secondaryLabel,
               ),
@@ -288,14 +286,14 @@ class FlowTimelineCards extends StatelessWidget {
 
   // Data extraction logic (placeholder for now)
   List<FlowDataPoint> _extractForecastData(ReachDataProvider reachProvider) {
-    // This would extract actual forecast data based on forecastType and timeFrame
+    // This would extract actual forecast data based on forecastType
     // For now, returning mock data structure
 
     // In the real implementation, this would:
     // 1. Get the appropriate forecast data from reachProvider
-    // 2. Filter by timeFrame
-    // 3. Convert to FlowDataPoint objects
-    // 4. Calculate trends between points
+    // 2. Convert to FlowDataPoint objects
+    // 3. Calculate trends between points
+    // 4. Return all available data points for the forecast type
 
     return _generateMockData();
   }

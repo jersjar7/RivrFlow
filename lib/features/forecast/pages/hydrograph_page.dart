@@ -9,14 +9,12 @@ import '../widgets/interactive_chart.dart';
 class HydrographPage extends StatefulWidget {
   final String? reachId;
   final String? forecastType;
-  final String? timeFrame;
   final String? title;
 
   const HydrographPage({
     super.key,
     this.reachId,
     this.forecastType,
-    this.timeFrame,
     this.title,
   });
 
@@ -27,7 +25,6 @@ class HydrographPage extends StatefulWidget {
 class _HydrographPageState extends State<HydrographPage> {
   String? _reachId;
   String? _forecastType;
-  String? _timeFrame;
   String? _pageTitle;
   bool _isInitialized = false;
   bool _showReturnPeriods = true;
@@ -44,7 +41,6 @@ class _HydrographPageState extends State<HydrographPage> {
     // Get parameters from widget or navigation arguments
     _reachId = widget.reachId;
     _forecastType = widget.forecastType;
-    _timeFrame = widget.timeFrame;
     _pageTitle = widget.title;
 
     if (_reachId == null || _forecastType == null) {
@@ -56,7 +52,6 @@ class _HydrographPageState extends State<HydrographPage> {
           setState(() {
             _reachId = args['reachId'] as String?;
             _forecastType = args['forecastType'] as String?;
-            _timeFrame = args['timeFrame'] as String?;
             _pageTitle = args['title'] as String?;
           });
         }
@@ -179,9 +174,8 @@ class _HydrographPageState extends State<HydrographPage> {
     };
 
     final typeName = typeNames[_forecastType] ?? _forecastType?.toUpperCase();
-    final timeFrame = _timeFrame?.toUpperCase() ?? 'All Data';
 
-    return '$typeName Forecast\nTime Frame: $timeFrame\nData Source: NOAA National Water Model';
+    return '$typeName Forecast\nShowing: All Available Data\nData Source: NOAA National Water Model';
   }
 
   @override
@@ -256,11 +250,10 @@ class _HydrographPageState extends State<HydrographPage> {
             ),
             child: InteractiveChart(
               key: ValueKey(
-                '$_reachId-$_forecastType-$_timeFrame-$_showReturnPeriods-$_isWaveView',
+                '$_reachId-$_forecastType-$_showReturnPeriods-$_isWaveView',
               ),
               reachId: _reachId!,
               forecastType: _forecastType!,
-              timeFrame: _timeFrame,
               showReturnPeriods: _showReturnPeriods,
               isWaveView: _isWaveView,
               showTooltips: _showTooltips,

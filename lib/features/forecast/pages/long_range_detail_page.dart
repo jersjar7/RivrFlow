@@ -4,13 +4,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/forecast_detail_template.dart';
-import '../widgets/time_frame_selector.dart';
+import '../widgets/flow_values_usage_guide.dart';
 
 class LongRangeDetailPage extends StatefulWidget {
   final String? reachId;
-  final String? initialTimeFrame;
 
-  const LongRangeDetailPage({super.key, this.reachId, this.initialTimeFrame});
+  const LongRangeDetailPage({super.key, this.reachId});
 
   @override
   State<LongRangeDetailPage> createState() => _LongRangeDetailPageState();
@@ -72,16 +71,15 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
     }
   }
 
-  void _navigateToHydrograph(Map<String, dynamic> context) {
+  void _navigateToHydrograph() {
     if (_reachId == null) return;
 
     Navigator.pushNamed(
-      this.context,
+      context,
       '/hydrograph',
       arguments: {
         'reachId': _reachId,
         'forecastType': 'long_range',
-        'timeFrame': context['timeFrame'] ?? '4w',
         'title': 'Long Range Hydrograph',
       },
     );
@@ -103,8 +101,8 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
           reachId: _reachId!,
           forecastType: 'long_range',
           title: 'Long Range Forecast',
-          timeFrameOptions: TimeFrameSelector.longRangeOptions(),
-          onChartTap: () => _navigateToHydrograph({'timeFrame': '4w'}),
+          usageGuideOptions: FlowValuesUsageGuide.longRangeOptions(),
+          onChartTap: _navigateToHydrograph,
           showCurrentFlow: false,
           additionalContent: _buildLongRangeSpecificContent(reachProvider),
         );
@@ -171,7 +169,7 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Updated daily • Weekly intervals for seasonal planning',
+            'Updated daily • 8 weeks of forecast data available',
             style: TextStyle(
               fontSize: 12,
               color: CupertinoColors.secondaryLabel,
@@ -247,7 +245,7 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
                   child: Text(
                     'Long range forecasts show general trends, not specific conditions',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: CupertinoColors.secondaryLabel,
                     ),
                   ),

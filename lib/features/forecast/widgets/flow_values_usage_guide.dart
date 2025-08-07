@@ -1,14 +1,18 @@
-// lib/features/forecast/widgets/time_frame_selector.dart
+// lib/features/forecast/widgets/flow_values_usage_guide.dart
 
 import 'package:flutter/cupertino.dart';
 
-class TimeFrameSelector extends StatelessWidget {
-  final List<TimeFrameOption> options;
+/// Educational widget that guides users on different planning horizons
+/// for interpreting NOAA National Water Model forecast data.
+/// This is not a filter - all options show the same complete forecast dataset.
+/// Options are based on official NOAA forecast durations and intended use cases.
+class FlowValuesUsageGuide extends StatelessWidget {
+  final List<UsageGuideOption> options;
   final String selectedValue;
   final ValueChanged<String> onChanged;
   final EdgeInsets? padding;
 
-  const TimeFrameSelector({
+  const FlowValuesUsageGuide({
     super.key,
     required this.options,
     required this.selectedValue,
@@ -30,6 +34,19 @@ class TimeFrameSelector extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Title for the usage guide
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Usage Guide',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.label,
+              ),
+            ),
+          ),
+
           // Segmented Control
           SizedBox(
             width: double.infinity,
@@ -57,7 +74,7 @@ class TimeFrameSelector extends StatelessWidget {
     );
   }
 
-  Widget _buildSegmentContent(TimeFrameOption option) {
+  Widget _buildSegmentContent(UsageGuideOption option) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: Column(
@@ -84,7 +101,7 @@ class TimeFrameSelector extends StatelessWidget {
     );
   }
 
-  Widget _buildDescription(TimeFrameOption option) {
+  Widget _buildDescription(UsageGuideOption option) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -117,7 +134,7 @@ class TimeFrameSelector extends StatelessWidget {
     );
   }
 
-  TimeFrameOption? _getSelectedOption() {
+  UsageGuideOption? _getSelectedOption() {
     try {
       return options.firstWhere((option) => option.value == selectedValue);
     } catch (e) {
@@ -126,63 +143,64 @@ class TimeFrameSelector extends StatelessWidget {
   }
 
   // Static factory methods for common forecast types
-  static List<TimeFrameOption> shortRangeOptions() {
+  static List<UsageGuideOption> shortRangeOptions() {
     return [
-      TimeFrameOption(
+      UsageGuideOption(
+        value: '6h',
+        displayName: '6H',
+        subtitle: 'Hours',
+        description: 'Emergency response - Immediate safety decisions',
+        icon: CupertinoIcons.exclamationmark_triangle,
+        dataPoints: 6,
+        intervalMinutes: 60,
+      ),
+      UsageGuideOption(
         value: '12h',
         displayName: '12H',
         subtitle: 'Hours',
-        description: 'Next 12 hours - Immediate planning and safety',
-        icon: CupertinoIcons.clock,
+        description: 'Daily operations - Near-term activity planning',
+        icon: CupertinoIcons.sun_max,
         dataPoints: 12,
         intervalMinutes: 60,
       ),
-      TimeFrameOption(
-        value: '24h',
-        displayName: '24H',
+      UsageGuideOption(
+        value: '18h',
+        displayName: '18H',
         subtitle: 'Hours',
-        description: 'Next 24 hours - Daily activities and logistics',
-        icon: CupertinoIcons.sun_max,
-        dataPoints: 24,
-        intervalMinutes: 60,
-      ),
-      TimeFrameOption(
-        value: '72h',
-        displayName: '72H',
-        subtitle: 'Hours',
-        description: 'Next 3 days - Extended trip planning',
+        description: 'Complete forecast - Full short-range planning horizon',
         icon: CupertinoIcons.calendar,
-        dataPoints: 72,
+        dataPoints: 18,
         intervalMinutes: 60,
       ),
     ];
   }
 
-  static List<TimeFrameOption> mediumRangeOptions() {
+  static List<UsageGuideOption> mediumRangeOptions() {
     return [
-      TimeFrameOption(
+      UsageGuideOption(
         value: '3d',
         displayName: '3D',
         subtitle: 'Days',
-        description: '3 days - Weekend trip planning',
+        description: 'Weekend planning - Short trip preparation',
         icon: CupertinoIcons.calendar,
         dataPoints: 3,
         intervalMinutes: 1440, // 24 hours
       ),
-      TimeFrameOption(
+      UsageGuideOption(
         value: '7d',
         displayName: '7D',
         subtitle: 'Days',
-        description: '1 week - Weekly planning and trends',
+        description:
+            'Water management - Weekly operations and resource planning',
         icon: CupertinoIcons.calendar_today,
         dataPoints: 7,
         intervalMinutes: 1440,
       ),
-      TimeFrameOption(
+      UsageGuideOption(
         value: '10d',
         displayName: '10D',
         subtitle: 'Days',
-        description: '10 days - Extended forecast confidence',
+        description: 'Extended planning - Full medium-range forecast horizon',
         icon: CupertinoIcons.calendar_badge_plus,
         dataPoints: 10,
         intervalMinutes: 1440,
@@ -190,49 +208,51 @@ class TimeFrameSelector extends StatelessWidget {
     ];
   }
 
-  static List<TimeFrameOption> longRangeOptions() {
+  static List<UsageGuideOption> longRangeOptions() {
     return [
-      TimeFrameOption(
+      UsageGuideOption(
+        value: '1w',
+        displayName: '1W',
+        subtitle: 'Week',
+        description: 'First week outlook - Highest long-range confidence',
+        icon: CupertinoIcons.calendar,
+        dataPoints: 7,
+        intervalMinutes: 1440,
+      ),
+      UsageGuideOption(
         value: '2w',
         displayName: '2W',
         subtitle: 'Weeks',
-        description: '2 weeks - Seasonal planning outlook',
-        icon: CupertinoIcons.calendar,
+        description: 'Two-week planning - Moderate confidence trends',
+        icon: CupertinoIcons.calendar_today,
         dataPoints: 14,
         intervalMinutes: 1440,
       ),
-      TimeFrameOption(
-        value: '4w',
-        displayName: '4W',
-        subtitle: 'Weeks',
-        description: '1 month - Monthly trend analysis',
-        icon: CupertinoIcons.calendar_today,
-        dataPoints: 28,
-        intervalMinutes: 1440,
-      ),
-      TimeFrameOption(
-        value: '8w',
-        displayName: '8W',
-        subtitle: 'Weeks',
-        description: '2 months - Long-term trend indicators',
+      UsageGuideOption(
+        value: '30d',
+        displayName: '30D',
+        subtitle: 'Days',
+        description: 'Seasonal outlook - Full long-range forecast horizon',
         icon: CupertinoIcons.chart_bar,
-        dataPoints: 56,
+        dataPoints: 30,
         intervalMinutes: 1440,
       ),
     ];
   }
 }
 
-class TimeFrameOption {
-  final String value; // '12h', '24h', '72h', '3d', '7d', etc.
-  final String displayName; // '12H', '24H', '72H', '3D', '7D', etc.
+/// Represents a usage guide option that explains how to interpret
+/// forecast data for a specific planning horizon.
+class UsageGuideOption {
+  final String value; // '6h', '12h', '18h', '3d', '7d', etc.
+  final String displayName; // '6H', '12H', '18H', '3D', '7D', etc.
   final String? subtitle; // 'Hours', 'Days', 'Weeks'
   final String description; // Detailed description for help text
   final IconData? icon; // Optional icon for the option
-  final int dataPoints; // Expected number of data points
-  final int intervalMinutes; // Minutes between data points
+  final int dataPoints; // Expected number of data points (for reference)
+  final int intervalMinutes; // Minutes between data points (for reference)
 
-  const TimeFrameOption({
+  const UsageGuideOption({
     required this.value,
     required this.displayName,
     this.subtitle,
@@ -242,7 +262,7 @@ class TimeFrameOption {
     required this.intervalMinutes,
   });
 
-  // Helper methods
+  // Helper methods for reference (not used for filtering)
   Duration get totalDuration {
     return Duration(minutes: dataPoints * intervalMinutes);
   }
@@ -265,13 +285,13 @@ class TimeFrameOption {
 
   @override
   String toString() {
-    return 'TimeFrameOption(value: $value, displayName: $displayName, dataPoints: $dataPoints)';
+    return 'UsageGuideOption(value: $value, displayName: $displayName, dataPoints: $dataPoints)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is TimeFrameOption && other.value == value;
+    return other is UsageGuideOption && other.value == value;
   }
 
   @override

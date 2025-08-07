@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import 'current_flow_status_card.dart';
-import 'time_frame_selector.dart';
+import 'flow_values_usage_guide.dart';
 import 'flow_timeline_cards.dart';
 import 'chart_preview_widget.dart';
 
@@ -12,7 +12,7 @@ class ForecastDetailTemplate extends StatefulWidget {
   final String reachId;
   final String forecastType;
   final String title;
-  final List<TimeFrameOption> timeFrameOptions;
+  final List<UsageGuideOption> usageGuideOptions;
   final VoidCallback? onChartTap;
   final Widget? additionalContent;
   final bool showCurrentFlow;
@@ -23,7 +23,7 @@ class ForecastDetailTemplate extends StatefulWidget {
     required this.reachId,
     required this.forecastType,
     required this.title,
-    required this.timeFrameOptions,
+    required this.usageGuideOptions,
     this.onChartTap,
     this.additionalContent,
     this.showCurrentFlow = true,
@@ -35,13 +35,13 @@ class ForecastDetailTemplate extends StatefulWidget {
 }
 
 class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
-  late String _selectedTimeFrame;
+  late String _selectedUsageGuide;
   bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedTimeFrame = widget.timeFrameOptions.first.value;
+    _selectedUsageGuide = widget.usageGuideOptions.first.value;
   }
 
   Future<void> _handleRefresh() async {
@@ -66,9 +66,9 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
     }
   }
 
-  void _onTimeFrameChanged(String newTimeFrame) {
+  void _onUsageGuideChanged(String newUsageGuide) {
     setState(() {
-      _selectedTimeFrame = newTimeFrame;
+      _selectedUsageGuide = newUsageGuide;
     });
   }
 
@@ -79,7 +79,7 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
       arguments: {
         'reachId': widget.reachId,
         'forecastType': widget.forecastType,
-        'timeFrame': _selectedTimeFrame,
+        // Removed timeFrame since we're not filtering data anymore
       },
     );
   }
@@ -136,7 +136,7 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
             ),
           ),
 
-        // Time Frame Selector
+        // Flow Values Usage Guide (no section header needed - widget provides its own title)
         SliverToBoxAdapter(
           child: Padding(
             padding:
@@ -144,13 +144,11 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 8),
-                _buildSectionHeader('Time Range'),
-                const SizedBox(height: 12),
-                TimeFrameSelector(
-                  options: widget.timeFrameOptions,
-                  selectedValue: _selectedTimeFrame,
-                  onChanged: _onTimeFrameChanged,
+                const SizedBox(height: 16),
+                FlowValuesUsageGuide(
+                  options: widget.usageGuideOptions,
+                  selectedValue: _selectedUsageGuide,
+                  onChanged: _onUsageGuideChanged,
                 ),
               ],
             ),
@@ -170,7 +168,7 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
                 const SizedBox(height: 12),
                 FlowTimelineCards(
                   forecastType: widget.forecastType,
-                  timeFrame: _selectedTimeFrame,
+                  // Removed timeFrame parameter - showing all available data
                   reachId: widget.reachId,
                 ),
               ],

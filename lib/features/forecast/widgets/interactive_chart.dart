@@ -8,7 +8,6 @@ import '../../../core/providers/reach_data_provider.dart';
 class InteractiveChart extends StatefulWidget {
   final String reachId;
   final String forecastType;
-  final String? timeFrame;
   final bool showReturnPeriods;
   final bool isWaveView;
   final bool showTooltips;
@@ -18,7 +17,6 @@ class InteractiveChart extends StatefulWidget {
     super.key,
     required this.reachId,
     required this.forecastType,
-    this.timeFrame,
     required this.showReturnPeriods,
     required this.isWaveView,
     required this.showTooltips,
@@ -48,7 +46,6 @@ class _InteractiveChartState extends State<InteractiveChart> {
   void didUpdateWidget(InteractiveChart oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.forecastType != widget.forecastType ||
-        oldWidget.timeFrame != widget.timeFrame ||
         oldWidget.showReturnPeriods != widget.showReturnPeriods ||
         oldWidget.isWaveView != widget.isWaveView) {
       _initializeChart();
@@ -70,7 +67,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       return;
     }
 
-    // Extract forecast data based on type and timeFrame
+    // Extract forecast data based on type - showing all available data
     final forecastData = _getForecastData();
     _chartData = _convertToFlSpots(forecastData);
   }
@@ -85,42 +82,27 @@ class _InteractiveChartState extends State<InteractiveChart> {
     final now = DateTime.now();
     final List<ChartDataPoint> data = [];
 
-    // Generate different amounts of data based on forecast type
-    int dataPoints = 24; // Default for short range
-    Duration interval = const Duration(hours: 1);
+    // Generate data amounts based on forecast type - showing full available data
+    int dataPoints;
+    Duration interval;
 
     switch (widget.forecastType) {
+      case 'short_range':
+        dataPoints = 18; // Full 18 hours available
+        interval = const Duration(hours: 1);
+        break;
       case 'medium_range':
-        dataPoints = 10;
+        dataPoints = 10; // Full 10 days available
         interval = const Duration(days: 1);
         break;
       case 'long_range':
-        dataPoints = 8;
+        dataPoints = 8; // Full 8 weeks available
         interval = const Duration(days: 7);
         break;
-    }
-
-    // Apply timeFrame filtering if specified
-    if (widget.timeFrame != null) {
-      switch (widget.timeFrame) {
-        case '12h':
-          dataPoints = 12;
-          break;
-        case '24h':
-          dataPoints = 24;
-          break;
-        case '72h':
-          dataPoints = 72;
-          break;
-        case '3d':
-          dataPoints = 3;
-          interval = const Duration(days: 1);
-          break;
-        case '7d':
-          dataPoints = 7;
-          interval = const Duration(days: 1);
-          break;
-      }
+      default:
+        dataPoints = 24; // Default fallback
+        interval = const Duration(hours: 1);
+        break;
     }
 
     for (int i = 0; i < dataPoints; i++) {
@@ -483,16 +465,14 @@ class _InteractiveChartState extends State<InteractiveChart> {
               color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
-          if (widget.timeFrame != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Try a different time frame',
-              style: TextStyle(
-                fontSize: 14,
-                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-              ),
+          const SizedBox(height: 8),
+          Text(
+            'Check back later for updated forecasts',
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
             ),
-          ],
+          ),
         ],
       ),
     );

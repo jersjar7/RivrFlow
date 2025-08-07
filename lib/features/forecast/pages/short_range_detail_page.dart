@@ -4,13 +4,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/forecast_detail_template.dart';
-import '../widgets/time_frame_selector.dart';
+import '../widgets/flow_values_usage_guide.dart';
 
 class ShortRangeDetailPage extends StatefulWidget {
   final String? reachId;
-  final String? initialTimeFrame;
 
-  const ShortRangeDetailPage({super.key, this.reachId, this.initialTimeFrame});
+  const ShortRangeDetailPage({super.key, this.reachId});
 
   @override
   State<ShortRangeDetailPage> createState() => _ShortRangeDetailPageState();
@@ -72,16 +71,15 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
     }
   }
 
-  void _navigateToHydrograph(Map<String, dynamic> context) {
+  void _navigateToHydrograph() {
     if (_reachId == null) return;
 
     Navigator.pushNamed(
-      this.context,
+      context,
       '/hydrograph',
       arguments: {
         'reachId': _reachId,
         'forecastType': 'short_range',
-        'timeFrame': context['timeFrame'] ?? '24h',
         'title': 'Short Range Hydrograph',
       },
     );
@@ -103,8 +101,8 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
           reachId: _reachId!,
           forecastType: 'short_range',
           title: 'Hourly Forecast',
-          timeFrameOptions: TimeFrameSelector.shortRangeOptions(),
-          onChartTap: () => _navigateToHydrograph({'timeFrame': '24h'}),
+          usageGuideOptions: FlowValuesUsageGuide.shortRangeOptions(),
+          onChartTap: _navigateToHydrograph,
           showCurrentFlow: false,
           additionalContent: _buildShortRangeSpecificContent(reachProvider),
         );
@@ -167,7 +165,7 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Updated hourly • High confidence for next 18 hours',
+            'Updated hourly • 18 hours of forecast data available',
             style: TextStyle(
               fontSize: 12,
               color: CupertinoColors.secondaryLabel,
@@ -211,18 +209,41 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildAccuracyMetric(
-            'Next 6 hours',
-            '95%',
-            CupertinoColors.systemGreen,
-          ),
+          _buildAccuracyMetric('Hours 1-6', '95%', CupertinoColors.systemGreen),
           const SizedBox(height: 8),
-          _buildAccuracyMetric('6-18 hours', '85%', CupertinoColors.systemBlue),
+          _buildAccuracyMetric('Hours 7-12', '90%', CupertinoColors.systemBlue),
           const SizedBox(height: 8),
           _buildAccuracyMetric(
-            '18-72 hours',
-            '75%',
+            'Hours 13-18',
+            '85%',
             CupertinoColors.systemOrange,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  CupertinoIcons.info_circle_fill,
+                  size: 14,
+                  color: CupertinoColors.systemBlue,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Accuracy decreases gradually over the 18-hour forecast period',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: CupertinoColors.secondaryLabel,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

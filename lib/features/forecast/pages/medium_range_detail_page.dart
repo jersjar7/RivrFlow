@@ -4,13 +4,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/forecast_detail_template.dart';
-import '../widgets/time_frame_selector.dart';
+import '../widgets/flow_values_usage_guide.dart';
 
 class MediumRangeDetailPage extends StatefulWidget {
   final String? reachId;
-  final String? initialTimeFrame;
 
-  const MediumRangeDetailPage({super.key, this.reachId, this.initialTimeFrame});
+  const MediumRangeDetailPage({super.key, this.reachId});
 
   @override
   State<MediumRangeDetailPage> createState() => _MediumRangeDetailPageState();
@@ -72,16 +71,15 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
     }
   }
 
-  void _navigateToHydrograph(Map<String, dynamic> context) {
+  void _navigateToHydrograph() {
     if (_reachId == null) return;
 
     Navigator.pushNamed(
-      this.context,
+      context,
       '/hydrograph',
       arguments: {
         'reachId': _reachId,
         'forecastType': 'medium_range',
-        'timeFrame': context['timeFrame'] ?? '7d',
         'title': 'Medium Range Hydrograph',
       },
     );
@@ -103,8 +101,8 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
           reachId: _reachId!,
           forecastType: 'medium_range',
           title: 'Medium Range Forecast',
-          timeFrameOptions: TimeFrameSelector.mediumRangeOptions(),
-          onChartTap: () => _navigateToHydrograph({'timeFrame': '7d'}),
+          usageGuideOptions: FlowValuesUsageGuide.mediumRangeOptions(),
+          onChartTap: _navigateToHydrograph,
           showCurrentFlow: false,
           additionalContent: _buildMediumRangeSpecificContent(reachProvider),
         );
@@ -169,7 +167,7 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Updated every 6 hours • Daily intervals for extended planning',
+            'Updated every 6 hours • 10 days of forecast data available',
             style: TextStyle(
               fontSize: 12,
               color: CupertinoColors.secondaryLabel,
@@ -221,6 +219,33 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
             'Days 8-10',
             '60%',
             CupertinoColors.systemOrange,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  CupertinoIcons.info_circle_fill,
+                  size: 14,
+                  color: CupertinoColors.systemBlue,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Best accuracy for trip planning within first 7 days',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: CupertinoColors.secondaryLabel,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
