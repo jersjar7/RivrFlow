@@ -73,9 +73,27 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
   void _navigateToForecastDetail(String forecastType) {
     if (widget.reachId == null) return;
 
+    // Route to the correct detail page based on forecast type
+    String routeName;
+    switch (forecastType) {
+      case 'short_range':
+        routeName = '/short-range-detail';
+        break;
+      case 'medium_range':
+        routeName = '/medium-range-detail';
+        break;
+      case 'long_range':
+        routeName = '/long-range-detail';
+        break;
+      default:
+        // Fallback to short range if unknown type
+        routeName = '/short-range-detail';
+        break;
+    }
+
     Navigator.pushNamed(
       context,
-      '/short-range-detail', // We'll update this to handle different types
+      routeName,
       arguments: {'reachId': widget.reachId, 'forecastType': forecastType},
     );
   }
