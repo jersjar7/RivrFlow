@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/interactive_chart.dart';
+import '../widgets/flood_categories_info_sheet.dart';
 
 class HydrographPage extends StatefulWidget {
   final String? reachId;
@@ -119,12 +120,29 @@ class _HydrographPageState extends State<HydrographPage> {
     );
   }
 
+  void _showFloodCategoriesInfo() {
+    final reachProvider = Provider.of<ReachDataProvider>(
+      context,
+      listen: false,
+    );
+    final reach = reachProvider.currentReach;
+    final returnPeriods = reach?.returnPeriods;
+
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) =>
+          FloodCategoriesInfoSheet(returnPeriods: returnPeriods),
+    );
+  }
+
   void _showChartInfo() {
     final reachProvider = Provider.of<ReachDataProvider>(
       context,
       listen: false,
     );
     final reach = reachProvider.currentReach;
+    final hasReturnPeriods =
+        reach?.returnPeriods != null && reach!.returnPeriods!.isNotEmpty;
 
     showCupertinoModalPopup(
       context: context,
@@ -132,6 +150,14 @@ class _HydrographPageState extends State<HydrographPage> {
         title: Text(reach?.displayName ?? 'Chart Information'),
         message: Text(_buildChartInfoMessage()),
         actions: [
+          if (hasReturnPeriods)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _showFloodCategoriesInfo();
+              },
+              child: const Text('Flood Risk Categories'),
+            ),
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(context),
             child: const Text('View Data Source'),

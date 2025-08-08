@@ -30,6 +30,37 @@ class ForecastInfo {
 class AppConstants {
   AppConstants._(); // Private constructor to prevent instantiation
 
+  // MARK: - Return Period Chart Colors
+
+  /// Background colors for return period zones
+  static const Color returnPeriodNormalBg = Color(0xFFFFFFFF); // White (0-2yr)
+  static const Color returnPeriodActionBg = Color(
+    0xFFFFF9C4,
+  ); // Subtle Yellow (2-5yr)
+  static const Color returnPeriodModerateBg = Color(
+    0xFFFFE0B2,
+  ); // Subtle Orange (5-10yr)
+  static const Color returnPeriodMajorBg = Color(
+    0xFFFFCDD2,
+  ); // Subtle Red (10-25yr)
+  static const Color returnPeriodExtremeBg = Color(
+    0xFFE1BEE7,
+  ); // Subtle Purple (25yr+)
+
+  /// Get display label for return period lines
+  static String getReturnPeriodLabel(int years) {
+    switch (years) {
+      case 5:
+        return 'Action';
+      case 10:
+        return 'Moderate';
+      case 25:
+        return 'Major';
+      default:
+        return '${years}yr';
+    }
+  }
+
   // MARK: - Stream Order Styling
 
   /// Get stream order color for consistent styling

@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' as math;
 import '../../../core/providers/reach_data_provider.dart';
+import '../../../core/constants.dart';
 
 class InteractiveChart extends StatefulWidget {
   final String reachId;
@@ -33,6 +34,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
   bool _isInitialized = false;
   List<FlSpot> _chartData = [];
   List<HorizontalLine> _returnPeriodLines = [];
+  List<HorizontalLine> _backgroundZones = [];
   final List<VerticalLine> _verticalLines = [];
   List<ChartDataPoint> _forecastData = [];
 
@@ -63,6 +65,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
 
     _calculateAxisBounds();
+    _buildBackgroundZones();
     _buildReturnPeriodLines();
     _buildVerticalLines();
 
@@ -215,6 +218,104 @@ class _InteractiveChartState extends State<InteractiveChart> {
     print('DEBUG: Final chart bounds Y: $_minY to $_maxY');
   }
 
+  void _buildBackgroundZones() {
+    _backgroundZones = [];
+
+    if (!widget.showReturnPeriods || !widget.reachProvider.hasData) {
+      return;
+    }
+
+    final reach = widget.reachProvider.currentReach;
+    if (reach?.returnPeriods == null) return;
+
+    final returnPeriods = reach!.returnPeriods!;
+    const cmsToCs = 35.3147; // Convert CMS to CFS
+
+    // Convert return periods to CFS and sort
+    final sortedReturnPeriods = <int, double>{};
+    for (final entry in returnPeriods.entries) {
+      sortedReturnPeriods[entry.key] = entry.value * cmsToCs;
+    }
+
+    // Define zone boundaries
+    final zones = <_FloodZone>[];
+
+    // Normal zone (0 to 2yr if available, otherwise to chart min)
+    final twoYearFlow = sortedReturnPeriods[2];
+    zones.add(
+      _FloodZone(
+        startY: _minY,
+        endY: twoYearFlow ?? _maxY,
+        color: AppConstants.returnPeriodNormalBg,
+      ),
+    );
+
+    // Action zone (2yr to 5yr)
+    final fiveYearFlow = sortedReturnPeriods[5];
+    if (twoYearFlow != null && fiveYearFlow != null) {
+      zones.add(
+        _FloodZone(
+          startY: twoYearFlow,
+          endY: fiveYearFlow,
+          color: AppConstants.returnPeriodActionBg,
+        ),
+      );
+    }
+
+    // Moderate zone (5yr to 10yr)
+    final tenYearFlow = sortedReturnPeriods[10];
+    if (fiveYearFlow != null && tenYearFlow != null) {
+      zones.add(
+        _FloodZone(
+          startY: fiveYearFlow,
+          endY: tenYearFlow,
+          color: AppConstants.returnPeriodModerateBg,
+        ),
+      );
+    }
+
+    // Major zone (10yr to 25yr)
+    final twentyFiveYearFlow = sortedReturnPeriods[25];
+    if (tenYearFlow != null && twentyFiveYearFlow != null) {
+      zones.add(
+        _FloodZone(
+          startY: tenYearFlow,
+          endY: twentyFiveYearFlow,
+          color: AppConstants.returnPeriodMajorBg,
+        ),
+      );
+    }
+
+    // Extreme zone (25yr to chart max)
+    if (twentyFiveYearFlow != null) {
+      zones.add(
+        _FloodZone(
+          startY: twentyFiveYearFlow,
+          endY: _maxY,
+          color: AppConstants.returnPeriodExtremeBg,
+        ),
+      );
+    }
+
+    // Create background zones using very thick horizontal lines
+    for (final zone in zones) {
+      if (zone.startY < zone.endY) {
+        final midY = (zone.startY + zone.endY) / 2;
+        final height = zone.endY - zone.startY;
+
+        _backgroundZones.add(
+          HorizontalLine(
+            y: midY,
+            color: zone.color.withOpacity(0.3),
+            strokeWidth: height.abs(),
+          ),
+        );
+      }
+    }
+
+    print('DEBUG: Added ${_backgroundZones.length} background zones');
+  }
+
   void _buildReturnPeriodLines() {
     _returnPeriodLines = [];
 
@@ -253,11 +354,14 @@ class _InteractiveChartState extends State<InteractiveChart> {
         'DEBUG: Adding return period line - ${year}yr = ${flowCfs.toStringAsFixed(1)} CFS',
       );
 
-      // NEW: Always add return period lines when toggle is ON (bounds are now adjusted to fit them)
+      // Use the new label function from constants
+      final label = AppConstants.getReturnPeriodLabel(year);
+
+      // Always add return period lines when toggle is ON (bounds are now adjusted to fit them)
       _returnPeriodLines.add(
         HorizontalLine(
           y: flowCfs,
-          color: colors[colorIndex % colors.length].withOpacity(0.7),
+          color: colors[colorIndex % colors.length].withOpacity(0.8),
           strokeWidth: 2,
           dashArray: [5, 5],
           label: HorizontalLineLabel(
@@ -268,7 +372,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
-            labelResolver: (line) => '${year}yr',
+            labelResolver: (line) => label,
           ),
         ),
       );
@@ -294,7 +398,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
           borderData: _buildBorderData(),
           lineBarsData: _buildLineData(),
           extraLinesData: ExtraLinesData(
-            horizontalLines: _returnPeriodLines,
+            horizontalLines: [..._backgroundZones, ..._returnPeriodLines],
             verticalLines: _verticalLines,
           ),
           lineTouchData: _buildTouchData(),
@@ -641,5 +745,18 @@ class ChartDataPoint {
     required this.flow,
     this.confidence,
     this.metadata,
+  });
+}
+
+// Helper class for background zones
+class _FloodZone {
+  final double startY;
+  final double endY;
+  final Color color;
+
+  const _FloodZone({
+    required this.startY,
+    required this.endY,
+    required this.color,
   });
 }
