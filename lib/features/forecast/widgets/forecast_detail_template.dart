@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:rivrflow/features/forecast/widgets/horizontal_flow_timeline.dart';
 import '../../../core/providers/reach_data_provider.dart';
+import '../../../core/services/forecast_service.dart';
 import 'current_flow_status_card.dart';
 import 'flow_values_usage_guide.dart';
 import 'chart_preview_widget.dart';
@@ -67,18 +68,18 @@ class ForecastDetailTemplate extends StatefulWidget {
     this.showCurrentFlow = true,
     this.padding,
 
-    // NEW: Custom widgets
+    // Custom widgets
     this.customHeaderWidget,
     this.customTimelineWidget,
     this.customChartPreview,
     this.customSummaryWidget,
 
-    // NEW: Section visibility
+    // Section visibility
     this.showTimelineSection = true,
     this.showChartSection = true,
     this.showForecastSummary = true,
 
-    // NEW: Section titles
+    // Section titles
     this.timelineSectionTitle,
     this.chartSectionTitle,
   });
@@ -90,6 +91,7 @@ class ForecastDetailTemplate extends StatefulWidget {
 class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
   late String _selectedUsageGuide;
   bool _isRefreshing = false;
+  final ForecastService _forecastService = ForecastService();
 
   @override
   void initState() {
@@ -188,7 +190,7 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
             ),
           ),
 
-        // NEW: Custom Header Widget (if provided)
+        // Custom Header Widget (if provided)
         if (widget.customHeaderWidget != null)
           SliverToBoxAdapter(
             child: Padding(
@@ -276,7 +278,8 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
         if (widget.showForecastSummary)
           SliverToBoxAdapter(
             child: Padding(
-              padding: widget.padding ?? const EdgeInsets.all(16),
+              padding:
+                  widget.padding ?? const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child:
                   widget.customSummaryWidget ??
                   _buildForecastSummary(reachProvider),
@@ -348,19 +351,141 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
   }
 
   Widget _buildSummaryMetrics(ReachDataProvider reachProvider) {
-    // This would be populated with actual forecast metrics
-    // For now, showing placeholder structure
+    if (!reachProvider.hasData || reachProvider.currentForecast == null) {
+      return _buildNoDataMetrics();
+    }
+
+    final forecast = reachProvider.currentForecast!;
+
+    // Calculate real metrics from forecast data
+    final peakFlow = _calculatePeakFlow(forecast);
+    final currentTrend = _calculateCurrentTrend(forecast);
+    final flowCategory = _forecastService.getFlowCategory(forecast);
+
     return Column(
       children: [
-        _buildMetricRow('Peak Flow', 'TBD CFS', CupertinoIcons.arrow_up),
+        _buildMetricRow(
+          'Peak Flow',
+          peakFlow != null ? '${peakFlow.toStringAsFixed(0)} CFS' : 'N/A',
+          CupertinoIcons.arrow_up,
+        ),
         const SizedBox(height: 8),
-        _buildMetricRow('Trend', 'Stable', CupertinoIcons.arrow_right),
+        _buildMetricRow(
+          'Current Trend',
+          currentTrend,
+          _getTrendIcon(currentTrend),
+        ),
         const SizedBox(height: 8),
-        _buildMetricRow('Confidence', 'High', CupertinoIcons.checkmark_circle),
-        const SizedBox(height: 8),
-        _buildMetricRow('Last Updated', 'Just now', CupertinoIcons.clock),
+        _buildMetricRow(
+          'Flow Level',
+          flowCategory,
+          _getCategoryIcon(flowCategory),
+        ),
       ],
     );
+  }
+
+  Widget _buildNoDataMetrics() {
+    return Column(
+      children: [
+        _buildMetricRow('Peak Flow', 'N/A', CupertinoIcons.arrow_up),
+        const SizedBox(height: 8),
+        _buildMetricRow('Current Trend', 'N/A', CupertinoIcons.arrow_right),
+        const SizedBox(height: 8),
+        _buildMetricRow('Flow Level', 'N/A', CupertinoIcons.drop),
+        const SizedBox(height: 8),
+        _buildMetricRow('Last Updated', 'N/A', CupertinoIcons.clock),
+      ],
+    );
+  }
+
+  double? _calculatePeakFlow(dynamic forecast) {
+    try {
+      // Get forecast data based on type
+      final forecastSeries = forecast.getPrimaryForecast(widget.forecastType);
+      if (forecastSeries == null || forecastSeries.isEmpty) return null;
+
+      // Find the maximum flow value in the forecast period
+      double maxFlow = forecastSeries.data.first.flow;
+      for (final point in forecastSeries.data) {
+        if (point.flow > maxFlow && point.flow > -9000) {
+          // Filter out missing data
+          maxFlow = point.flow;
+        }
+      }
+
+      return maxFlow > -9000 ? maxFlow : null;
+    } catch (e) {
+      print('Error calculating peak flow: $e');
+      return null;
+    }
+  }
+
+  String _calculateCurrentTrend(dynamic forecast) {
+    try {
+      // For short range, use hourly data to calculate trend
+      if (widget.forecastType == 'short_range') {
+        final hourlyData = _forecastService.getShortRangeHourlyData(forecast);
+        if (hourlyData.length >= 3) {
+          // Compare current flow vs next 2 hours
+          final current = hourlyData[0].flow;
+          final future1 = hourlyData[1].flow;
+          final future2 = hourlyData[2].flow;
+
+          final avgFuture = (future1 + future2) / 2;
+          final change = avgFuture - current;
+
+          if (change > 10) return 'Rising';
+          if (change < -10) return 'Falling';
+          return 'Stable';
+        }
+      }
+
+      // For other forecast types, use first few data points
+      final forecastSeries = forecast.getPrimaryForecast(widget.forecastType);
+      if (forecastSeries != null && forecastSeries.data.length >= 3) {
+        final first = forecastSeries.data[0].flow;
+        final third = forecastSeries.data[2].flow;
+        final change = third - first;
+
+        if (change > 20) return 'Rising';
+        if (change < -20) return 'Falling';
+        return 'Stable';
+      }
+
+      return 'Stable';
+    } catch (e) {
+      print('Error calculating trend: $e');
+      return 'Unknown';
+    }
+  }
+
+  IconData _getTrendIcon(String trend) {
+    switch (trend.toLowerCase()) {
+      case 'rising':
+        return CupertinoIcons.arrow_up;
+      case 'falling':
+        return CupertinoIcons.arrow_down;
+      case 'stable':
+        return CupertinoIcons.arrow_right;
+      default:
+        return CupertinoIcons.minus;
+    }
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'normal':
+        return CupertinoIcons.drop;
+      case 'elevated':
+        return CupertinoIcons.drop_triangle;
+      case 'high':
+        return CupertinoIcons.exclamationmark_triangle;
+      case 'flood risk':
+        return CupertinoIcons.exclamationmark_triangle_fill;
+      default:
+        return CupertinoIcons.drop;
+    }
   }
 
   Widget _buildMetricRow(String label, String value, IconData icon) {

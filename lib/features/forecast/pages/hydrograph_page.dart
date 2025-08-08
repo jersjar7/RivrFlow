@@ -320,17 +320,6 @@ class _HydrographPageState extends State<HydrographPage> {
               },
               child: const Text('Flood Risk Categories'),
             ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('View Data Source'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(context);
-              _exportChart();
-            },
-            child: const Text('Export Chart'),
-          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context),

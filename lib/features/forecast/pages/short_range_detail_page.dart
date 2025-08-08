@@ -1,6 +1,7 @@
 // lib/features/forecast/pages/short_range_detail_page.dart
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/forecast_detail_template.dart';
@@ -116,11 +117,11 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Divider(),
+          const SizedBox(height: 16),
+          _buildForecastDetails(reachProvider),
+          const SizedBox(height: 20),
           _buildDataSourceInfo(reachProvider),
-          const SizedBox(height: 16),
-          _buildForecastAccuracy(),
-          const SizedBox(height: 16),
-          _buildHourlyInsights(reachProvider),
         ],
       ),
     );
@@ -142,12 +143,6 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
         children: [
           Row(
             children: [
-              const Icon(
-                CupertinoIcons.info_circle,
-                size: 16,
-                color: CupertinoColors.systemBlue,
-              ),
-              const SizedBox(width: 8),
               const Text(
                 'Data Source',
                 style: TextStyle(
@@ -164,7 +159,7 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
             style: TextStyle(fontSize: 14, color: CupertinoColors.label),
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             'Updated hourly • 18 hours of forecast data available',
             style: TextStyle(
               fontSize: 12,
@@ -176,30 +171,20 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
     );
   }
 
-  Widget _buildForecastAccuracy() {
+  Widget _buildForecastDetails(ReachDataProvider reachProvider) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGreen.withOpacity(0.1),
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: CupertinoColors.systemGreen.withOpacity(0.2),
-          width: 1,
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                CupertinoIcons.checkmark_circle,
-                size: 16,
-                color: CupertinoColors.systemGreen,
-              ),
-              const SizedBox(width: 8),
               const Text(
-                'Forecast Accuracy',
+                'Hourly Forecast Details',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -209,33 +194,47 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildAccuracyMetric('Hours 1-6', '95%', CupertinoColors.systemGreen),
+          _buildDetailItem(
+            'Purpose',
+            'Emergency response and flash flood monitoring',
+            CupertinoIcons.exclamationmark_triangle,
+          ),
           const SizedBox(height: 8),
-          _buildAccuracyMetric('Hours 7-12', '90%', CupertinoColors.systemBlue),
+          _buildDetailItem(
+            'Time Range',
+            'Next 18 hours from current time',
+            CupertinoIcons.clock,
+          ),
           const SizedBox(height: 8),
-          _buildAccuracyMetric(
-            'Hours 13-18',
-            '85%',
-            CupertinoColors.systemOrange,
+          _buildDetailItem(
+            'Update Frequency',
+            'New forecast every hour',
+            CupertinoIcons.arrow_clockwise,
+          ),
+          const SizedBox(height: 8),
+          _buildDetailItem(
+            'Best Use',
+            'Real-time monitoring and immediate decision making',
+            CupertinoIcons.checkmark_circle,
           ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withOpacity(0.1),
+              color: CupertinoColors.systemGreen.withOpacity(0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
               children: [
                 const Icon(
-                  CupertinoIcons.info_circle_fill,
+                  CupertinoIcons.lightbulb,
                   size: 14,
-                  color: CupertinoColors.systemBlue,
+                  color: CupertinoColors.systemGreen,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Accuracy decreases gradually over the 18-hour forecast period',
+                    'Most reliable for the next 6 hours, suitable for emergency planning',
                     style: TextStyle(
                       fontSize: 11,
                       color: CupertinoColors.secondaryLabel,
@@ -250,89 +249,11 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
     );
   }
 
-  Widget _buildAccuracyMetric(String timeRange, String accuracy, Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          timeRange,
-          style: const TextStyle(fontSize: 14, color: CupertinoColors.label),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            accuracy,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHourlyInsights(ReachDataProvider reachProvider) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6.resolveFrom(context),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                CupertinoIcons.lightbulb,
-                size: 16,
-                color: CupertinoColors.systemYellow,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Hourly Insights',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: CupertinoColors.label,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildInsightItem(
-            'Peak Flow',
-            'Expected around 3:00 PM today',
-            CupertinoIcons.arrow_up_circle,
-          ),
-          const SizedBox(height: 8),
-          _buildInsightItem(
-            'Stability',
-            'Flows remain within normal range',
-            CupertinoIcons.checkmark_circle,
-          ),
-          const SizedBox(height: 8),
-          _buildInsightItem(
-            'Conditions',
-            'Good for water activities today',
-            CupertinoIcons.sun_max,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInsightItem(String title, String description, IconData icon) {
+  Widget _buildDetailItem(String title, String description, IconData icon) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: CupertinoColors.systemBlue),
+        Icon(icon, size: 14, color: CupertinoColors.systemBlue),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -341,7 +262,7 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: CupertinoColors.label,
                 ),
@@ -363,24 +284,22 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
   Widget _buildLoadingPage() {
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
-        middle: Text('Short Range Forecast'),
+        middle: Text('Hourly Forecast'),
       ),
-      child: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CupertinoActivityIndicator(radius: 20),
-              const SizedBox(height: 16),
-              Text(
-                'Loading forecast data...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CupertinoActivityIndicator(radius: 20),
+            const SizedBox(height: 16),
+            const Text(
+              'Loading forecast data...',
+              style: TextStyle(
+                fontSize: 16,
+                color: CupertinoColors.secondaryLabel,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -389,45 +308,48 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
   Widget _buildErrorPage(String error) {
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
-        middle: Text('Short Range Forecast'),
+        middle: Text('Hourly Forecast'),
       ),
-      child: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  CupertinoIcons.exclamationmark_triangle,
-                  size: 64,
-                  color: CupertinoColors.systemRed,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                CupertinoIcons.exclamationmark_triangle,
+                size: 64,
+                color: CupertinoColors.systemRed,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Unable to load forecast',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: CupertinoColors.label,
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Unable to load forecast',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: CupertinoColors.label,
-                  ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: CupertinoColors.secondaryLabel,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  error,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                CupertinoButton.filled(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Go Back'),
-                ),
-              ],
-            ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              CupertinoButton.filled(
+                onPressed: () {
+                  setState(() {
+                    _isInitialized = false;
+                  });
+                  _loadReachData();
+                },
+                child: const Text('Try Again'),
+              ),
+            ],
           ),
         ),
       ),
