@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/forecast_detail_template.dart';
 import '../widgets/flow_values_usage_guide.dart';
+import '../widgets/daily_expandable_widget/daily_flow_forecast_widget.dart';
 
 class MediumRangeDetailPage extends StatefulWidget {
   final String? reachId;
@@ -85,6 +86,23 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
     );
   }
 
+  /// Handle refresh for the daily forecast widget
+  Future<void> _handleForecastRefresh() async {
+    if (_reachId == null) return;
+
+    final reachProvider = Provider.of<ReachDataProvider>(
+      context,
+      listen: false,
+    );
+
+    try {
+      await reachProvider.loadReach(_reachId!);
+    } catch (e) {
+      // Error handling is managed by the provider
+      print('Error refreshing forecast data: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_reachId == null) {
@@ -104,9 +122,52 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
           usageGuideOptions: FlowValuesUsageGuide.mediumRangeOptions(),
           onChartTap: _navigateToHydrograph,
           showCurrentFlow: false,
+
+          // NEW: Custom timeline widget using our DailyFlowForecastWidget
+          customTimelineWidget: _buildDailyForecastWidget(reachProvider),
+          timelineSectionTitle: '10-Day Daily Forecast',
+          showTimelineSection: true,
+
+          // Keep existing additional content
           additionalContent: _buildMediumRangeSpecificContent(reachProvider),
         );
       },
+    );
+  }
+
+  /// Build the new daily forecast widget
+  Widget _buildDailyForecastWidget(ReachDataProvider reachProvider) {
+    // Check if we have forecast data
+    if (!reachProvider.hasData || reachProvider.forecastResponse == null) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                CupertinoIcons.calendar,
+                size: 48,
+                color: CupertinoColors.systemGrey2.resolveFrom(context),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Loading Daily Forecasts...',
+                style: CupertinoTheme.of(context).textTheme.navTitleTextStyle
+                    .copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return DailyFlowForecastWidget(
+      forecastResponse: reachProvider.forecastResponse,
+      forecastType: 'medium_range',
+      onRefresh: _handleForecastRefresh,
+      allowMultipleExpanded: false,
+      maxHeight: 600, // Reasonable height constraint for the page
     );
   }
 
@@ -129,6 +190,29 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
   }
 
   Widget _buildDataSourceInfo(ReachDataProvider reachProvider) {
+    // Enhanced data source info that reflects our new processing
+    final forecastResponse = reachProvider.forecastResponse;
+    String dataSourceDetail = 'NOAA National Water Model Medium Range Forecast';
+    String updateInfo =
+        'Updated every 6 hours • 10 days of forecast data available';
+
+    // Add ensemble information if available
+    if (forecastResponse != null) {
+      final ensembleInfo = forecastResponse.mediumRange;
+      if (ensembleInfo.containsKey('mean') &&
+          ensembleInfo['mean']?.isNotEmpty == true) {
+        updateInfo += ' • Using ensemble mean';
+      } else {
+        final memberCount = ensembleInfo.keys
+            .where((k) => k.startsWith('member'))
+            .length;
+        if (memberCount > 0) {
+          updateInfo +=
+              ' • Using ensemble member data ($memberCount members available)';
+        }
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -161,13 +245,13 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            'NOAA National Water Model Medium Range Forecast',
-            style: TextStyle(fontSize: 14, color: CupertinoColors.label),
+          Text(
+            dataSourceDetail,
+            style: const TextStyle(fontSize: 14, color: CupertinoColors.label),
           ),
           const SizedBox(height: 4),
           Text(
-            'Updated every 6 hours • 10 days of forecast data available',
+            updateInfo,
             style: TextStyle(
               fontSize: 12,
               color: CupertinoColors.secondaryLabel,
@@ -237,7 +321,7 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Best accuracy for trip planning within first 7 days',
+                    'Tap any day above to view detailed hourly forecasts and flow statistics',
                     style: TextStyle(
                       fontSize: 11,
                       color: CupertinoColors.secondaryLabel,
@@ -309,21 +393,21 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
           ),
           const SizedBox(height: 12),
           _buildInsightItem(
-            'Best Days',
-            'Days 3-5 show optimal flow conditions',
-            CupertinoIcons.calendar_today,
+            'Interactive Daily View',
+            'Tap any day above to see hourly flow patterns',
+            CupertinoIcons.hand_point_left_fill,
           ),
           const SizedBox(height: 8),
           _buildInsightItem(
-            'Flow Trend',
-            'Gradual increase expected mid-week',
-            CupertinoIcons.arrow_up_right,
+            'Flow Categories',
+            'Color-coded icons show Normal, Elevated, High, or Flood Risk',
+            CupertinoIcons.circle_fill,
           ),
           const SizedBox(height: 8),
           _buildInsightItem(
-            'Weekend Outlook',
-            'Good conditions for recreational activities',
-            CupertinoIcons.sun_max,
+            'Range Visualization',
+            'Flow bars show daily min-max ranges for planning',
+            CupertinoIcons.chart_bar,
           ),
         ],
       ),
@@ -365,21 +449,21 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
           const SizedBox(height: 12),
           _buildWeatherItem(
             'Precipitation',
-            'Light rain expected on Day 4',
+            'Weather impacts reflected in ensemble forecasts',
             CupertinoIcons.drop,
             CupertinoColors.systemBlue,
           ),
           const SizedBox(height: 8),
           _buildWeatherItem(
             'Snowmelt',
-            'Minimal impact from upstream snowpack',
+            'Seasonal snowpack effects included in model',
             CupertinoIcons.snow,
             CupertinoColors.systemGrey,
           ),
           const SizedBox(height: 8),
           _buildWeatherItem(
             'Temperature',
-            'Moderate temperatures, stable flows',
+            'Daily temperature variations affect flow patterns',
             CupertinoIcons.thermometer,
             CupertinoColors.systemOrange,
           ),
