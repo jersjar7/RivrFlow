@@ -28,7 +28,6 @@ class _HydrographPageState extends State<HydrographPage> {
   String? _pageTitle;
   bool _isInitialized = false;
   bool _showReturnPeriods = true;
-  bool _isWaveView = false;
   final bool _showTooltips = true;
 
   @override
@@ -98,19 +97,6 @@ class _HydrographPageState extends State<HydrographPage> {
   void _toggleReturnPeriods() {
     setState(() {
       _showReturnPeriods = !_showReturnPeriods;
-    });
-  }
-
-  void _toggleWaveView() {
-    setState(() {
-      _isWaveView = !_isWaveView;
-    });
-  }
-
-  void _resetZoom() {
-    // This will be called on the InteractiveChart widget
-    setState(() {
-      // Trigger chart reset through key or controller
     });
   }
 
@@ -249,13 +235,10 @@ class _HydrographPageState extends State<HydrographPage> {
               ),
             ),
             child: InteractiveChart(
-              key: ValueKey(
-                '$_reachId-$_forecastType-$_showReturnPeriods-$_isWaveView',
-              ),
+              key: ValueKey('$_reachId-$_forecastType-$_showReturnPeriods'),
               reachId: _reachId!,
               forecastType: _forecastType!,
               showReturnPeriods: _showReturnPeriods,
-              isWaveView: _isWaveView,
               showTooltips: _showTooltips,
               reachProvider: reachProvider,
             ),
@@ -303,55 +286,6 @@ class _HydrographPageState extends State<HydrographPage> {
                   ),
                 ],
               ),
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Wave View Toggle
-          Expanded(
-            child: CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              color: _isWaveView
-                  ? CupertinoColors.systemBlue
-                  : CupertinoColors.systemGrey5.resolveFrom(context),
-              onPressed: _toggleWaveView,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    CupertinoIcons.waveform,
-                    size: 16,
-                    color: _isWaveView
-                        ? CupertinoColors.white
-                        : CupertinoColors.label.resolveFrom(context),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Wave View',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: _isWaveView
-                          ? CupertinoColors.white
-                          : CupertinoColors.label.resolveFrom(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Reset Zoom Button
-          CupertinoButton(
-            padding: const EdgeInsets.all(8),
-            color: CupertinoColors.systemGrey5.resolveFrom(context),
-            onPressed: _resetZoom,
-            child: Icon(
-              CupertinoIcons.zoom_out,
-              size: 16,
-              color: CupertinoColors.label.resolveFrom(context),
             ),
           ),
 

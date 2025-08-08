@@ -359,6 +359,12 @@ class ReachDataProvider with ChangeNotifier {
     return _forecastService.getShortRangeHourlyData(_currentForecast!);
   }
 
+  /// Get ALL hourly data for charts (including past hours)
+  List<HourlyFlowDataPoint> getAllShortRangeHourlyData() {
+    if (_currentForecast == null) return [];
+    return _forecastService.getAllShortRangeHourlyData(_currentForecast!);
+  }
+
   // Update all computed caches when data changes
   void _updateComputedCaches(String reachId) {
     if (_currentForecast == null) return;

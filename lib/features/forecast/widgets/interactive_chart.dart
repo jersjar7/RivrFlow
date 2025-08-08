@@ -9,7 +9,6 @@ class InteractiveChart extends StatefulWidget {
   final String reachId;
   final String forecastType;
   final bool showReturnPeriods;
-  final bool isWaveView;
   final bool showTooltips;
   final ReachDataProvider reachProvider;
 
@@ -18,7 +17,6 @@ class InteractiveChart extends StatefulWidget {
     required this.reachId,
     required this.forecastType,
     required this.showReturnPeriods,
-    required this.isWaveView,
     required this.showTooltips,
     required this.reachProvider,
   });
@@ -35,6 +33,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
   bool _isInitialized = false;
   List<FlSpot> _chartData = [];
   List<HorizontalLine> _returnPeriodLines = [];
+  final List<VerticalLine> _verticalLines = [];
+  List<ChartDataPoint> _forecastData = [];
 
   @override
   void initState() {
@@ -46,95 +46,122 @@ class _InteractiveChartState extends State<InteractiveChart> {
   void didUpdateWidget(InteractiveChart oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.forecastType != widget.forecastType ||
-        oldWidget.showReturnPeriods != widget.showReturnPeriods ||
-        oldWidget.isWaveView != widget.isWaveView) {
+        oldWidget.showReturnPeriods != widget.showReturnPeriods) {
       _initializeChart();
     }
   }
 
   void _initializeChart() {
     _extractChartData();
+
+    // ONLY proceed if we actually have forecast data
+    if (_forecastData.isEmpty) {
+      setState(() {
+        _isInitialized = false; // Mark as not ready
+      });
+      return;
+    }
+
     _calculateAxisBounds();
     _buildReturnPeriodLines();
+    _buildVerticalLines();
+
     setState(() {
-      _isInitialized = true;
+      _isInitialized = true; // Now we're truly ready
     });
+  }
+
+  void _buildVerticalLines() {
+    _verticalLines.clear();
+
+    // Add "Now" line for short_range forecast
+    if (widget.forecastType == 'short_range' && _forecastData.isNotEmpty) {
+      final now = DateTime.now();
+      final earliestTime = _forecastData
+          .map((d) => d.time)
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+
+      // Position "Now" line at exact current time relative to forecast data
+      final nowPosition = now.difference(earliestTime).inMinutes / 60.0;
+
+      _verticalLines.add(
+        VerticalLine(
+          x: nowPosition,
+          color: CupertinoColors.systemRed.withOpacity(0.8),
+          strokeWidth: 2,
+          dashArray: [8, 4],
+          label: VerticalLineLabel(
+            show: true,
+            alignment: Alignment.topLeft,
+            style: const TextStyle(
+              color: CupertinoColors.systemRed,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            labelResolver: (line) => 'Now',
+          ),
+        ),
+      );
+    }
   }
 
   void _extractChartData() {
     if (!widget.reachProvider.hasData) {
       _chartData = [];
+      _forecastData = [];
       return;
     }
 
-    // Extract forecast data based on type - showing all available data
-    final forecastData = _getForecastData();
-    _chartData = _convertToFlSpots(forecastData);
+    // Get forecast data once and store it
+    _forecastData = _getForecastData();
+    _chartData = _convertToFlSpots(_forecastData);
   }
 
   List<ChartDataPoint> _getForecastData() {
-    // This would extract actual forecast data from the provider
-    // For now, generating mock data that represents the structure
-    return _generateMockForecastData();
-  }
+    final forecast = widget.reachProvider.currentForecast;
+    if (forecast == null) return [];
 
-  List<ChartDataPoint> _generateMockForecastData() {
-    final now = DateTime.now();
-    final List<ChartDataPoint> data = [];
+    // Use real API data instead of mock data
+    if (widget.forecastType == 'short_range') {
+      final forecastSeries = forecast.getPrimaryForecast('short_range');
+      if (forecastSeries == null || forecastSeries.isEmpty) return [];
 
-    // Generate data amounts based on forecast type - showing full available data
-    int dataPoints;
-    Duration interval;
-
-    switch (widget.forecastType) {
-      case 'short_range':
-        dataPoints = 18; // Full 18 hours available
-        interval = const Duration(hours: 1);
-        break;
-      case 'medium_range':
-        dataPoints = 10; // Full 10 days available
-        interval = const Duration(days: 1);
-        break;
-      case 'long_range':
-        dataPoints = 8; // Full 8 weeks available
-        interval = const Duration(days: 7);
-        break;
-      default:
-        dataPoints = 24; // Default fallback
-        interval = const Duration(hours: 1);
-        break;
+      // Use ALL data points (including past hours)
+      return forecastSeries.data
+          .map(
+            (point) => ChartDataPoint(
+              time: point.validTime.toLocal(),
+              flow: point.flow,
+            ),
+          )
+          .toList();
     }
 
-    for (int i = 0; i < dataPoints; i++) {
-      final time = now.add(
-        Duration(milliseconds: (interval.inMilliseconds * i).round()),
-      );
+    // For other forecast types, use existing logic but with real data
+    final forecastSeries = forecast.getPrimaryForecast(widget.forecastType);
+    if (forecastSeries == null || forecastSeries.isEmpty) return [];
 
-      // Create realistic flow variation
-      final baseFlow = 155.0;
-      final variation = math.sin(i * 0.3) * 50 + math.cos(i * 0.1) * 20;
-      final noise = (math.Random().nextDouble() - 0.5) * 10;
-      final flow = (baseFlow + variation + noise).clamp(50.0, 400.0);
-
-      data.add(
-        ChartDataPoint(
-          time: time,
-          flow: flow,
-          confidence: 0.9 - (i * 0.01), // Decreasing confidence over time
-        ),
-      );
-    }
-
-    return data;
+    return forecastSeries.data
+        .map(
+          (point) =>
+              ChartDataPoint(time: point.validTime.toLocal(), flow: point.flow),
+        )
+        .toList();
   }
 
   List<FlSpot> _convertToFlSpots(List<ChartDataPoint> data) {
     if (data.isEmpty) return [];
 
-    final firstTime = data.first.time;
+    // Find the earliest time as reference point
+    final earliestTime = data
+        .map((d) => d.time)
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+
     return data.map((point) {
-      final xValue = point.time.difference(firstTime).inHours.toDouble();
-      return FlSpot(xValue, point.flow);
+      // Convert to hours since the earliest time
+      final hoursSinceStart =
+          point.time.difference(earliestTime).inMinutes / 60.0;
+      return FlSpot(hoursSinceStart, point.flow);
     }).toList();
   }
 
@@ -169,14 +196,20 @@ class _InteractiveChartState extends State<InteractiveChart> {
   void _buildReturnPeriodLines() {
     _returnPeriodLines = [];
 
+    print('DEBUG: showReturnPeriods = ${widget.showReturnPeriods}');
+    print('DEBUG: hasData = ${widget.reachProvider.hasData}');
+
     if (!widget.showReturnPeriods || !widget.reachProvider.hasData) {
       return;
     }
 
     final reach = widget.reachProvider.currentReach;
+    print('DEBUG: reach.returnPeriods = ${reach?.returnPeriods}');
     if (reach?.returnPeriods == null) return;
 
     final returnPeriods = reach!.returnPeriods!;
+    print('DEBUG: Chart bounds Y: $_minY to $_maxY');
+
     final colors = [
       CupertinoColors.systemYellow,
       CupertinoColors.systemOrange,
@@ -189,6 +222,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       final year = entry.key;
       final flowCms = entry.value;
       final flowCfs = flowCms * 35.3147; // Convert CMS to CFS
+      print('DEBUG: ${year}yr = ${flowCfs.toStringAsFixed(1)} CFS');
 
       // Only show lines that are within the chart bounds
       if (flowCfs >= _minY && flowCfs <= _maxY) {
@@ -217,7 +251,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized || _chartData.isEmpty) {
+    // DON'T render chart until we have actual forecast data
+    if (!_isInitialized || _chartData.isEmpty || _forecastData.isEmpty) {
       return _buildEmptyChart();
     }
 
@@ -229,7 +264,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
           titlesData: _buildTitlesData(),
           borderData: _buildBorderData(),
           lineBarsData: _buildLineData(),
-          extraLinesData: ExtraLinesData(horizontalLines: _returnPeriodLines),
+          extraLinesData: ExtraLinesData(
+            horizontalLines: _returnPeriodLines,
+            verticalLines: _verticalLines,
+          ),
           lineTouchData: _buildTouchData(),
           minX: _minX,
           maxX: _maxX,
@@ -304,6 +342,16 @@ class _InteractiveChartState extends State<InteractiveChart> {
           reservedSize: 40,
           interval: (_maxX - _minX) / 6,
           getTitlesWidget: (value, meta) {
+            // Skip the first label to prevent overlap on left
+            if (value <= _minX + 0.1) {
+              return const SizedBox.shrink();
+            }
+
+            // Skip the last label to prevent overlap on right
+            if (value >= _maxX - 0.1) {
+              return const SizedBox.shrink();
+            }
+
             return Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
@@ -356,12 +404,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
     return [
       LineChartBarData(
         spots: _chartData,
-        isCurved: !widget.isWaveView,
+        isCurved: true,
         color: CupertinoColors.systemBlue,
-        barWidth: widget.isWaveView ? 1 : 3,
+        barWidth: 3,
         isStrokeCapRound: true,
         dotData: FlDotData(
-          show: !widget.isWaveView || _chartData.length <= 20,
+          show: _chartData.length <= 20,
           getDotPainter: (spot, percent, barData, index) {
             return FlDotCirclePainter(
               radius: 3,
@@ -490,35 +538,58 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
   }
 
-  String _formatTimeValue(double hours) {
-    if (widget.forecastType == 'long_range') {
-      final days = (hours / 24).round();
+  String _formatTimeValue(double hoursSinceStart) {
+    // For short_range, we MUST have forecast data to show correct times
+    if (widget.forecastType == 'short_range') {
+      if (_forecastData.isEmpty) {
+        // Data not ready - don't render anything
+        return '';
+      }
+
+      final earliestTime = _forecastData
+          .map((d) => d.time)
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+      final actualTime = earliestTime.add(
+        Duration(minutes: (hoursSinceStart * 60).round()),
+      );
+
+      return '${actualTime.hour.toString().padLeft(2, '0')}:${(actualTime.minute ~/ 30 * 30).toString().padLeft(2, '0')}';
+    }
+
+    // For other forecast types
+    if (widget.forecastType == 'medium_range') {
+      final days = (hoursSinceStart / 24).round();
+      return '${days}d';
+    } else {
+      final days = (hoursSinceStart / 24).round();
       final weeks = (days / 7).round();
       if (weeks > 0) return '${weeks}w';
       return '${days}d';
-    } else if (widget.forecastType == 'medium_range') {
-      final days = (hours / 24).round();
-      return '${days}d';
-    } else {
-      return '${hours.toInt()}h';
     }
   }
 
-  String _formatTooltipTime(double hours) {
-    final now = DateTime.now();
-    final targetTime = now.add(Duration(hours: hours.toInt()));
+  String _formatTooltipTime(double hoursSinceStart) {
+    if (widget.forecastType == 'short_range' && _forecastData.isNotEmpty) {
+      final earliestTime = _forecastData
+          .map((d) => d.time)
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+      final actualTime = earliestTime.add(
+        Duration(minutes: (hoursSinceStart * 60).round()),
+      );
 
-    if (widget.forecastType == 'short_range') {
-      return '${targetTime.hour.toString().padLeft(2, '0')}:${targetTime.minute.toString().padLeft(2, '0')}';
-    } else {
-      return '${targetTime.month}/${targetTime.day}';
+      return '${actualTime.hour.toString().padLeft(2, '0')}:${actualTime.minute.toString().padLeft(2, '0')}';
     }
+
+    // Fallback for other forecast types
+    final now = DateTime.now();
+    final targetTime = now.add(Duration(hours: hoursSinceStart.toInt()));
+    return '${targetTime.month}/${targetTime.day}';
   }
 
   String _getTimeAxisLabel() {
     switch (widget.forecastType) {
       case 'short_range':
-        return 'Hours from now';
+        return 'Time of Day';
       case 'medium_range':
         return 'Days from now';
       case 'long_range':

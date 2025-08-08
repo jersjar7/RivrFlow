@@ -176,15 +176,55 @@ class ChartPreviewWidget extends StatelessWidget {
     final forecast = reachProvider.currentForecast;
     if (forecast == null) return [];
 
-    // Use the ForecastResponse.getPrimaryForecast method
+    // Special handling for short_range to get ALL data including past hours
+    if (forecastType == 'short_range') {
+      final forecastSeries = forecast.getPrimaryForecast(forecastType);
+      if (forecastSeries == null || forecastSeries.isEmpty) return [];
+
+      final List<ChartDataPoint> points = [];
+      final now = DateTime.now();
+
+      try {
+        // Use ALL data points (no filtering by time - includes past hours)
+        final data = forecastSeries.data;
+
+        for (final point in data) {
+          final flow = point.flow;
+
+          if (flow > -9000) {
+            // Filter out missing data sentinel values
+            // Calculate hours from now (negative values = past hours)
+            final hoursFromNow = point.validTime
+                .difference(now)
+                .inHours
+                .toDouble();
+            points.add(ChartDataPoint(x: hoursFromNow, y: flow));
+          }
+        }
+
+        // Sort by time to ensure proper order
+        points.sort((a, b) => a.x.compareTo(b.x));
+
+        print(
+          'CHART_PREVIEW: Short-range using ${points.length} total hours including past data',
+        );
+        return points;
+      } catch (e) {
+        print('CHART_PREVIEW: Error extracting short-range data: $e');
+        return [];
+      }
+    }
+
+    // Existing logic for other forecast types (medium_range, long_range)
     final forecastSeries = forecast.getPrimaryForecast(forecastType);
     if (forecastSeries == null || forecastSeries.isEmpty) return [];
 
-    // Extract flow data points from ForecastSeries
     final List<ChartDataPoint> points = [];
 
     try {
       final data = forecastSeries.data;
+      final now = DateTime.now();
+
       for (int i = 0; i < data.length && i < 50; i++) {
         // Limit points for preview
         final point = data[i];
@@ -192,7 +232,11 @@ class ChartPreviewWidget extends StatelessWidget {
 
         if (flow > -9000) {
           // Filter out missing data sentinel values
-          points.add(ChartDataPoint(x: i.toDouble(), y: flow));
+          // Use actual time difference for better chart accuracy
+          final timeFromNow = forecastType == 'medium_range'
+              ? point.validTime.difference(now).inDays.toDouble()
+              : point.validTime.difference(now).inHours.toDouble();
+          points.add(ChartDataPoint(x: timeFromNow, y: flow));
         }
       }
     } catch (e) {
