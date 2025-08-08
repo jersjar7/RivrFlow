@@ -179,6 +179,26 @@ class _InteractiveChartState extends State<InteractiveChart> {
     _minY = _chartData.map((spot) => spot.y).reduce(math.min);
     _maxY = _chartData.map((spot) => spot.y).reduce(math.max);
 
+    // Include return period values in bounds calculation when toggle is ON
+    if (widget.showReturnPeriods && widget.reachProvider.hasData) {
+      final reach = widget.reachProvider.currentReach;
+      if (reach?.returnPeriods != null) {
+        final returnPeriods = reach!.returnPeriods!;
+        const cmsToCs = 35.3147; // Convert CMS to CFS
+
+        for (final entry in returnPeriods.entries) {
+          final flowCfs = entry.value * cmsToCs;
+          // Include return period values in Y bounds
+          if (flowCfs > _maxY) _maxY = flowCfs;
+          if (flowCfs < _minY) _minY = flowCfs;
+        }
+
+        print(
+          'DEBUG: Bounds adjusted for return periods - Y: $_minY to $_maxY',
+        );
+      }
+    }
+
     // Add padding
     final xRange = _maxX - _minX;
     final yRange = _maxY - _minY;
@@ -191,6 +211,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
     // Ensure minimum bounds
     if (_minY < 0) _minY = 0;
     if (_maxY < 100) _maxY = 100;
+
+    print('DEBUG: Final chart bounds Y: $_minY to $_maxY');
   }
 
   void _buildReturnPeriodLines() {
@@ -208,45 +230,52 @@ class _InteractiveChartState extends State<InteractiveChart> {
     if (reach?.returnPeriods == null) return;
 
     final returnPeriods = reach!.returnPeriods!;
-    print('DEBUG: Chart bounds Y: $_minY to $_maxY');
 
     final colors = [
       CupertinoColors.systemYellow,
       CupertinoColors.systemOrange,
       CupertinoColors.systemRed,
       CupertinoColors.systemPurple,
+      CupertinoColors.systemBlue,
+      CupertinoColors.systemGreen,
     ];
 
     int colorIndex = 0;
-    for (final entry in returnPeriods.entries) {
+    // Sort return periods by year for consistent coloring
+    final sortedEntries = returnPeriods.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    for (final entry in sortedEntries) {
       final year = entry.key;
       final flowCms = entry.value;
       final flowCfs = flowCms * 35.3147; // Convert CMS to CFS
-      print('DEBUG: ${year}yr = ${flowCfs.toStringAsFixed(1)} CFS');
+      print(
+        'DEBUG: Adding return period line - ${year}yr = ${flowCfs.toStringAsFixed(1)} CFS',
+      );
 
-      // Only show lines that are within the chart bounds
-      if (flowCfs >= _minY && flowCfs <= _maxY) {
-        _returnPeriodLines.add(
-          HorizontalLine(
-            y: flowCfs,
-            color: colors[colorIndex % colors.length].withOpacity(0.7),
-            strokeWidth: 2,
-            dashArray: [5, 5],
-            label: HorizontalLineLabel(
-              show: true,
-              alignment: Alignment.topRight,
-              style: TextStyle(
-                color: colors[colorIndex % colors.length],
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-              labelResolver: (line) => '${year}yr',
+      // NEW: Always add return period lines when toggle is ON (bounds are now adjusted to fit them)
+      _returnPeriodLines.add(
+        HorizontalLine(
+          y: flowCfs,
+          color: colors[colorIndex % colors.length].withOpacity(0.7),
+          strokeWidth: 2,
+          dashArray: [5, 5],
+          label: HorizontalLineLabel(
+            show: true,
+            alignment: Alignment.topRight,
+            style: TextStyle(
+              color: colors[colorIndex % colors.length],
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
+            labelResolver: (line) => '${year}yr',
           ),
-        );
-        colorIndex++;
-      }
+        ),
+      );
+      colorIndex++;
     }
+
+    print('DEBUG: Added ${_returnPeriodLines.length} return period lines');
   }
 
   @override

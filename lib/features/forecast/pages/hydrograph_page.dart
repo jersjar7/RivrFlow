@@ -219,10 +219,7 @@ class _HydrographPageState extends State<HydrographPage> {
   Widget _buildChartContent(ReachDataProvider reachProvider) {
     return Column(
       children: [
-        // Chart Controls
-        _buildChartControls(),
-
-        // Main Chart Area
+        // Main Chart Area (moved to top)
         Expanded(
           child: Container(
             margin: const EdgeInsets.all(16),
@@ -245,7 +242,10 @@ class _HydrographPageState extends State<HydrographPage> {
           ),
         ),
 
-        // Chart Legend/Info
+        // Chart Controls (moved below chart)
+        _buildChartControls(),
+
+        // Chart Legend/Info (at bottom)
         _buildChartLegend(reachProvider),
       ],
     );
