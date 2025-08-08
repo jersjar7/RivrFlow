@@ -38,7 +38,7 @@ class FlowValuesUsageGuide extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.only(bottom: 8),
             child: Text(
-              'Usage Guide',
+              'Educational Usage Guide',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
