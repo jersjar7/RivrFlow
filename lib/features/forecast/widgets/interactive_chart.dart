@@ -387,28 +387,35 @@ class _InteractiveChartState extends State<InteractiveChart> {
     final sortedEntries = returnPeriods.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
+    // Define which years to show
+    final yearsToShow = [5, 10, 25];
+
     for (final entry in sortedEntries) {
       final year = entry.key;
-      final flowCfs = entry.value * cmsToCs;
-      final label = AppConstants.getReturnPeriodLabel(year);
 
-      // Create a line (start == end) with label
-      lines.add(
-        PlotBand(
-          start: flowCfs,
-          end: flowCfs,
-          borderColor: CupertinoColors.systemRed,
-          borderWidth: 2,
-          dashArray: [5, 5],
-          text: label,
-          textStyle: const TextStyle(
-            color: CupertinoColors.systemRed,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+      // Only show lines for specified years
+      if (yearsToShow.contains(year)) {
+        final flowCfs = entry.value * cmsToCs;
+        final label = AppConstants.getReturnPeriodLabel(year);
+
+        // Create a line (start == end) with label
+        lines.add(
+          PlotBand(
+            start: flowCfs,
+            end: flowCfs,
+            borderColor: CupertinoColors.label,
+            borderWidth: 0,
+            dashArray: [5, 5],
+            text: "$label\n",
+            textStyle: const TextStyle(
+              color: CupertinoColors.label,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            horizontalTextAlignment: TextAnchor.end,
           ),
-          horizontalTextAlignment: TextAnchor.end,
-        ),
-      );
+        );
+      }
     }
 
     return lines;
@@ -476,12 +483,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
                   PlotBand(
                     start: nowPosition,
                     end: nowPosition,
-                    borderColor: CupertinoColors.systemRed,
-                    borderWidth: 2,
-                    dashArray: [8, 4],
-                    text: 'Now',
+                    borderColor: CupertinoColors.systemBrown,
+                    borderWidth: 1.7,
+                    dashArray: [2, 6],
+                    text: 'Now\n',
                     textStyle: const TextStyle(
-                      color: CupertinoColors.systemRed,
+                      color: CupertinoColors.systemBrown,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),

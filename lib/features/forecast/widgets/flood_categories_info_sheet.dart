@@ -44,7 +44,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                       AppConstants.returnPeriodNormalBg,
                       CupertinoColors.systemGrey,
                       CupertinoIcons.checkmark_circle_fill,
-                      returnPeriods?[2],
+                      null,
                     ),
 
                     _buildFloodCategoryItem(
@@ -54,7 +54,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                       AppConstants.returnPeriodActionBg,
                       CupertinoColors.systemYellow,
                       CupertinoIcons.exclamationmark_triangle,
-                      returnPeriods?[5],
+                      returnPeriods?[2],
                     ),
 
                     _buildFloodCategoryItem(
@@ -64,7 +64,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                       AppConstants.returnPeriodModerateBg,
                       CupertinoColors.systemOrange,
                       CupertinoIcons.exclamationmark_triangle_fill,
-                      returnPeriods?[10],
+                      returnPeriods?[5],
                     ),
 
                     _buildFloodCategoryItem(
@@ -74,7 +74,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                       AppConstants.returnPeriodMajorBg,
                       CupertinoColors.systemRed,
                       CupertinoIcons.exclamationmark_octagon_fill,
-                      returnPeriods?[25],
+                      returnPeriods?[10],
                     ),
 
                     _buildFloodCategoryItem(
@@ -84,7 +84,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                       AppConstants.returnPeriodExtremeBg,
                       CupertinoColors.systemPurple,
                       CupertinoIcons.xmark_octagon_fill,
-                      null, // No upper bound
+                      returnPeriods?[25], // No upper bound
                     ),
 
                     const SizedBox(height: 20),

@@ -254,7 +254,7 @@ class _HydrographPageState extends State<HydrographPage> {
   Widget _buildChartContent(ReachDataProvider reachProvider) {
     return Column(
       children: [
-        // Main Chart Area (moved to top)
+        // Main Chart Area
         Expanded(
           child: Container(
             margin: const EdgeInsets.all(16),
@@ -403,20 +403,6 @@ class _HydrographPageState extends State<HydrographPage> {
                   color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
-              const SizedBox(width: 16),
-              Icon(
-                CupertinoIcons.clock,
-                size: 12,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'Updated ${_getUpdateTime()}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-              ),
             ],
           ),
         ],
@@ -446,11 +432,6 @@ class _HydrographPageState extends State<HydrographPage> {
         ),
       ],
     );
-  }
-
-  String _getUpdateTime() {
-    // This would return the actual update time from the data
-    return 'just now';
   }
 
   Widget _buildLoadingState() {

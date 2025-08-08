@@ -80,7 +80,7 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
       arguments: {
         'reachId': _reachId,
         'forecastType': 'short_range',
-        'title': 'Short Range Hydrograph',
+        'title': 'Hourly Flow Chart',
       },
     );
   }
