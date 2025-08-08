@@ -1,5 +1,7 @@
 // lib/features/forecast/widgets/chart_preview_widget.dart
 
+import 'dart:math';
+
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/reach_data_provider.dart';
@@ -51,12 +53,46 @@ class ChartPreviewWidget extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     child: chartData.isEmpty
                         ? _buildNoDataMessage(context)
-                        : CustomPaint(
-                            painter: _ChartPainter(
-                              data: chartData,
-                              forecastType: forecastType,
-                            ),
-                            size: Size.infinite,
+                        : Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CustomPaint(
+                                  painter: _ChartPainter(
+                                    data: chartData,
+                                    forecastType: forecastType,
+                                  ),
+                                  size: Size.infinite,
+                                ),
+                              ),
+                              // Touch indicator icon in top right
+                              if (onTap != null)
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: CupertinoColors.systemBackground
+                                          .withOpacity(0.8),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: CupertinoColors.separator
+                                            .withOpacity(0.5),
+                                        width: 0.5,
+                                      ),
+                                    ),
+                                    child: Transform.rotate(
+                                      angle: -pi / 2, // 90 degrees clockwise
+                                      child: Icon(
+                                        CupertinoIcons.hand_point_right_fill,
+                                        size: 16,
+                                        color: CupertinoColors.secondaryLabel,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                   ),
                 ),
@@ -249,17 +285,17 @@ class ChartPreviewWidget extends StatelessWidget {
   String _getForecastDisplayName(String type) {
     switch (type) {
       case 'analysis_assimilation':
-        return 'Current Analysis';
+        return 'Current Analysis Preview';
       case 'short_range':
-        return 'Short Range';
+        return 'Short Range Preview';
       case 'medium_range':
-        return 'Medium Range';
+        return 'Medium Range Preview';
       case 'medium_range_blend':
-        return 'Medium Blend';
+        return 'Medium Blend Preview';
       case 'long_range':
-        return 'Long Range';
+        return 'Long Range Preview';
       default:
-        return 'Forecast';
+        return 'Forecast Preview';
     }
   }
 }
