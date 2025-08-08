@@ -101,7 +101,7 @@ class AppConstants {
       start: start,
       end: end,
       color: backgroundColor,
-      opacity: 0.6,
+      opacity: 0.8,
     );
   }
 

@@ -198,11 +198,6 @@ class _HydrographPageState extends State<HydrographPage> {
         forecastType: _forecastType!,
         context: context,
       );
-
-      ExportFunctionality.showSuccessMessage(
-        context,
-        'Chart shared successfully!',
-      );
     } catch (e) {
       ExportFunctionality.showErrorMessage(context, e.toString());
     }
@@ -231,8 +226,6 @@ class _HydrographPageState extends State<HydrographPage> {
         forecastType: _forecastType!,
         context: context,
       );
-
-      ExportFunctionality.showSuccessMessage(context, 'Chart saved to Photos!');
     } catch (e) {
       ExportFunctionality.showErrorMessage(context, e.toString());
     }
@@ -265,7 +258,7 @@ class _HydrographPageState extends State<HydrographPage> {
         return;
       }
 
-      // Convert to ChartDataPoint format
+      // Convert to ChartDataPoint format (without confidence)
       final chartData = forecastSeries.data
           .map(
             (point) => ChartDataPoint(
@@ -283,11 +276,6 @@ class _HydrographPageState extends State<HydrographPage> {
         reachName: reach.displayName,
         forecastType: _forecastType!,
         returnPeriods: returnPeriods,
-      );
-
-      ExportFunctionality.showSuccessMessage(
-        context,
-        'Data exported successfully!',
       );
     } catch (e) {
       ExportFunctionality.showErrorMessage(context, e.toString());
