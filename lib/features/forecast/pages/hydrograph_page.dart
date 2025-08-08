@@ -3,8 +3,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/features/forecast/utils/export_functionality.dart';
 import '../../../core/providers/reach_data_provider.dart';
-import '../widgets/interactive_chart.dart';
+import '../widgets/interactive_chart.dart' hide ChartDataPoint;
 import '../widgets/flood_categories_info_sheet.dart';
 
 class HydrographPage extends StatefulWidget {
@@ -113,57 +114,203 @@ class _HydrographPageState extends State<HydrographPage> {
   void _exportChart() {
     HapticFeedback.mediumImpact();
 
-    showCupertinoActionSheet(
+    showCupertinoModalPopup<void>(
       context: context,
-      title: const Text('Export Chart'),
-      message: const Text('Choose export option'),
-      actions: [
-        CupertinoActionSheetAction(
-          onPressed: () {
-            Navigator.pop(context);
-            _shareChartImage();
-          },
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(CupertinoIcons.share, size: 18),
-              SizedBox(width: 8),
-              Text('Share Chart'),
-            ],
+      builder: (BuildContext context) => CupertinoActionSheet(
+        title: const Text('Export Chart'),
+        message: const Text('Choose export option'),
+        actions: <CupertinoActionSheetAction>[
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _shareChartImage();
+            },
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(CupertinoIcons.share, size: 18),
+                SizedBox(width: 8),
+                Text('Share Chart'),
+              ],
+            ),
           ),
-        ),
-        CupertinoActionSheetAction(
-          onPressed: () {
-            Navigator.pop(context);
-            _saveChartToGallery();
-          },
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(CupertinoIcons.photo, size: 18),
-              SizedBox(width: 8),
-              Text('Save to Photos'),
-            ],
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _saveChartToGallery();
+            },
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(CupertinoIcons.photo, size: 18),
+                SizedBox(width: 8),
+                Text('Save to Photos'),
+              ],
+            ),
           ),
-        ),
-        CupertinoActionSheetAction(
-          onPressed: () {
-            Navigator.pop(context);
-            _exportDataAsCSV();
-          },
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(CupertinoIcons.doc_text, size: 18),
-              SizedBox(width: 8),
-              Text('Export Data (CSV)'),
-            ],
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _exportDataAsCSV();
+            },
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(CupertinoIcons.doc_text, size: 18),
+                SizedBox(width: 8),
+                Text('Export Data (CSV)'),
+              ],
+            ),
           ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
         ),
-      ],
-      cancelButton: CupertinoActionSheetAction(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+      ),
+    );
+  }
+
+  Future<void> _shareChartImage() async {
+    try {
+      final reachProvider = Provider.of<ReachDataProvider>(
+        context,
+        listen: false,
+      );
+      final reach = reachProvider.currentReach;
+
+      if (reach == null) {
+        ExportFunctionality.showErrorMessage(
+          context,
+          'No reach data available',
+        );
+        return;
+      }
+
+      // Get the chart widget - you'll need to wrap your chart in a method
+      final chartWidget = _buildChartWidget();
+
+      await ExportFunctionality.shareChartImage(
+        chartWidget: chartWidget,
+        reachName: reach.displayName,
+        forecastType: _forecastType!,
+        context: context,
+      );
+
+      ExportFunctionality.showSuccessMessage(
+        context,
+        'Chart shared successfully!',
+      );
+    } catch (e) {
+      ExportFunctionality.showErrorMessage(context, e.toString());
+    }
+  }
+
+  Future<void> _saveChartToGallery() async {
+    try {
+      final reachProvider = Provider.of<ReachDataProvider>(
+        context,
+        listen: false,
+      );
+      final reach = reachProvider.currentReach;
+
+      if (reach == null) {
+        ExportFunctionality.showErrorMessage(
+          context,
+          'No reach data available',
+        );
+        return;
+      }
+
+      // Get the chart widget
+      final chartWidget = _buildChartWidget();
+
+      await ExportFunctionality.saveChartToGallery(
+        chartWidget: chartWidget,
+        reachName: reach.displayName,
+        forecastType: _forecastType!,
+        context: context,
+      );
+
+      ExportFunctionality.showSuccessMessage(context, 'Chart saved to Photos!');
+    } catch (e) {
+      ExportFunctionality.showErrorMessage(context, e.toString());
+    }
+  }
+
+  Future<void> _exportDataAsCSV() async {
+    try {
+      final reachProvider = Provider.of<ReachDataProvider>(
+        context,
+        listen: false,
+      );
+      final reach = reachProvider.currentReach;
+      final forecast = reachProvider.currentForecast;
+
+      if (reach == null || forecast == null) {
+        ExportFunctionality.showErrorMessage(
+          context,
+          'No data available for export',
+        );
+        return;
+      }
+
+      // Get the forecast data
+      final forecastSeries = forecast.getPrimaryForecast(_forecastType!);
+      if (forecastSeries == null || forecastSeries.isEmpty) {
+        ExportFunctionality.showErrorMessage(
+          context,
+          'No forecast data available',
+        );
+        return;
+      }
+
+      // Convert to ChartDataPoint format
+      final chartData = forecastSeries.data
+          .map(
+            (point) => ChartDataPoint(
+              time: point.validTime.toLocal(),
+              flow: point.flow,
+              confidence: null, // Add if you have confidence data
+            ),
+          )
+          .toList();
+
+      // Get return periods for flood categories
+      final returnPeriods = reach.returnPeriods;
+
+      await ExportFunctionality.exportDataAsCSV(
+        chartData: chartData,
+        reachName: reach.displayName,
+        forecastType: _forecastType!,
+        returnPeriods: returnPeriods,
+      );
+
+      ExportFunctionality.showSuccessMessage(
+        context,
+        'Data exported successfully!',
+      );
+    } catch (e) {
+      ExportFunctionality.showErrorMessage(context, e.toString());
+    }
+  }
+
+  Widget _buildChartWidget() {
+    final reachProvider = Provider.of<ReachDataProvider>(
+      context,
+      listen: false,
+    );
+
+    // Return the same chart that's displayed on your page
+    return Container(
+      color: CupertinoColors.systemBackground.resolveFrom(context),
+      child: InteractiveChart(
+        reachId: _reachId!,
+        forecastType: _forecastType!,
+        showReturnPeriods: _showReturnPeriods,
+        showTooltips: false, // Disable tooltips for export
+        reachProvider: reachProvider,
+        controller: _chartController,
       ),
     );
   }
