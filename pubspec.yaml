@@ -49,6 +49,7 @@ dependencies:
   url_launcher: ^6.3.2
   share_plus: ^11.0.0
   flutter_localization: ^0.3.3
+  syncfusion_flutter_charts: ^30.2.4
 
 dev_dependencies:
   flutter_test:

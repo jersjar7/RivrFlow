@@ -5,6 +5,7 @@
 //
 
 import 'package:flutter/cupertino.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 
 /// Forecast information for display
 class ForecastInfo {
@@ -25,6 +26,14 @@ class ForecastInfo {
     required this.useCase,
     required this.sourceUrls,
   });
+}
+
+/// Simple data class for Syncfusion charts
+class ChartData {
+  final double x;
+  final double y;
+
+  const ChartData(this.x, this.y);
 }
 
 class AppConstants {
@@ -59,6 +68,41 @@ class AppConstants {
       default:
         return '${years}yr';
     }
+  }
+
+  /// Create PlotBand for flood zones
+  static PlotBand createFloodZonePlotBand(
+    double start,
+    double end,
+    String zoneName,
+  ) {
+    Color backgroundColor;
+    switch (zoneName.toLowerCase()) {
+      case 'normal':
+        backgroundColor = returnPeriodNormalBg;
+        break;
+      case 'action':
+        backgroundColor = returnPeriodActionBg;
+        break;
+      case 'moderate':
+        backgroundColor = returnPeriodModerateBg;
+        break;
+      case 'major':
+        backgroundColor = returnPeriodMajorBg;
+        break;
+      case 'extreme':
+        backgroundColor = returnPeriodExtremeBg;
+        break;
+      default:
+        backgroundColor = returnPeriodNormalBg;
+    }
+
+    return PlotBand(
+      start: start,
+      end: end,
+      color: backgroundColor,
+      opacity: 0.6,
+    );
   }
 
   // MARK: - Stream Order Styling

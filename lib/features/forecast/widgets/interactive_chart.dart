@@ -1,7 +1,7 @@
 // lib/features/forecast/widgets/interactive_chart.dart
 
 import 'package:flutter/cupertino.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 import 'dart:math' as math;
 import '../../../core/providers/reach_data_provider.dart';
 import '../../../core/constants.dart';
@@ -32,10 +32,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
   double _minY = 0;
   double _maxY = 0;
   bool _isInitialized = false;
-  List<FlSpot> _chartData = [];
-  List<HorizontalLine> _returnPeriodLines = [];
-  List<HorizontalLine> _backgroundZones = [];
-  final List<VerticalLine> _verticalLines = [];
+  List<ChartData> _chartData = [];
   List<ChartDataPoint> _forecastData = [];
 
   @override
@@ -65,47 +62,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
 
     _calculateAxisBounds();
-    _buildBackgroundZones();
-    _buildReturnPeriodLines();
-    _buildVerticalLines();
 
     setState(() {
       _isInitialized = true; // Now we're truly ready
     });
-  }
-
-  void _buildVerticalLines() {
-    _verticalLines.clear();
-
-    // Add "Now" line for short_range forecast
-    if (widget.forecastType == 'short_range' && _forecastData.isNotEmpty) {
-      final now = DateTime.now();
-      final earliestTime = _forecastData
-          .map((d) => d.time)
-          .reduce((a, b) => a.isBefore(b) ? a : b);
-
-      // Position "Now" line at exact current time relative to forecast data
-      final nowPosition = now.difference(earliestTime).inMinutes / 60.0;
-
-      _verticalLines.add(
-        VerticalLine(
-          x: nowPosition,
-          color: CupertinoColors.systemRed.withOpacity(0.8),
-          strokeWidth: 2,
-          dashArray: [8, 4],
-          label: VerticalLineLabel(
-            show: true,
-            alignment: Alignment.topLeft,
-            style: const TextStyle(
-              color: CupertinoColors.systemRed,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-            labelResolver: (line) => 'Now',
-          ),
-        ),
-      );
-    }
   }
 
   void _extractChartData() {
@@ -117,7 +77,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
     // Get forecast data once and store it
     _forecastData = _getForecastData();
-    _chartData = _convertToFlSpots(_forecastData);
+    _chartData = _convertToChartData(_forecastData);
   }
 
   List<ChartDataPoint> _getForecastData() {
@@ -152,7 +112,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
         .toList();
   }
 
-  List<FlSpot> _convertToFlSpots(List<ChartDataPoint> data) {
+  List<ChartData> _convertToChartData(List<ChartDataPoint> data) {
     if (data.isEmpty) return [];
 
     // Find the earliest time as reference point
@@ -164,7 +124,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       // Convert to hours since the earliest time
       final hoursSinceStart =
           point.time.difference(earliestTime).inMinutes / 60.0;
-      return FlSpot(hoursSinceStart, point.flow);
+      return ChartData(hoursSinceStart, point.flow);
     }).toList();
   }
 
@@ -177,10 +137,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
       return;
     }
 
-    _minX = _chartData.map((spot) => spot.x).reduce(math.min);
-    _maxX = _chartData.map((spot) => spot.x).reduce(math.max);
-    _minY = _chartData.map((spot) => spot.y).reduce(math.min);
-    _maxY = _chartData.map((spot) => spot.y).reduce(math.max);
+    _minX = _chartData.map((data) => data.x).reduce(math.min);
+    _maxX = _chartData.map((data) => data.x).reduce(math.max);
+    _minY = _chartData.map((data) => data.y).reduce(math.min);
+    _maxY = _chartData.map((data) => data.y).reduce(math.max);
 
     // Include return period values in bounds calculation when toggle is ON
     if (widget.showReturnPeriods && widget.reachProvider.hasData) {
@@ -218,15 +178,13 @@ class _InteractiveChartState extends State<InteractiveChart> {
     print('DEBUG: Final chart bounds Y: $_minY to $_maxY');
   }
 
-  void _buildBackgroundZones() {
-    _backgroundZones = [];
-
+  List<PlotBand> _buildPlotBands() {
     if (!widget.showReturnPeriods || !widget.reachProvider.hasData) {
-      return;
+      return [];
     }
 
     final reach = widget.reachProvider.currentReach;
-    if (reach?.returnPeriods == null) return;
+    if (reach?.returnPeriods == null) return [];
 
     final returnPeriods = reach!.returnPeriods!;
     const cmsToCs = 35.3147; // Convert CMS to CFS
@@ -237,27 +195,24 @@ class _InteractiveChartState extends State<InteractiveChart> {
       sortedReturnPeriods[entry.key] = entry.value * cmsToCs;
     }
 
-    // Define zone boundaries
-    final zones = <_FloodZone>[];
+    final plotBands = <PlotBand>[];
 
-    // Normal zone (0 to 2yr if available, otherwise to chart min)
+    // Normal zone (chart min to 2yr)
     final twoYearFlow = sortedReturnPeriods[2];
-    zones.add(
-      _FloodZone(
-        startY: _minY,
-        endY: twoYearFlow ?? _maxY,
-        color: AppConstants.returnPeriodNormalBg,
-      ),
-    );
+    if (twoYearFlow != null) {
+      plotBands.add(
+        AppConstants.createFloodZonePlotBand(_minY, twoYearFlow, 'normal'),
+      );
+    }
 
     // Action zone (2yr to 5yr)
     final fiveYearFlow = sortedReturnPeriods[5];
     if (twoYearFlow != null && fiveYearFlow != null) {
-      zones.add(
-        _FloodZone(
-          startY: twoYearFlow,
-          endY: fiveYearFlow,
-          color: AppConstants.returnPeriodActionBg,
+      plotBands.add(
+        AppConstants.createFloodZonePlotBand(
+          twoYearFlow,
+          fiveYearFlow,
+          'action',
         ),
       );
     }
@@ -265,11 +220,11 @@ class _InteractiveChartState extends State<InteractiveChart> {
     // Moderate zone (5yr to 10yr)
     final tenYearFlow = sortedReturnPeriods[10];
     if (fiveYearFlow != null && tenYearFlow != null) {
-      zones.add(
-        _FloodZone(
-          startY: fiveYearFlow,
-          endY: tenYearFlow,
-          color: AppConstants.returnPeriodModerateBg,
+      plotBands.add(
+        AppConstants.createFloodZonePlotBand(
+          fiveYearFlow,
+          tenYearFlow,
+          'moderate',
         ),
       );
     }
@@ -277,109 +232,83 @@ class _InteractiveChartState extends State<InteractiveChart> {
     // Major zone (10yr to 25yr)
     final twentyFiveYearFlow = sortedReturnPeriods[25];
     if (tenYearFlow != null && twentyFiveYearFlow != null) {
-      zones.add(
-        _FloodZone(
-          startY: tenYearFlow,
-          endY: twentyFiveYearFlow,
-          color: AppConstants.returnPeriodMajorBg,
+      plotBands.add(
+        AppConstants.createFloodZonePlotBand(
+          tenYearFlow,
+          twentyFiveYearFlow,
+          'major',
         ),
       );
     }
 
     // Extreme zone (25yr to chart max)
     if (twentyFiveYearFlow != null) {
-      zones.add(
-        _FloodZone(
-          startY: twentyFiveYearFlow,
-          endY: _maxY,
-          color: AppConstants.returnPeriodExtremeBg,
+      plotBands.add(
+        AppConstants.createFloodZonePlotBand(
+          twentyFiveYearFlow,
+          _maxY,
+          'extreme',
         ),
       );
     }
 
-    // Create background zones using very thick horizontal lines
-    for (final zone in zones) {
-      if (zone.startY < zone.endY) {
-        final midY = (zone.startY + zone.endY) / 2;
-        final height = zone.endY - zone.startY;
-
-        _backgroundZones.add(
-          HorizontalLine(
-            y: midY,
-            color: zone.color.withOpacity(0.3),
-            strokeWidth: height.abs(),
-          ),
-        );
-      }
-    }
-
-    print('DEBUG: Added ${_backgroundZones.length} background zones');
+    print('DEBUG: Added ${plotBands.length} plot bands');
+    return plotBands;
   }
 
-  void _buildReturnPeriodLines() {
-    _returnPeriodLines = [];
-
-    print('DEBUG: showReturnPeriods = ${widget.showReturnPeriods}');
-    print('DEBUG: hasData = ${widget.reachProvider.hasData}');
-
+  List<PlotBand> _buildReturnPeriodLines() {
     if (!widget.showReturnPeriods || !widget.reachProvider.hasData) {
-      return;
+      return [];
     }
 
     final reach = widget.reachProvider.currentReach;
-    print('DEBUG: reach.returnPeriods = ${reach?.returnPeriods}');
-    if (reach?.returnPeriods == null) return;
+    if (reach?.returnPeriods == null) return [];
 
     final returnPeriods = reach!.returnPeriods!;
+    const cmsToCs = 35.3147; // Convert CMS to CFS
 
-    final colors = [
-      CupertinoColors.systemYellow,
-      CupertinoColors.systemOrange,
-      CupertinoColors.systemRed,
-      CupertinoColors.systemPurple,
-      CupertinoColors.systemBlue,
-      CupertinoColors.systemGreen,
-    ];
-
-    int colorIndex = 0;
-    // Sort return periods by year for consistent coloring
+    final lines = <PlotBand>[];
     final sortedEntries = returnPeriods.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
     for (final entry in sortedEntries) {
       final year = entry.key;
-      final flowCms = entry.value;
-      final flowCfs = flowCms * 35.3147; // Convert CMS to CFS
-      print(
-        'DEBUG: Adding return period line - ${year}yr = ${flowCfs.toStringAsFixed(1)} CFS',
-      );
-
-      // Use the new label function from constants
+      final flowCfs = entry.value * cmsToCs;
       final label = AppConstants.getReturnPeriodLabel(year);
 
-      // Always add return period lines when toggle is ON (bounds are now adjusted to fit them)
-      _returnPeriodLines.add(
-        HorizontalLine(
-          y: flowCfs,
-          color: colors[colorIndex % colors.length].withOpacity(0.8),
-          strokeWidth: 2,
+      // Create a line (start == end) with label
+      lines.add(
+        PlotBand(
+          start: flowCfs,
+          end: flowCfs,
+          borderColor: CupertinoColors.systemRed,
+          borderWidth: 2,
           dashArray: [5, 5],
-          label: HorizontalLineLabel(
-            show: true,
-            alignment: Alignment.topRight,
-            style: TextStyle(
-              color: colors[colorIndex % colors.length],
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-            labelResolver: (line) => label,
+          text: label,
+          textStyle: const TextStyle(
+            color: CupertinoColors.systemRed,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
+          horizontalTextAlignment: TextAnchor.end,
         ),
       );
-      colorIndex++;
     }
 
-    print('DEBUG: Added ${_returnPeriodLines.length} return period lines');
+    return lines;
+  }
+
+  double? _getNowLinePosition() {
+    if (widget.forecastType != 'short_range' || _forecastData.isEmpty) {
+      return null;
+    }
+
+    final now = DateTime.now();
+    final earliestTime = _forecastData
+        .map((d) => d.time)
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+
+    return now.difference(earliestTime).inMinutes / 60.0;
   }
 
   @override
@@ -389,241 +318,114 @@ class _InteractiveChartState extends State<InteractiveChart> {
       return _buildEmptyChart();
     }
 
+    final nowPosition = _getNowLinePosition();
+
     return Container(
       padding: const EdgeInsets.all(16),
-      child: LineChart(
-        LineChartData(
-          gridData: _buildGridData(),
-          titlesData: _buildTitlesData(),
-          borderData: _buildBorderData(),
-          lineBarsData: _buildLineData(),
-          extraLinesData: ExtraLinesData(
-            horizontalLines: [..._backgroundZones, ..._returnPeriodLines],
-            verticalLines: _verticalLines,
-          ),
-          lineTouchData: _buildTouchData(),
-          minX: _minX,
-          maxX: _maxX,
-          minY: _minY,
-          maxY: _maxY,
-          clipData: const FlClipData.all(),
-        ),
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      ),
-    );
-  }
-
-  FlGridData _buildGridData() {
-    return FlGridData(
-      show: true,
-      drawVerticalLine: true,
-      drawHorizontalLine: true,
-      horizontalInterval: (_maxY - _minY) / 6,
-      verticalInterval: (_maxX - _minX) / 8,
-      getDrawingHorizontalLine: (value) {
-        return FlLine(
-          color: CupertinoColors.separator.resolveFrom(context),
-          strokeWidth: 0.5,
-        );
-      },
-      getDrawingVerticalLine: (value) {
-        return FlLine(
-          color: CupertinoColors.separator.resolveFrom(context),
-          strokeWidth: 0.5,
-        );
-      },
-    );
-  }
-
-  FlTitlesData _buildTitlesData() {
-    return FlTitlesData(
-      leftTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 60,
-          interval: (_maxY - _minY) / 6,
-          getTitlesWidget: (value, meta) {
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Text(
-                _formatFlowValue(value),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-                textAlign: TextAlign.right,
-              ),
-            );
-          },
-        ),
-        axisNameWidget: Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            'Flow (CFS)',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-        ),
-      ),
-      bottomTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 40,
+      child: SfCartesianChart(
+        primaryXAxis: NumericAxis(
+          minimum: _minX,
+          maximum: _maxX,
           interval: (_maxX - _minX) / 6,
-          getTitlesWidget: (value, meta) {
-            // Skip the first label to prevent overlap on left
-            if (value <= _minX + 0.1) {
-              return const SizedBox.shrink();
-            }
-
-            // Skip the last label to prevent overlap on right
-            if (value >= _maxX - 0.1) {
-              return const SizedBox.shrink();
-            }
-
-            return Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                _formatTimeValue(value),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            );
-          },
-        ),
-        axisNameWidget: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            _getTimeAxisLabel(),
-            style: TextStyle(
+          title: AxisTitle(
+            text: _getTimeAxisLabel(),
+            textStyle: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
+          axisLabelFormatter: (AxisLabelRenderDetails details) {
+            return ChartAxisLabel(
+              _formatTimeValue(details.value.toDouble()),
+              TextStyle(
+                fontSize: 11,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            );
+          },
+          plotBands: nowPosition != null
+              ? [
+                  PlotBand(
+                    start: nowPosition,
+                    end: nowPosition,
+                    borderColor: CupertinoColors.systemRed,
+                    borderWidth: 2,
+                    dashArray: [8, 4],
+                    text: 'Now',
+                    textStyle: const TextStyle(
+                      color: CupertinoColors.systemRed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    verticalTextAlignment: TextAnchor.start,
+                  ),
+                ]
+              : [],
         ),
-      ),
-      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-    );
-  }
-
-  FlBorderData _buildBorderData() {
-    return FlBorderData(
-      show: true,
-      border: Border(
-        left: BorderSide(
-          color: CupertinoColors.separator.resolveFrom(context),
-          width: 1,
+        primaryYAxis: NumericAxis(
+          minimum: _minY,
+          maximum: _maxY,
+          interval: (_maxY - _minY) / 6,
+          title: AxisTitle(
+            text: 'Flow (CFS)',
+            textStyle: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+          axisLabelFormatter: (AxisLabelRenderDetails details) {
+            return ChartAxisLabel(
+              _formatFlowValue(details.value.toDouble()),
+              TextStyle(
+                fontSize: 11,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+              ),
+            );
+          },
+          plotBands: [..._buildPlotBands(), ..._buildReturnPeriodLines()],
         ),
-        bottom: BorderSide(
-          color: CupertinoColors.separator.resolveFrom(context),
-          width: 1,
-        ),
-      ),
-    );
-  }
-
-  List<LineChartBarData> _buildLineData() {
-    if (_chartData.isEmpty) return [];
-
-    return [
-      LineChartBarData(
-        spots: _chartData,
-        isCurved: true,
-        color: CupertinoColors.systemBlue,
-        barWidth: 3,
-        isStrokeCapRound: true,
-        dotData: FlDotData(
-          show: _chartData.length <= 20,
-          getDotPainter: (spot, percent, barData, index) {
-            return FlDotCirclePainter(
-              radius: 3,
+        series: [
+          LineSeries<ChartData, double>(
+            dataSource: _chartData,
+            xValueMapper: (ChartData data, _) => data.x,
+            yValueMapper: (ChartData data, _) => data.y,
+            color: CupertinoColors.systemBlue,
+            width: 3,
+            markerSettings: MarkerSettings(
+              isVisible: _chartData.length <= 20,
+              shape: DataMarkerType.circle,
+              width: 6,
+              height: 6,
               color: CupertinoColors.systemBlue,
-              strokeWidth: 2,
-              strokeColor: CupertinoColors.systemBackground.resolveFrom(
+              borderWidth: 2,
+              borderColor: CupertinoColors.systemBackground.resolveFrom(
                 context,
               ),
-            );
-          },
-        ),
-        belowBarData: BarAreaData(
-          show: true,
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              CupertinoColors.systemBlue.withOpacity(0.3),
-              CupertinoColors.systemBlue.withOpacity(0.1),
-              CupertinoColors.systemBlue.withOpacity(0.0),
-            ],
+            ),
           ),
+        ],
+        tooltipBehavior: widget.showTooltips
+            ? TooltipBehavior(
+                enable: true,
+                color: CupertinoColors.systemBackground.resolveFrom(context),
+                borderColor: CupertinoColors.separator.resolveFrom(context),
+                borderWidth: 1,
+                format: 'point.y CFS\npoint.x hours',
+                textStyle: TextStyle(
+                  color: CupertinoColors.label.resolveFrom(context),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            : null,
+        zoomPanBehavior: ZoomPanBehavior(
+          enablePinching: true,
+          enablePanning: true,
+          enableDoubleTapZooming: true,
         ),
       ),
-    ];
-  }
-
-  LineTouchData _buildTouchData() {
-    if (!widget.showTooltips) {
-      return LineTouchData(enabled: false);
-    }
-
-    return LineTouchData(
-      enabled: true,
-      touchCallback: (FlTouchEvent event, LineTouchResponse? touchResponse) {
-        // Handle touch events for custom interactions
-      },
-      touchTooltipData: LineTouchTooltipData(
-        getTooltipColor: (touchedSpot) =>
-            CupertinoColors.systemBackground.resolveFrom(context),
-        tooltipBorder: BorderSide(
-          color: CupertinoColors.separator.resolveFrom(context),
-        ),
-        tooltipBorderRadius: BorderRadius.circular(8),
-        getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
-          return touchedBarSpots.map((barSpot) {
-            return LineTooltipItem(
-              '${_formatFlowValue(barSpot.y)}\n${_formatTooltipTime(barSpot.x)}',
-              TextStyle(
-                color: CupertinoColors.label.resolveFrom(context),
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-            );
-          }).toList();
-        },
-      ),
-      getTouchedSpotIndicator:
-          (LineChartBarData barData, List<int> spotIndexes) {
-            return spotIndexes.map((spotIndex) {
-              return TouchedSpotIndicatorData(
-                FlLine(
-                  color: CupertinoColors.systemBlue,
-                  strokeWidth: 2,
-                  dashArray: [3, 3],
-                ),
-                FlDotData(
-                  getDotPainter: (spot, percent, barData, index) {
-                    return FlDotCirclePainter(
-                      radius: 5,
-                      color: CupertinoColors.systemBlue,
-                      strokeWidth: 3,
-                      strokeColor: CupertinoColors.systemBackground.resolveFrom(
-                        context,
-                      ),
-                    );
-                  },
-                ),
-              );
-            }).toList();
-          },
     );
   }
 
@@ -701,24 +503,6 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
   }
 
-  String _formatTooltipTime(double hoursSinceStart) {
-    if (widget.forecastType == 'short_range' && _forecastData.isNotEmpty) {
-      final earliestTime = _forecastData
-          .map((d) => d.time)
-          .reduce((a, b) => a.isBefore(b) ? a : b);
-      final actualTime = earliestTime.add(
-        Duration(minutes: (hoursSinceStart * 60).round()),
-      );
-
-      return '${actualTime.hour.toString().padLeft(2, '0')}:${actualTime.minute.toString().padLeft(2, '0')}';
-    }
-
-    // Fallback for other forecast types
-    final now = DateTime.now();
-    final targetTime = now.add(Duration(hours: hoursSinceStart.toInt()));
-    return '${targetTime.month}/${targetTime.day}';
-  }
-
   String _getTimeAxisLabel() {
     switch (widget.forecastType) {
       case 'short_range':
@@ -745,18 +529,5 @@ class ChartDataPoint {
     required this.flow,
     this.confidence,
     this.metadata,
-  });
-}
-
-// Helper class for background zones
-class _FloodZone {
-  final double startY;
-  final double endY;
-  final Color color;
-
-  const _FloodZone({
-    required this.startY,
-    required this.endY,
-    required this.color,
   });
 }
