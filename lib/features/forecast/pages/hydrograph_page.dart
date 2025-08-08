@@ -3,6 +3,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:screenshot/screenshot.dart';
 import 'package:rivrflow/features/forecast/utils/export_functionality.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/interactive_chart.dart' hide ChartDataPoint;
@@ -34,6 +35,9 @@ class _HydrographPageState extends State<HydrographPage> {
 
   // Add ChartController to control chart interactions
   final ChartController _chartController = ChartController();
+
+  // Add ScreenshotController for chart export
+  final ScreenshotController _screenshotController = ScreenshotController();
 
   @override
   void initState() {
@@ -187,11 +191,9 @@ class _HydrographPageState extends State<HydrographPage> {
         return;
       }
 
-      // Get the chart widget - you'll need to wrap your chart in a method
-      final chartWidget = _buildChartWidget();
-
-      await ExportFunctionality.shareChartImage(
-        chartWidget: chartWidget,
+      // Use the new screenshot-based method
+      await ExportFunctionality.shareChartImageFromController(
+        screenshotController: _screenshotController,
         reachName: reach.displayName,
         forecastType: _forecastType!,
         context: context,
@@ -222,11 +224,9 @@ class _HydrographPageState extends State<HydrographPage> {
         return;
       }
 
-      // Get the chart widget
-      final chartWidget = _buildChartWidget();
-
-      await ExportFunctionality.saveChartToGallery(
-        chartWidget: chartWidget,
+      // Use the new screenshot-based method
+      await ExportFunctionality.saveChartImageFromController(
+        screenshotController: _screenshotController,
         reachName: reach.displayName,
         forecastType: _forecastType!,
         context: context,
@@ -271,7 +271,6 @@ class _HydrographPageState extends State<HydrographPage> {
             (point) => ChartDataPoint(
               time: point.validTime.toLocal(),
               flow: point.flow,
-              confidence: null, // Add if you have confidence data
             ),
           )
           .toList();
@@ -293,26 +292,6 @@ class _HydrographPageState extends State<HydrographPage> {
     } catch (e) {
       ExportFunctionality.showErrorMessage(context, e.toString());
     }
-  }
-
-  Widget _buildChartWidget() {
-    final reachProvider = Provider.of<ReachDataProvider>(
-      context,
-      listen: false,
-    );
-
-    // Return the same chart that's displayed on your page
-    return Container(
-      color: CupertinoColors.systemBackground.resolveFrom(context),
-      child: InteractiveChart(
-        reachId: _reachId!,
-        forecastType: _forecastType!,
-        showReturnPeriods: _showReturnPeriods,
-        showTooltips: false, // Disable tooltips for export
-        reachProvider: reachProvider,
-        controller: _chartController,
-      ),
-    );
   }
 
   void _showFloodCategoriesInfo() {
@@ -440,7 +419,7 @@ class _HydrographPageState extends State<HydrographPage> {
   Widget _buildChartContent(ReachDataProvider reachProvider) {
     return Column(
       children: [
-        // Main Chart Area
+        // Main Chart Area (wrapped with Screenshot widget)
         Expanded(
           child: Container(
             margin: const EdgeInsets.all(16),
@@ -452,13 +431,16 @@ class _HydrographPageState extends State<HydrographPage> {
                 width: 0.5,
               ),
             ),
-            child: InteractiveChart(
-              controller: _chartController,
-              reachId: _reachId!,
-              forecastType: _forecastType!,
-              showReturnPeriods: _showReturnPeriods,
-              showTooltips: _showTooltips,
-              reachProvider: reachProvider,
+            child: Screenshot(
+              controller: _screenshotController,
+              child: InteractiveChart(
+                controller: _chartController,
+                reachId: _reachId!,
+                forecastType: _forecastType!,
+                showReturnPeriods: _showReturnPeriods,
+                showTooltips: _showTooltips,
+                reachProvider: reachProvider,
+              ),
             ),
           ),
         ),

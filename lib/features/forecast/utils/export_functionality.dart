@@ -1,7 +1,6 @@
 // lib/features/forecast/utils/export_functionality.dart
 
 import 'dart:io';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,77 +9,40 @@ import 'package:share_plus/share_plus.dart';
 import 'package:csv/csv.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 
-/// Data model for chart points - matches your existing structure
+/// Data model for chart points - simplified without confidence values
 class ChartDataPoint {
   final DateTime time;
   final double flow;
-  final double? confidence;
   final Map<String, dynamic>? metadata;
 
-  const ChartDataPoint({
-    required this.time,
-    required this.flow,
-    this.confidence,
-    this.metadata,
-  });
+  const ChartDataPoint({required this.time, required this.flow, this.metadata});
 }
 
 class ExportFunctionality {
   static final ScreenshotController _screenshotController =
       ScreenshotController();
 
-  /// Share chart as image via platform share sheet
-  static Future<void> shareChartImage({
-    required Widget chartWidget,
+  /// Share chart image using existing ScreenshotController
+  static Future<void> shareChartImageFromController({
+    required ScreenshotController screenshotController,
     required String reachName,
     required String forecastType,
     required BuildContext context,
   }) async {
     try {
-      // Get MediaQuery data from the current context
-      final mediaQueryData = MediaQuery.of(context);
+      // Capture the existing chart
+      final imageBytes = await screenshotController.capture();
+      if (imageBytes == null) {
+        throw Exception('Failed to capture chart image');
+      }
 
-      // Capture chart as image with title and metadata
-      final imageBytes = await _screenshotController.captureFromWidget(
-        MediaQuery(
-          data: mediaQueryData,
-          child: Material(
-            child: Container(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Add title to the exported image
-                  Text(
-                    '$reachName - ${_formatForecastType(forecastType)}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: CupertinoColors.label.resolveFrom(context),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Chart widget
-                  SizedBox(width: 800, height: 400, child: chartWidget),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Generated on ${_formatDateTime(DateTime.now())}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: CupertinoColors.secondaryLabel.resolveFrom(
-                        context,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        pixelRatio: 2.0,
+      // Create enhanced image with title and metadata
+      final enhancedImageBytes = await _addMetadataToImage(
+        imageBytes,
+        reachName,
+        forecastType,
+        context,
       );
 
       // Save to temporary file
@@ -92,7 +54,7 @@ class ExportFunctionality {
         'png',
       );
       final file = File('${tempDir.path}/$fileName');
-      await file.writeAsBytes(imageBytes);
+      await file.writeAsBytes(enhancedImageBytes);
 
       // Share the file
       await Share.shareXFiles(
@@ -108,60 +70,26 @@ class ExportFunctionality {
     }
   }
 
-  /// Save chart image to device gallery
-  static Future<void> saveChartToGallery({
-    required Widget chartWidget,
+  /// Save chart image to gallery using existing ScreenshotController
+  static Future<void> saveChartImageFromController({
+    required ScreenshotController screenshotController,
     required String reachName,
     required String forecastType,
     required BuildContext context,
   }) async {
     try {
-      // Request storage permission
-      final permission = await Permission.photos.request();
-      if (!permission.isGranted) {
-        throw Exception('Storage permission denied');
+      // Capture the existing chart
+      final imageBytes = await screenshotController.capture();
+      if (imageBytes == null) {
+        throw Exception('Failed to capture chart image');
       }
 
-      // Get MediaQuery data from the current context
-      final mediaQueryData = MediaQuery.of(context);
-
-      // Capture chart as image
-      final imageBytes = await _screenshotController.captureFromWidget(
-        MediaQuery(
-          data: mediaQueryData,
-          child: Material(
-            child: Container(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$reachName - ${_formatForecastType(forecastType)}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: CupertinoColors.label.resolveFrom(context),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(width: 800, height: 400, child: chartWidget),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Generated on ${_formatDateTime(DateTime.now())}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: CupertinoColors.secondaryLabel.resolveFrom(
-                        context,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        pixelRatio: 2.0,
+      // Create enhanced image with title and metadata
+      final enhancedImageBytes = await _addMetadataToImage(
+        imageBytes,
+        reachName,
+        forecastType,
+        context,
       );
 
       // Save to temporary file first
@@ -173,16 +101,76 @@ class ExportFunctionality {
         'png',
       );
       final file = File('${tempDir.path}/$fileName');
-      await file.writeAsBytes(imageBytes);
+      await file.writeAsBytes(enhancedImageBytes);
 
-      // Save to gallery using Gal
+      // Save to gallery using Gal (which handles permissions internally)
       await Gal.putImage(file.path);
 
+      // If no exception is thrown, assume success
       HapticFeedback.lightImpact();
     } catch (e) {
-      print('Error saving chart to gallery: $e');
-      rethrow;
+      if (e.toString().contains('permission')) {
+        throw Exception(
+          'Permission denied to save photos. Please enable photo access in Settings.',
+        );
+      } else {
+        print('Error saving chart to gallery: $e');
+        rethrow;
+      }
     }
+  }
+
+  /// Helper method to add metadata to captured image
+  static Future<Uint8List> _addMetadataToImage(
+    Uint8List imageBytes,
+    String reachName,
+    String forecastType,
+    BuildContext context,
+  ) async {
+    // Get MediaQuery data from the current context
+    final mediaQueryData = MediaQuery.of(context);
+
+    // Create a widget with the original image plus metadata
+    final enhancedImageBytes = await _screenshotController.captureFromWidget(
+      MediaQuery(
+        data: mediaQueryData,
+        child: Material(
+          child: Container(
+            color: CupertinoColors.systemBackground.resolveFrom(context),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Title
+                Text(
+                  '$reachName - ${_formatForecastType(forecastType)}',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: CupertinoColors.label.resolveFrom(context),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Original chart image
+                Image.memory(imageBytes),
+                const SizedBox(height: 8),
+                // Timestamp
+                Text(
+                  'Generated on ${_formatDateTime(DateTime.now())}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      pixelRatio: 2.0,
+    );
+
+    return enhancedImageBytes;
   }
 
   /// Export chart data as CSV file
@@ -204,15 +192,14 @@ class ExportFunctionality {
       csvData.add(['Total Data Points', chartData.length.toString()]);
       csvData.add([]); // Empty row
 
-      // Add main data header
-      csvData.add(['Date/Time', 'Flow (CFS)', 'Confidence']);
+      // Add main data header (without confidence column)
+      csvData.add(['Date/Time', 'Flow (CFS)']);
 
       // Add chart data rows
       for (final point in chartData) {
         csvData.add([
           point.time.toIso8601String(),
           point.flow.toStringAsFixed(2),
-          point.confidence?.toStringAsFixed(3) ?? 'N/A',
         ]);
       }
 
