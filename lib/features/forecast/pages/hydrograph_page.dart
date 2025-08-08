@@ -31,6 +31,9 @@ class _HydrographPageState extends State<HydrographPage> {
   bool _showReturnPeriods = true;
   final bool _showTooltips = true;
 
+  // Add ChartController to control chart interactions
+  final ChartController _chartController = ChartController();
+
   @override
   void initState() {
     super.initState();
@@ -99,6 +102,12 @@ class _HydrographPageState extends State<HydrographPage> {
     setState(() {
       _showReturnPeriods = !_showReturnPeriods;
     });
+  }
+
+  void _resetZoom() {
+    // Call the reset method on the chart
+    _chartController.resetZoom();
+    HapticFeedback.lightImpact();
   }
 
   void _exportChart() {
@@ -258,7 +267,7 @@ class _HydrographPageState extends State<HydrographPage> {
               ),
             ),
             child: InteractiveChart(
-              key: ValueKey('$_reachId-$_forecastType-$_showReturnPeriods'),
+              controller: _chartController,
               reachId: _reachId!,
               forecastType: _forecastType!,
               showReturnPeriods: _showReturnPeriods,
@@ -293,14 +302,15 @@ class _HydrographPageState extends State<HydrographPage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    CupertinoIcons.chart_bar_alt_fill,
-                    size: 16,
-                    color: _showReturnPeriods
-                        ? CupertinoColors.white
-                        : CupertinoColors.label.resolveFrom(context),
-                  ),
-                  const SizedBox(width: 6),
+                  // Show checkmark when toggled ON, nothing when OFF
+                  if (_showReturnPeriods)
+                    const Icon(
+                      CupertinoIcons.checkmark,
+                      size: 16,
+                      color: CupertinoColors.white,
+                    ),
+                  // Add spacing only when checkmark is shown
+                  if (_showReturnPeriods) const SizedBox(width: 6),
                   Text(
                     'Return Periods',
                     style: TextStyle(
@@ -312,6 +322,20 @@ class _HydrographPageState extends State<HydrographPage> {
                   ),
                 ],
               ),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // Reset Zoom Button
+          CupertinoButton(
+            padding: const EdgeInsets.all(8),
+            color: CupertinoColors.systemGrey5.resolveFrom(context),
+            onPressed: _resetZoom,
+            child: Icon(
+              CupertinoIcons.zoom_out,
+              size: 16,
+              color: CupertinoColors.label.resolveFrom(context),
             ),
           ),
 

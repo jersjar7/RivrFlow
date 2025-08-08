@@ -6,12 +6,26 @@ import 'dart:math' as math;
 import '../../../core/providers/reach_data_provider.dart';
 import '../../../core/constants.dart';
 
+// Simple controller for chart interactions
+class ChartController {
+  VoidCallback? _resetZoom;
+
+  void _setResetCallback(VoidCallback callback) {
+    _resetZoom = callback;
+  }
+
+  void resetZoom() {
+    _resetZoom?.call();
+  }
+}
+
 class InteractiveChart extends StatefulWidget {
   final String reachId;
   final String forecastType;
   final bool showReturnPeriods;
   final bool showTooltips;
   final ReachDataProvider reachProvider;
+  final ChartController? controller;
 
   const InteractiveChart({
     super.key,
@@ -20,6 +34,7 @@ class InteractiveChart extends StatefulWidget {
     required this.showReturnPeriods,
     required this.showTooltips,
     required this.reachProvider,
+    this.controller,
   });
 
   @override
@@ -35,10 +50,27 @@ class _InteractiveChartState extends State<InteractiveChart> {
   List<ChartData> _chartData = [];
   List<ChartDataPoint> _forecastData = [];
 
+  // User interaction behaviors
+  late TrackballBehavior _trackballBehavior;
+  late CrosshairBehavior _crosshairBehavior;
+  late ZoomPanBehavior _zoomPanBehavior;
+  late TooltipBehavior _tooltipBehavior;
+
   @override
   void initState() {
     super.initState();
     _initializeChart();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _initializeBehaviors();
+
+    // Set up controller callback if provided
+    widget.controller?._setResetCallback(() {
+      _zoomPanBehavior.reset();
+    });
   }
 
   @override
@@ -48,6 +80,90 @@ class _InteractiveChartState extends State<InteractiveChart> {
         oldWidget.showReturnPeriods != widget.showReturnPeriods) {
       _initializeChart();
     }
+    if (oldWidget.showTooltips != widget.showTooltips) {
+      _initializeBehaviors();
+    }
+  }
+
+  void _initializeBehaviors() {
+    // Trackball - Shows tooltip for nearest data point
+    _trackballBehavior = TrackballBehavior(
+      enable: true,
+      activationMode: ActivationMode.singleTap,
+      lineType: TrackballLineType.vertical,
+      lineColor: CupertinoColors.systemGrey,
+      lineWidth: 1,
+      lineDashArray: [8, 4],
+      shouldAlwaysShow: false,
+      hideDelay: 3000,
+      tooltipDisplayMode: TrackballDisplayMode.nearestPoint,
+      tooltipAlignment: ChartAlignment.near,
+      tooltipSettings: InteractiveTooltip(
+        enable: true,
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderColor: CupertinoColors.separator.resolveFrom(context),
+        borderWidth: 1,
+        format: 'point.y CFS',
+        textStyle: TextStyle(
+          color: CupertinoColors.label.resolveFrom(context),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        canShowMarker: true,
+      ),
+      markerSettings: TrackballMarkerSettings(
+        markerVisibility: TrackballVisibilityMode.visible,
+        width: 8,
+        height: 8,
+        color: CupertinoColors.systemBlue,
+        borderColor: CupertinoColors.white,
+        borderWidth: 2,
+      ),
+    );
+
+    // Crosshair - Shows axis values with cross lines
+    _crosshairBehavior = CrosshairBehavior(
+      enable: true,
+      activationMode: ActivationMode.longPress,
+      lineType: CrosshairLineType.both,
+      lineColor: CupertinoColors.systemGrey2,
+      lineWidth: 1,
+      lineDashArray: [5, 5],
+      shouldAlwaysShow: false,
+      hideDelay: 3000,
+    );
+
+    // Enhanced zoom and pan behavior
+    _zoomPanBehavior = ZoomPanBehavior(
+      enablePinching: true,
+      enablePanning: true,
+      enableDoubleTapZooming: true,
+      enableSelectionZooming: true,
+      enableMouseWheelZooming: true,
+      enableDirectionalZooming: true,
+      zoomMode: ZoomMode.xy,
+      maximumZoomLevel: 0.01,
+      selectionRectBorderWidth: 2,
+      selectionRectBorderColor: CupertinoColors.systemBlue,
+      selectionRectColor: CupertinoColors.systemBlue.withOpacity(0.2),
+    );
+
+    // Enhanced tooltip behavior
+    _tooltipBehavior = TooltipBehavior(
+      enable: widget.showTooltips,
+      color: CupertinoColors.systemBackground.resolveFrom(context),
+      borderColor: CupertinoColors.separator.resolveFrom(context),
+      borderWidth: 1,
+      opacity: 0.9,
+      format: 'point.y CFS',
+      textStyle: TextStyle(
+        color: CupertinoColors.label.resolveFrom(context),
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+      animationDuration: 300,
+      canShowMarker: true,
+    );
   }
 
   void _initializeChart() {
@@ -344,6 +460,17 @@ class _InteractiveChartState extends State<InteractiveChart> {
               ),
             );
           },
+          // Enable interactive tooltip for crosshair
+          interactiveTooltip: InteractiveTooltip(
+            enable: true,
+            borderColor: CupertinoColors.systemBlue,
+            borderWidth: 1,
+            format: '{value}',
+            textStyle: TextStyle(
+              color: CupertinoColors.label.resolveFrom(context),
+              fontSize: 11,
+            ),
+          ),
           plotBands: nowPosition != null
               ? [
                   PlotBand(
@@ -384,6 +511,17 @@ class _InteractiveChartState extends State<InteractiveChart> {
               ),
             );
           },
+          // Enable interactive tooltip for crosshair
+          interactiveTooltip: InteractiveTooltip(
+            enable: true,
+            borderColor: CupertinoColors.systemBlue,
+            borderWidth: 1,
+            format: '{value} CFS',
+            textStyle: TextStyle(
+              color: CupertinoColors.label.resolveFrom(context),
+              fontSize: 11,
+            ),
+          ),
           plotBands: [..._buildPlotBands(), ..._buildReturnPeriodLines()],
         ),
         series: [
@@ -404,27 +542,66 @@ class _InteractiveChartState extends State<InteractiveChart> {
                 context,
               ),
             ),
+            // Enable selection for the series
+            selectionBehavior: SelectionBehavior(
+              enable: true,
+              selectedColor: CupertinoColors.systemOrange,
+              unselectedColor: CupertinoColors.systemBlue.withOpacity(0.5),
+              selectedBorderColor: CupertinoColors.systemRed,
+              selectedBorderWidth: 2,
+              toggleSelection: true,
+            ),
+            // Enable trackball for this series
+            enableTrackball: true,
           ),
         ],
-        tooltipBehavior: widget.showTooltips
-            ? TooltipBehavior(
-                enable: true,
-                color: CupertinoColors.systemBackground.resolveFrom(context),
-                borderColor: CupertinoColors.separator.resolveFrom(context),
-                borderWidth: 1,
-                format: 'point.y CFS\npoint.x hours',
-                textStyle: TextStyle(
-                  color: CupertinoColors.label.resolveFrom(context),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-            : null,
-        zoomPanBehavior: ZoomPanBehavior(
-          enablePinching: true,
-          enablePanning: true,
-          enableDoubleTapZooming: true,
-        ),
+
+        // User interaction behaviors
+        trackballBehavior: _trackballBehavior,
+        crosshairBehavior: _crosshairBehavior,
+        zoomPanBehavior: _zoomPanBehavior,
+        tooltipBehavior: _tooltipBehavior,
+
+        // Event callbacks for enhanced interactions
+        onTrackballPositionChanging: (TrackballArgs args) {
+          // Customize trackball display
+          final flow = args.chartPointInfo.chartPoint?.y;
+          final time = args.chartPointInfo.chartPoint?.x;
+          if (flow != null && time != null) {
+            args.chartPointInfo.label =
+                '${_formatFlowValue(flow.toDouble())} CFS\n${_formatTimeValue(time)}';
+          }
+        },
+
+        onCrosshairPositionChanging: (CrosshairRenderArgs args) {
+          // Customize crosshair tooltip based on axis
+          if (args.orientation == AxisOrientation.vertical) {
+            args.text = _formatTimeValue(args.value);
+          } else {
+            args.text = '${_formatFlowValue(args.value)} CFS';
+          }
+        },
+
+        onTooltipRender: (TooltipArgs args) {
+          // Enhanced tooltip formatting
+          // You can customize args.text here if needed
+          // args.text = 'Custom: ${args.text}';
+        },
+
+        onSelectionChanged: (SelectionArgs args) {
+          // Handle data point selection
+          print('Selection changed');
+        },
+
+        onZooming: (ZoomPanArgs args) {
+          // Handle zoom events
+          print('Chart is being zoomed');
+        },
+
+        onActualRangeChanged: (ActualRangeChangedArgs args) {
+          // Handle axis range changes during zoom/pan
+          print('Axis range changed');
+        },
       ),
     );
   }
