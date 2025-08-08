@@ -142,7 +142,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
+        padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 0),
         itemCount: data.length,
         itemBuilder: (context, index) {
           final dataPoint = data[index];

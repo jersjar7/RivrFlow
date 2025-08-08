@@ -38,7 +38,7 @@ class ChartPreviewWidget extends StatelessWidget {
           onTap: onTap,
           child: Container(
             height: height,
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
             decoration: BoxDecoration(
               color: CupertinoColors.systemBackground,
               borderRadius: BorderRadius.circular(12),

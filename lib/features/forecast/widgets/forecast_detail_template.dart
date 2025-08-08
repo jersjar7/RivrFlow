@@ -237,7 +237,6 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
                 children: [
                   const SizedBox(height: 24),
                   _buildSectionHeader(_getTimelineSectionTitle()),
-                  const SizedBox(height: 12),
                   // Use custom timeline widget if provided, otherwise default
                   widget.customTimelineWidget ??
                       HorizontalFlowTimeline(reachId: widget.reachId),
@@ -256,7 +255,9 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 24),
-                  _buildSectionHeader(widget.chartSectionTitle ?? 'Flow Chart'),
+                  _buildSectionHeader(
+                    widget.chartSectionTitle ?? 'Flow Chart Preview',
+                  ),
                   const SizedBox(height: 12),
                   // Use custom chart preview if provided, otherwise default
                   widget.customChartPreview ??
