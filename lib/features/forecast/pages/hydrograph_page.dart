@@ -111,20 +111,59 @@ class _HydrographPageState extends State<HydrographPage> {
   }
 
   void _exportChart() {
-    // TODO: Implement chart export functionality
     HapticFeedback.mediumImpact();
 
-    showCupertinoDialog(
+    showCupertinoActionSheet(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Export Chart'),
-        content: const Text('Chart export functionality coming soon!'),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('OK'),
-            onPressed: () => Navigator.pop(context),
+      title: const Text('Export Chart'),
+      message: const Text('Choose export option'),
+      actions: [
+        CupertinoActionSheetAction(
+          onPressed: () {
+            Navigator.pop(context);
+            _shareChartImage();
+          },
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(CupertinoIcons.share, size: 18),
+              SizedBox(width: 8),
+              Text('Share Chart'),
+            ],
           ),
-        ],
+        ),
+        CupertinoActionSheetAction(
+          onPressed: () {
+            Navigator.pop(context);
+            _saveChartToGallery();
+          },
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(CupertinoIcons.photo, size: 18),
+              SizedBox(width: 8),
+              Text('Save to Photos'),
+            ],
+          ),
+        ),
+        CupertinoActionSheetAction(
+          onPressed: () {
+            Navigator.pop(context);
+            _exportDataAsCSV();
+          },
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(CupertinoIcons.doc_text, size: 18),
+              SizedBox(width: 8),
+              Text('Export Data (CSV)'),
+            ],
+          ),
+        ),
+      ],
+      cancelButton: CupertinoActionSheetAction(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
       ),
     );
   }
