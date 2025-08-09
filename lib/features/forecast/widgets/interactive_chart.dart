@@ -215,7 +215,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
   }
 
-  // NEW: Load all ensemble members
+  // NEW: Load all ensemble members using updated forecast service methods
   void _loadEnsembleData() {
     final forecast = widget.reachProvider.currentForecast;
     if (forecast == null) {
@@ -225,8 +225,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
       return;
     }
 
-    // Get all ensemble data using our new method
-    final ensembleData = _forecastService.getAllEnsembleChartData(
+    // UPDATED: Use new method name that returns Chart-ready data
+    final ensembleData = _forecastService.getEnsembleSeriesForChart(
       forecast,
       widget.forecastType,
     );
@@ -238,27 +238,44 @@ class _InteractiveChartState extends State<InteractiveChart> {
       return;
     }
 
-    // Convert each member to chart data
+    // FIXED: Convert between the different ChartData types
     _ensembleChartData = {};
-    _forecastData = []; // Use first available series for bounds calculation
-
     for (final entry in ensembleData.entries) {
       final memberName = entry.key;
-      final memberData = entry.value;
+      final serviceChartData = entry.value;
 
-      if (memberData.isNotEmpty) {
-        final chartData = _convertToChartData(memberData);
-        _ensembleChartData[memberName] = chartData;
+      // Convert from forecast_service.ChartData to interactive_chart.ChartData
+      final convertedData = serviceChartData
+          .map((point) => ChartData(point.x, point.y))
+          .toList();
 
-        // Use first series for forecast data (for bounds calculation)
-        if (_forecastData.isEmpty) {
-          _forecastData = memberData;
-        }
-      }
+      _ensembleChartData[memberName] = convertedData;
     }
+
+    // FIXED: Convert between the different ChartDataPoint types
+    final serviceReferenceData = _forecastService.getEnsembleReferenceData(
+      forecast,
+      widget.forecastType,
+    );
+
+    // Convert from forecast_service.ChartDataPoint to interactive_chart.ChartDataPoint
+    _forecastData = serviceReferenceData
+        .map(
+          (point) => ChartDataPoint(
+            time: point.time,
+            flow: point.flow,
+            confidence: point.confidence,
+            metadata: point.metadata,
+          ),
+        )
+        .toList();
 
     // Clear single series data when showing ensemble
     _chartData = [];
+
+    print(
+      'INTERACTIVE_CHART: Loaded ${_ensembleChartData.length} ensemble series',
+    );
   }
 
   List<ChartDataPoint> _getForecastData() {

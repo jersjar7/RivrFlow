@@ -2,8 +2,8 @@
 
 import 'package:rivrflow/features/forecast/widgets/horizontal_flow_timeline.dart';
 import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
-import '../../features/forecast/widgets/interactive_chart.dart'
-    show ChartDataPoint;
+// REMOVED: Conflicting import that was causing type issues
+// import '../../features/forecast/widgets/interactive_chart.dart' show ChartDataPoint;
 
 import '../models/reach_data.dart';
 import 'noaa_api_service.dart';
@@ -634,36 +634,6 @@ class ForecastService {
     return hourlyData;
   }
 
-  /// Get all ensemble members for chart display (medium/long range only)
-  /// Returns Map<String, List<ChartDataPoint>> where key is member name ('mean', 'member01', etc.)
-  Map<String, List<ChartDataPoint>> getAllEnsembleChartData(
-    ForecastResponse forecast,
-    String forecastType,
-  ) {
-    final ensembleData = forecast.getAllEnsembleData(forecastType);
-    final chartSeries = <String, List<ChartDataPoint>>{};
-
-    for (final entry in ensembleData.entries) {
-      final memberName = entry.key;
-      final series = entry.value;
-
-      if (series.isEmpty) continue;
-
-      final chartData = series.data
-          .map(
-            (point) => ChartDataPoint(
-              time: point.validTime.toLocal(),
-              flow: point.flow,
-            ),
-          )
-          .toList();
-
-      chartSeries[memberName] = chartData;
-    }
-
-    return chartSeries;
-  }
-
   /// Get ensemble statistics for uncertainty visualization
   /// Returns min, max, and mean values at each time point
   List<EnsembleStatPoint> getEnsembleStatistics(
@@ -727,6 +697,83 @@ class ForecastService {
     return memberCount > 1;
   }
 
+  // ===== NEW METHODS FOR CHART DISPLAY (NO CONFLICTS) =====
+
+  /// NEW: Get all ensemble data ready for chart display
+  /// Returns Map<String, List<ChartData>> where ChartData has x,y coordinates
+  /// This replaces the conflicting getAllEnsembleChartData method
+  Map<String, List<ChartData>> getEnsembleSeriesForChart(
+    ForecastResponse forecast,
+    String forecastType,
+  ) {
+    final ensembleData = forecast.getAllEnsembleData(forecastType);
+    final chartSeries = <String, List<ChartData>>{};
+
+    // Find earliest time for reference point (for x-axis calculation)
+    DateTime? earliestTime;
+    for (final entry in ensembleData.entries) {
+      final series = entry.value;
+      if (series.isNotEmpty) {
+        final firstTime = series.data.first.validTime.toLocal();
+        if (earliestTime == null || firstTime.isBefore(earliestTime)) {
+          earliestTime = firstTime;
+        }
+      }
+    }
+
+    if (earliestTime == null) return chartSeries;
+
+    for (final entry in ensembleData.entries) {
+      final memberName = entry.key;
+      final series = entry.value;
+
+      if (series.isEmpty) continue;
+
+      final chartData = series.data.map((point) {
+        final localTime = point.validTime.toLocal();
+        final hoursDiff = localTime
+            .difference(earliestTime!)
+            .inHours
+            .toDouble();
+
+        return ChartData(hoursDiff, point.flow);
+      }).toList();
+
+      chartSeries[memberName] = chartData;
+    }
+
+    print(
+      'FORECAST_SERVICE: Generated ${chartSeries.length} chart series for $forecastType',
+    );
+    return chartSeries;
+  }
+
+  /// NEW: Get ensemble data as time-based points (for bounds calculation in charts)
+  /// Returns the first available series as ChartDataPoint (DateTime, flow) for interactive_chart.dart
+  List<ChartDataPoint> getEnsembleReferenceData(
+    ForecastResponse forecast,
+    String forecastType,
+  ) {
+    final ensembleData = forecast.getAllEnsembleData(forecastType);
+
+    // Get the first available series for reference
+    for (final entry in ensembleData.entries) {
+      final series = entry.value;
+      if (series.isNotEmpty) {
+        return series.data
+            .map(
+              (point) => ChartDataPoint(
+                time: point.validTime.toLocal(),
+                flow: point.flow,
+              ),
+            )
+            .toList();
+      }
+    }
+
+    return [];
+  }
+
   // NEW: Clear all caches (useful for testing)
   void clearComputedCaches() {
     _currentFlowCache.clear();
@@ -752,7 +799,7 @@ class EnsembleStatPoint {
   });
 }
 
-// Reuse existing ChartDataPoint class or define if needed
+// Internal ChartDataPoint class for forecast_service.dart (time-based)
 class ChartDataPoint {
   final DateTime time;
   final double flow;
@@ -765,4 +812,12 @@ class ChartDataPoint {
     this.confidence,
     this.metadata,
   });
+}
+
+// Simple ChartData class for chart output (x,y coordinates)
+class ChartData {
+  final double x;
+  final double y;
+
+  ChartData(this.x, this.y);
 }

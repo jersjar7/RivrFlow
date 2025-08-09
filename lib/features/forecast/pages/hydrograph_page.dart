@@ -6,7 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:rivrflow/features/forecast/utils/export_functionality.dart';
 import '../../../core/providers/reach_data_provider.dart';
-import '../../../core/services/forecast_service.dart'; // NEW: Add forecast service import
+import '../../../core/services/forecast_service.dart'
+    hide ChartDataPoint; // NEW: Add forecast service import
 import '../widgets/interactive_chart.dart' hide ChartDataPoint;
 import '../widgets/flood_categories_info_sheet.dart';
 
@@ -263,38 +264,87 @@ class _HydrographPageState extends State<HydrographPage> {
         return;
       }
 
-      // Get the forecast data
-      final forecastSeries = forecast.getPrimaryForecast(_forecastType!);
-      if (forecastSeries == null || forecastSeries.isEmpty) {
-        ExportFunctionality.showErrorMessage(
-          context,
-          'No forecast data available',
-        );
-        return;
+      // UPDATED: Check if we're showing ensemble data and export accordingly
+      if (_showEnsembleMembers &&
+          (widget.forecastType == 'medium_range' ||
+              widget.forecastType == 'long_range')) {
+        // Export ensemble data
+        await _exportEnsembleDataAsCSV(reach, forecast);
+      } else {
+        // Export single series data (existing logic)
+        await _exportSingleSeriesAsCSV(reach, forecast);
       }
-
-      // Convert to ChartDataPoint format (without confidence)
-      final chartData = forecastSeries.data
-          .map(
-            (point) => ChartDataPoint(
-              time: point.validTime.toLocal(),
-              flow: point.flow,
-            ),
-          )
-          .toList();
-
-      // Get return periods for flood categories
-      final returnPeriods = reach.returnPeriods;
-
-      await ExportFunctionality.exportDataAsCSV(
-        chartData: chartData,
-        reachName: reach.displayName,
-        forecastType: _forecastType!,
-        returnPeriods: returnPeriods,
-      );
     } catch (e) {
       ExportFunctionality.showErrorMessage(context, e.toString());
     }
+  }
+
+  Future<void> _exportSingleSeriesAsCSV(reach, forecast) async {
+    // Get the forecast data
+    final forecastSeries = forecast.getPrimaryForecast(_forecastType!);
+    if (forecastSeries == null || forecastSeries.isEmpty) {
+      ExportFunctionality.showErrorMessage(
+        context,
+        'No forecast data available',
+      );
+      return;
+    }
+
+    // FIXED: Use interactive_chart's ChartDataPoint type directly
+    final chartData = forecastSeries.data
+        .map(
+          (point) =>
+              ChartDataPoint(time: point.validTime.toLocal(), flow: point.flow),
+        )
+        .toList();
+
+    // Get return periods for flood categories
+    final returnPeriods = reach.returnPeriods;
+
+    await ExportFunctionality.exportDataAsCSV(
+      chartData: chartData,
+      reachName: reach.displayName,
+      forecastType: _forecastType!,
+      returnPeriods: returnPeriods,
+    );
+  }
+
+  Future<void> _exportEnsembleDataAsCSV(reach, forecast) async {
+    // Get ensemble data using our service
+    final ensembleData = _forecastService.getEnsembleReferenceData(
+      forecast,
+      _forecastType!,
+    );
+
+    if (ensembleData.isEmpty) {
+      ExportFunctionality.showErrorMessage(
+        context,
+        'No ensemble data available',
+      );
+      return;
+    }
+
+    // Convert to the interactive_chart ChartDataPoint format
+    final chartData = ensembleData
+        .map(
+          (point) => ChartDataPoint(
+            time: point.time,
+            flow: point.flow,
+            metadata: point.metadata,
+          ),
+        )
+        .toList();
+
+    // Get return periods for flood categories
+    final returnPeriods = reach.returnPeriods;
+
+    // Export with special naming for ensemble data
+    await ExportFunctionality.exportDataAsCSV(
+      chartData: chartData,
+      reachName: reach.displayName,
+      forecastType: '${_forecastType!}_ensemble',
+      returnPeriods: returnPeriods,
+    );
   }
 
   void _showFloodCategoriesInfo() {
@@ -353,7 +403,12 @@ class _HydrographPageState extends State<HydrographPage> {
 
     final typeName = typeNames[_forecastType] ?? _forecastType?.toUpperCase();
 
-    return '$typeName Forecast\nShowing: All Available Data\nData Source: NOAA National Water Model';
+    // UPDATED: Show different message based on ensemble toggle
+    final displayMode = _showEnsembleMembers
+        ? 'All Ensemble Members + Mean'
+        : 'Mean Forecast Only';
+
+    return '$typeName Forecast\nShowing: $displayMode\nData Source: NOAA National Water Model';
   }
 
   @override
@@ -455,7 +510,8 @@ class _HydrographPageState extends State<HydrographPage> {
     final forecast = reachProvider.currentForecast;
     final hasEnsemble =
         forecast != null &&
-        _forecastService.hasMultipleEnsembleMembers(forecast, _forecastType!);
+        _forecastService.hasMultipleEnsembleMembers(forecast, _forecastType!) &&
+        (_forecastType == 'medium_range' || _forecastType == 'long_range');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
