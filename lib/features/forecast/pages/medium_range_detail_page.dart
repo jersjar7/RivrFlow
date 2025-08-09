@@ -125,9 +125,8 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
 
           // Custom timeline widget using our DailyFlowForecastWidget
           customTimelineWidget: _buildDailyForecastWidget(reachProvider),
-          timelineSectionTitle: null,
           showTimelineSection: true,
-
+          showTimelineTitle: false,
           // Keep existing additional content
           additionalContent: _buildMediumRangeSpecificContent(reachProvider),
         );

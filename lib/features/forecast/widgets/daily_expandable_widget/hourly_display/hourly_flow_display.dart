@@ -193,18 +193,18 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
       return _buildSingleDataPointState();
     }
 
-    // Main hourly display - REMOVED the header section with "Hourly Flow Data" text
+    // NEW LAYOUT: Row with Column (chart/slider/time) + FlowValueIndicator
     return Container(
       height: widget.height,
       padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Bar chart and value indicator row - EXPANDED to take more space
+          // LEFT SIDE: Column with chart, slider, and time values
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Micro bar chart (takes most of the space)
+                // Bar chart (takes most space)
                 Expanded(
                   child: MicroBarChart(
                     hourlyData: _sortedHourlyData,
@@ -213,7 +213,6 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
                     maxValue: _maxFlow,
                     reach: widget.reach,
                     onBarTapped: (index) {
-                      // Add tap functionality to bars
                       setState(() {
                         _selectedHourIndex = index;
                         _updateSelectedValues();
@@ -222,33 +221,34 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
                   ),
                 ),
 
-                const SizedBox(width: 12),
-
-                // Flow value indicator - ENSURE it's visible by adding constraints
-                SizedBox(
-                  width: 120,
-                  child: FlowValueIndicator(
-                    flowValue: _selectedFlow,
-                    time: _selectedTime,
-                    flowCategory: _selectedCategory,
-                    size: 120,
+                // Slider (if enabled)
+                if (widget.showTimeSlider)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: HourlyTimeSlider(
+                      hourCount: _sortedHourlyData.length,
+                      currentValue: _selectedHourIndex.toDouble(),
+                      onChanged: _onSliderChanged,
+                      hourLabels: _sortedHourlyData.map((e) => e.key).toList(),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
 
-          // Time slider
-          if (widget.showTimeSlider)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: HourlyTimeSlider(
-                hourCount: _sortedHourlyData.length,
-                currentValue: _selectedHourIndex.toDouble(),
-                onChanged: _onSliderChanged,
-                hourLabels: _sortedHourlyData.map((e) => e.key).toList(),
+          const SizedBox(width: 10), // Space between chart column and indicator
+          // RIGHT SIDE: Flow value indicator (now has much more space!)
+          Column(
+            children: [
+              FlowValueIndicator(
+                flowValue: _selectedFlow,
+                time: _selectedTime,
+                flowCategory: _selectedCategory,
+                size: 100.0,
               ),
-            ),
+              Spacer(),
+            ],
+          ),
         ],
       ),
     );
@@ -302,14 +302,14 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Single data point display - REMOVED the "Hourly Flow Data" header
+          // Single data point display
           Expanded(
             child: Center(
               child: FlowValueIndicator(
                 flowValue: flow,
                 time: time,
                 flowCategory: category,
-                size: 100.0, // Larger size for single data point
+                size: 120.0, // Updated size for single data point
               ),
             ),
           ),

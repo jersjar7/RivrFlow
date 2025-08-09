@@ -274,24 +274,6 @@ class _DailyForecastRowState extends State<DailyForecastRow>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: widget.forecast.categoryColor.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        widget.forecast.flowCategory,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: widget.forecast.categoryColor,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
 
@@ -350,51 +332,27 @@ class _DailyForecastRowState extends State<DailyForecastRow>
     return Row(
       children: [
         Expanded(
-          child: _buildStatItem(
-            context,
-            'Min Flow',
-            widget.forecast.minFlow,
-            CupertinoColors.systemBlue,
-          ),
+          child: _buildStatItem(context, 'Min Flow', widget.forecast.minFlow),
         ),
         Expanded(
-          child: _buildStatItem(
-            context,
-            'Max Flow',
-            widget.forecast.maxFlow,
-            CupertinoColors.systemRed,
-          ),
+          child: _buildStatItem(context, 'Max Flow', widget.forecast.maxFlow),
         ),
         Expanded(
-          child: _buildStatItem(
-            context,
-            'Avg Flow',
-            widget.forecast.avgFlow,
-            CupertinoColors.systemPurple,
-          ),
+          child: _buildStatItem(context, 'Avg Flow', widget.forecast.avgFlow),
         ),
       ],
     );
   }
 
   /// Build individual statistic item
-  Widget _buildStatItem(
-    BuildContext context,
-    String label,
-    double value,
-    Color color,
-  ) {
+  Widget _buildStatItem(BuildContext context, String label, double value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-            ),
+            SizedBox(width: 8, height: 8),
             const SizedBox(width: 6),
             Text(
               label,

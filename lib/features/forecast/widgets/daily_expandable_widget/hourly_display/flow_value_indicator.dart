@@ -108,7 +108,7 @@ class FlowValueIndicator extends StatelessWidget {
                 child: Text(
                   flowCategory!,
                   style: TextStyle(
-                    fontSize: 8,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600,
                     color: indicatorBorderColor,
                   ),

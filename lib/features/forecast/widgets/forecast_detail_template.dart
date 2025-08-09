@@ -46,6 +46,7 @@ class ForecastDetailTemplate extends StatefulWidget {
   final bool showTimelineSection; // Show/hide entire timeline section
   final bool showChartSection; // Show/hide entire chart section
   final bool showForecastSummary; // Show/hide forecast summary section
+  final bool showTimelineTitle; // Show/hide timeline section title
 
   // NEW: Section titles customization
   final String? timelineSectionTitle; // Custom title for timeline section:
@@ -78,7 +79,8 @@ class ForecastDetailTemplate extends StatefulWidget {
     this.showTimelineSection = true,
     this.showChartSection = true,
     this.showForecastSummary = true,
-
+    this.showTimelineTitle =
+        true, // Default to true to maintain existing behavior
     // Section titles
     this.timelineSectionTitle,
     this.chartSectionTitle,
@@ -237,8 +239,14 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(_getTimelineSectionTitle()),
+                  // Conditional spacing and title based on showTimelineTitle
+                  if (widget.showTimelineTitle) ...[
+                    const SizedBox(height: 24),
+                    _buildSectionHeader(_getTimelineSectionTitle()),
+                  ] else ...[
+                    const SizedBox(height: 12), // Reduced spacing when no title
+                  ],
+
                   // Use custom timeline widget if provided, otherwise default
                   widget.customTimelineWidget ??
                       HorizontalFlowTimeline(reachId: widget.reachId),
