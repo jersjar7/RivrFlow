@@ -81,7 +81,7 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
       arguments: {
         'reachId': _reachId,
         'forecastType': 'long_range',
-        'title': 'Long Range Hydrograph',
+        'title': 'Extended Forecast',
       },
     );
   }
@@ -101,7 +101,7 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
         return ForecastDetailTemplate(
           reachId: _reachId!,
           forecastType: 'long_range',
-          title: 'Long Range Forecast',
+          title: 'Extended Forecast',
           usageGuideOptions: FlowValuesUsageGuide.longRangeOptions(),
           onChartTap: _navigateToHydrograph,
           showCurrentFlow: false,

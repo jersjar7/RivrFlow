@@ -642,7 +642,7 @@ class _HydrographPageState extends State<HydrographPage> {
                 const SizedBox(width: 16),
                 _buildLegendItem(
                   'Ensemble Members',
-                  CupertinoColors.systemGrey,
+                  CupertinoColors.systemPurple,
                 ),
               ],
               const Spacer(),

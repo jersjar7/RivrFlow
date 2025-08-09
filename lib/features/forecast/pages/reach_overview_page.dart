@@ -6,7 +6,6 @@ import 'package:rivrflow/core/models/reach_data.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/current_flow_status_card.dart';
 import '../widgets/forecast_category_grid.dart';
-import '../widgets/chart_preview_widget.dart';
 
 class ReachOverviewPage extends StatefulWidget {
   final String? reachId;
@@ -168,9 +167,6 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
           SliverToBoxAdapter(
             child: _buildForecastCategoriesSection(reachProvider),
           ),
-
-          // Chart Previews Section - Shows when forecast data is available
-          SliverToBoxAdapter(child: _buildChartPreviewsSection(reachProvider)),
 
           // Station Metadata - Enhanced progressively
           SliverToBoxAdapter(
@@ -354,43 +350,6 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildChartPreviewsSection(ReachDataProvider reachProvider) {
-    final availableTypes = reachProvider.getAvailableForecastTypes();
-
-    if (availableTypes.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Text(
-            'Quick Chart Previews',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: CupertinoColors.label,
-            ),
-          ),
-        ),
-
-        // Show chart previews for available forecast types
-        ...availableTypes.take(3).map((forecastType) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ChartPreviewWidget(
-              forecastType: forecastType,
-              onTap: () => _navigateToHydrograph(forecastType),
-              height: 120,
-            ),
-          );
-        }),
-      ],
     );
   }
 
