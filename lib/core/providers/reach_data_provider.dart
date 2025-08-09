@@ -6,7 +6,7 @@ import '../models/reach_data.dart';
 import '../services/forecast_service.dart';
 
 /// State management for reach and forecast data
-/// Now with phased loading and computed value caching for better performance
+/// Now with phased loading and progressive forecast category loading
 class ReachDataProvider with ChangeNotifier {
   final ForecastService _forecastService = ForecastService();
 
@@ -21,6 +21,11 @@ class ReachDataProvider with ChangeNotifier {
   String _loadingPhase =
       'none'; // 'none', 'overview', 'supplementary', 'complete'
 
+  // NEW: Progressive forecast category loading states
+  bool _isLoadingHourly = false;
+  bool _isLoadingDaily = false;
+  bool _isLoadingExtended = false;
+
   // Simple in-memory cache for current session
   final Map<String, ForecastResponse> _sessionCache = {};
 
@@ -32,12 +37,17 @@ class ReachDataProvider with ChangeNotifier {
 
   // Getters
   bool get isLoading => _isLoading;
-  bool get isLoadingOverview => _isLoadingOverview; // NEW
-  bool get isLoadingSupplementary => _isLoadingSupplementary; // NEW
-  String get loadingPhase => _loadingPhase; // NEW
+  bool get isLoadingOverview => _isLoadingOverview;
+  bool get isLoadingSupplementary => _isLoadingSupplementary;
+  String get loadingPhase => _loadingPhase;
   String? get errorMessage => _errorMessage;
   ForecastResponse? get currentForecast => _currentForecast;
   bool get hasData => _currentForecast != null;
+
+  // NEW: Forecast category loading state getters
+  bool get isLoadingHourly => _isLoadingHourly;
+  bool get isLoadingDaily => _isLoadingDaily;
+  bool get isLoadingExtended => _isLoadingExtended;
 
   // Get current reach data if available
   ReachData? get currentReach => _currentForecast?.reach;
@@ -49,6 +59,46 @@ class ReachDataProvider with ChangeNotifier {
   // Check if we have supplementary data (return periods)
   bool get hasSupplementaryData =>
       _currentForecast?.reach.hasReturnPeriods ?? false;
+
+  // NEW: Check if specific forecast categories are available in current data
+  bool get hasHourlyForecast =>
+      _currentForecast?.shortRange?.isNotEmpty ?? false;
+  bool get hasDailyForecast =>
+      _currentForecast?.mediumRange.isNotEmpty ?? false;
+  bool get hasExtendedForecast =>
+      _currentForecast?.longRange.isNotEmpty ?? false;
+
+  // NEW: Immediately clear current reach display (fixes wrong river issue)
+  void clearCurrentReach() {
+    print('REACH_PROVIDER: Immediately clearing current reach display');
+    _currentForecast = null;
+    _clearAllComputedCaches();
+    _clearError();
+    _setLoadingPhase('none');
+    _resetAllLoadingStates();
+    notifyListeners();
+  }
+
+  // NEW: Get loading state summary for forecast categories
+  Map<String, dynamic> getForecastCategoryLoadingState() {
+    return {
+      'hourly': {
+        'loading': _isLoadingHourly,
+        'available': hasHourlyForecast,
+        'type': 'short_range',
+      },
+      'daily': {
+        'loading': _isLoadingDaily,
+        'available': hasDailyForecast,
+        'type': 'medium_range',
+      },
+      'extended': {
+        'loading': _isLoadingExtended,
+        'available': hasExtendedForecast,
+        'type': 'long_range',
+      },
+    };
+  }
 
   // PHASE 1 - Load overview data only (reach info + current flow)
   /// Load minimal data for overview page display
@@ -88,6 +138,180 @@ class ReachDataProvider with ChangeNotifier {
       _setError(e.toString());
       _setLoadingOverview(false);
       _setLoadingPhase('none');
+      return false;
+    }
+  }
+
+  // NEW: Load hourly forecast data specifically (short-range)
+  Future<bool> loadHourlyForecast(String reachId) async {
+    print('REACH_PROVIDER: Loading hourly forecast for reach: $reachId');
+
+    _setLoadingHourly(true);
+
+    try {
+      // If we don't have any data yet, load overview first
+      if (_currentForecast == null) {
+        final overviewSuccess = await loadOverviewData(reachId);
+        if (!overviewSuccess) {
+          _setLoadingHourly(false);
+          return false;
+        }
+      }
+
+      // Load hourly data
+      final hourlyForecast = await _forecastService.loadSpecificForecast(
+        reachId,
+        'short_range',
+      );
+
+      // FIXED: Merge with existing data instead of overwriting
+      _currentForecast = _mergeForecastData(_currentForecast!, hourlyForecast);
+      _sessionCache[reachId] = _currentForecast!;
+      _updateComputedCaches(reachId);
+
+      print('REACH_PROVIDER: ✅ Hourly forecast loaded and merged');
+      _setLoadingHourly(false);
+      return true;
+    } catch (e) {
+      print('REACH_PROVIDER: ❌ Error loading hourly forecast: $e');
+      _setLoadingHourly(false);
+      return false;
+    }
+  }
+
+  // NEW: Load daily forecast data specifically (medium-range)
+  Future<bool> loadDailyForecast(String reachId) async {
+    print('REACH_PROVIDER: Loading daily forecast for reach: $reachId');
+
+    _setLoadingDaily(true);
+
+    try {
+      // If we don't have any data yet, load overview first
+      if (_currentForecast == null) {
+        final overviewSuccess = await loadOverviewData(reachId);
+        if (!overviewSuccess) {
+          _setLoadingDaily(false);
+          return false;
+        }
+      }
+
+      // Load daily data
+      final dailyForecast = await _forecastService.loadSpecificForecast(
+        reachId,
+        'medium_range',
+      );
+
+      // FIXED: Merge with existing data instead of overwriting
+      _currentForecast = _mergeForecastData(_currentForecast!, dailyForecast);
+      _sessionCache[reachId] = _currentForecast!;
+      _updateComputedCaches(reachId);
+
+      print('REACH_PROVIDER: ✅ Daily forecast loaded and merged');
+      _setLoadingDaily(false);
+      return true;
+    } catch (e) {
+      print('REACH_PROVIDER: ❌ Error loading daily forecast: $e');
+      _setLoadingDaily(false);
+      return false;
+    }
+  }
+
+  // NEW: Load extended forecast data specifically (long-range)
+  Future<bool> loadExtendedForecast(String reachId) async {
+    print('REACH_PROVIDER: Loading extended forecast for reach: $reachId');
+
+    _setLoadingExtended(true);
+
+    try {
+      // If we don't have any data yet, load overview first
+      if (_currentForecast == null) {
+        final overviewSuccess = await loadOverviewData(reachId);
+        if (!overviewSuccess) {
+          _setLoadingExtended(false);
+          return false;
+        }
+      }
+
+      // Load extended data
+      final extendedForecast = await _forecastService.loadSpecificForecast(
+        reachId,
+        'long_range',
+      );
+
+      // FIXED: Merge with existing data instead of overwriting
+      _currentForecast = _mergeForecastData(
+        _currentForecast!,
+        extendedForecast,
+      );
+      _sessionCache[reachId] = _currentForecast!;
+      _updateComputedCaches(reachId);
+
+      print('REACH_PROVIDER: ✅ Extended forecast loaded and merged');
+      _setLoadingExtended(false);
+      return true;
+    } catch (e) {
+      print('REACH_PROVIDER: ❌ Error loading extended forecast: $e');
+      _setLoadingExtended(false);
+      return false;
+    }
+  }
+
+  // NEW: Merge forecast data properly (preserves existing data)
+  ForecastResponse _mergeForecastData(
+    ForecastResponse existing,
+    ForecastResponse newData,
+  ) {
+    return ForecastResponse(
+      reach: existing.reach, // Keep existing reach data
+      // Merge forecast data - use new data if available, otherwise keep existing
+      analysisAssimilation: newData.analysisAssimilation?.isNotEmpty == true
+          ? newData.analysisAssimilation
+          : existing.analysisAssimilation,
+      shortRange: newData.shortRange?.isNotEmpty == true
+          ? newData.shortRange
+          : existing.shortRange,
+      mediumRange: newData.mediumRange.isNotEmpty
+          ? newData.mediumRange
+          : existing.mediumRange,
+      longRange: newData.longRange.isNotEmpty
+          ? newData.longRange
+          : existing.longRange,
+      mediumRangeBlend: newData.mediumRangeBlend?.isNotEmpty == true
+          ? newData.mediumRangeBlend
+          : existing.mediumRangeBlend,
+    );
+  }
+
+  // NEW: Comprehensive refresh - loads all forecast categories systematically
+  Future<bool> comprehensiveRefresh(String reachId) async {
+    print('REACH_PROVIDER: Starting comprehensive refresh for: $reachId');
+
+    // Clear caches first
+    _sessionCache.remove(reachId);
+    _clearComputedCaches(reachId);
+    _forecastService.clearComputedCaches();
+
+    try {
+      // Step 1: Load overview data first
+      final overviewSuccess = await loadOverviewData(reachId);
+      if (!overviewSuccess) {
+        return false;
+      }
+
+      // Step 2: Load all forecast categories progressively
+      // Note: These run sequentially so each one can enhance the previous data
+      await loadHourlyForecast(reachId);
+      await loadDailyForecast(reachId);
+      await loadExtendedForecast(reachId);
+
+      // Step 3: Load supplementary data
+      await loadSupplementaryData(reachId);
+
+      print('REACH_PROVIDER: ✅ Comprehensive refresh completed');
+      return true;
+    } catch (e) {
+      print('REACH_PROVIDER: ❌ Error in comprehensive refresh: $e');
+      _setError(e.toString());
       return false;
     }
   }
@@ -227,12 +451,8 @@ class ReachDataProvider with ChangeNotifier {
     final reachId = _currentForecast!.reach.reachId;
     print('REACH_PROVIDER: Force refreshing: $reachId');
 
-    // Clear all caches
-    _sessionCache.remove(reachId);
-    _clearComputedCaches(reachId);
-    _forecastService.clearComputedCaches();
-
-    return await loadReach(reachId);
+    // Use comprehensive refresh instead of basic loadReach
+    return await comprehensiveRefresh(reachId);
   }
 
   // Use cached values instead of computing each time
@@ -328,6 +548,7 @@ class ReachDataProvider with ChangeNotifier {
     _clearAllComputedCaches();
     _clearError();
     _setLoadingPhase('none');
+    _resetAllLoadingStates();
     notifyListeners();
     print('REACH_PROVIDER: Cleared all data');
   }
@@ -415,6 +636,38 @@ class ReachDataProvider with ChangeNotifier {
       _isLoadingSupplementary = loading;
       notifyListeners();
     }
+  }
+
+  // NEW: Individual forecast category loading state setters
+  void _setLoadingHourly(bool loading) {
+    if (_isLoadingHourly != loading) {
+      _isLoadingHourly = loading;
+      notifyListeners();
+    }
+  }
+
+  void _setLoadingDaily(bool loading) {
+    if (_isLoadingDaily != loading) {
+      _isLoadingDaily = loading;
+      notifyListeners();
+    }
+  }
+
+  void _setLoadingExtended(bool loading) {
+    if (_isLoadingExtended != loading) {
+      _isLoadingExtended = loading;
+      notifyListeners();
+    }
+  }
+
+  // NEW: Reset all loading states
+  void _resetAllLoadingStates() {
+    _isLoading = false;
+    _isLoadingOverview = false;
+    _isLoadingSupplementary = false;
+    _isLoadingHourly = false;
+    _isLoadingDaily = false;
+    _isLoadingExtended = false;
   }
 
   void _setLoadingPhase(String phase) {

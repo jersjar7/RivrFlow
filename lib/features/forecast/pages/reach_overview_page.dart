@@ -18,6 +18,7 @@ class ReachOverviewPage extends StatefulWidget {
 
 class _ReachOverviewPageState extends State<ReachOverviewPage> {
   bool _isInitialized = false;
+  String? _currentLoadingReachId; // Track which reach we're loading
 
   @override
   void initState() {
@@ -28,7 +29,16 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     });
   }
 
-  // Phased loading approach for better performance
+  @override
+  void didUpdateWidget(ReachOverviewPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Handle reachId changes (when navigating to different river)
+    if (oldWidget.reachId != widget.reachId) {
+      _loadReachData();
+    }
+  }
+
+  // FIXED: Progressive loading with immediate state clearing
   Future<void> _loadReachData() async {
     if (widget.reachId == null) return;
 
@@ -36,37 +46,94 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
       context,
       listen: false,
     );
-    await reachProvider.refreshCurrentReach(); // This clears cache
 
-    // Only load if we don't already have this reach loaded
+    // CRITICAL FIX: Immediately clear wrong river data when switching
     if (reachProvider.currentReach?.reachId != widget.reachId) {
+      print('OVERVIEW_PAGE: Switching rivers, clearing current display');
+      reachProvider.clearCurrentReach();
+      setState(() {
+        _isInitialized = false;
+        _currentLoadingReachId = widget.reachId;
+      });
+    }
+
+    try {
       // PHASE 1: Load overview data first (fast - shows name, location, current flow)
+      print('OVERVIEW_PAGE: Starting Phase 1 - Overview data');
       final overviewSuccess = await reachProvider.loadOverviewData(
         widget.reachId!,
       );
 
-      if (overviewSuccess) {
-        // PHASE 2: Load supplementary data in background (adds return periods, flow categories)
-        // This runs after overview is displayed, so user sees immediate feedback
-        reachProvider.loadSupplementaryData(widget.reachId!);
+      if (!overviewSuccess) {
+        print('OVERVIEW_PAGE: Failed to load overview data');
+        return;
       }
-    }
 
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
+      // Mark as initialized after overview loads (shows basic info immediately)
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+
+      // PHASE 2: Progressive forecast category loading
+      print('OVERVIEW_PAGE: Starting Phase 2 - Progressive forecast loading');
+      await _loadForecastCategoriesProgressively(widget.reachId!);
+
+      // PHASE 3: Load supplementary data (return periods, enhanced categorization)
+      print('OVERVIEW_PAGE: Starting Phase 3 - Supplementary data');
+      await reachProvider.loadSupplementaryData(widget.reachId!);
+
+      print('OVERVIEW_PAGE: All loading phases completed');
+    } catch (e) {
+      print('OVERVIEW_PAGE: Error in loading sequence: $e');
     }
   }
 
-  Future<void> _handleRefresh() async {
-    if (widget.reachId == null) return;
-
+  // NEW: Progressive forecast category loading
+  Future<void> _loadForecastCategoriesProgressively(String reachId) async {
     final reachProvider = Provider.of<ReachDataProvider>(
       context,
       listen: false,
     );
-    await reachProvider.refreshCurrentReach();
+
+    // Load forecast categories one by one so they appear progressively
+    // This provides better user experience - they see data as it becomes available
+
+    // Load Hourly forecast (short-range) first - usually fastest
+    print('OVERVIEW_PAGE: Loading hourly forecast...');
+    await reachProvider.loadHourlyForecast(reachId);
+
+    // Small delay to allow UI to update and show the hourly category
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    // Load Daily forecast (medium-range) second
+    print('OVERVIEW_PAGE: Loading daily forecast...');
+    await reachProvider.loadDailyForecast(reachId);
+
+    // Small delay to allow UI to update and show the daily category
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    // Load Extended forecast (long-range) third
+    print('OVERVIEW_PAGE: Loading extended forecast...');
+    await reachProvider.loadExtendedForecast(reachId);
+
+    print('OVERVIEW_PAGE: Progressive forecast loading completed');
+  }
+
+  // FIXED: Comprehensive refresh for all forecast categories
+  Future<void> _handleRefresh() async {
+    if (widget.reachId == null) return;
+
+    print('OVERVIEW_PAGE: Starting comprehensive refresh');
+    final reachProvider = Provider.of<ReachDataProvider>(
+      context,
+      listen: false,
+    );
+
+    // Use comprehensive refresh instead of basic refresh
+    await reachProvider.comprehensiveRefresh(widget.reachId!);
+    print('OVERVIEW_PAGE: Comprehensive refresh completed');
   }
 
   void _navigateToForecastDetail(String forecastType) {
@@ -124,12 +191,27 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
         trailing: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _handleRefresh,
-          child: const Icon(CupertinoIcons.refresh),
+          child: Consumer<ReachDataProvider>(
+            builder: (context, reachProvider, child) {
+              // Show loading indicator when any loading is happening
+              final isAnyLoading =
+                  reachProvider.isLoading ||
+                  reachProvider.isLoadingOverview ||
+                  reachProvider.isLoadingSupplementary ||
+                  reachProvider.isLoadingHourly ||
+                  reachProvider.isLoadingDaily ||
+                  reachProvider.isLoadingExtended;
+
+              return isAnyLoading
+                  ? const CupertinoActivityIndicator(radius: 10)
+                  : const Icon(CupertinoIcons.refresh);
+            },
+          ),
         ),
       ),
       child: Consumer<ReachDataProvider>(
         builder: (context, reachProvider, child) {
-          // Handle different loading phases
+          // Handle different loading and error states
           if (!_isInitialized && reachProvider.isLoadingOverview) {
             return _buildInitialLoadingState();
           }
@@ -163,7 +245,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
           // Hero Flow Status Card - Shows immediately after Phase 1
           SliverToBoxAdapter(child: _buildFlowStatusSection(reachProvider)),
 
-          // Forecast Categories Grid - Enhanced after Phase 2 (return periods loaded)
+          // Forecast Categories Grid - Your original design with loading improvements
           SliverToBoxAdapter(
             child: _buildForecastCategoriesSection(reachProvider),
           ),
@@ -257,18 +339,20 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
-  // Progressive forecast categories with enhanced functionality after Phase 2
+  // RESTORED: Your original forecast categories design with loading improvements
   Widget _buildForecastCategoriesSection(ReachDataProvider reachProvider) {
+    // Check if we should show the shimmer loading or your actual ForecastCategoryGrid
     if (reachProvider.loadingPhase == 'overview' &&
         !reachProvider.hasSupplementaryData) {
-      // Show loading shimmer for forecast categories during Phase 2
+      // Show your original loading shimmer for forecast categories during Phase 2
       return _buildForecastCategoriesShimmer();
     }
 
+    // Show your original ForecastCategoryGrid design
     return ForecastCategoryGrid(onCategoryTap: _navigateToForecastDetail);
   }
 
-  // Loading shimmer for forecast categories
+  // Your original loading shimmer for forecast categories (kept exactly as you designed it)
   Widget _buildForecastCategoriesShimmer() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -298,6 +382,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
+  // Your original category shimmer design (kept exactly as you designed it)
   Widget _buildCategoryShimmer() {
     return Container(
       decoration: BoxDecoration(
@@ -388,7 +473,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
           if (reachProvider.hasEnsembleData())
             _buildMetadataRow('Ensemble Data', 'Available'),
 
-          // NEW: Progressive display - only show when return periods are loaded
+          // Progressive display - only show when return periods are loaded
           if (reachProvider.hasSupplementaryData && reach.hasReturnPeriods)
             _buildMetadataRow(
               'Return Periods',
@@ -415,7 +500,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
-  // NEW: Technical info section with coordinates and reach ID at the bottom
+  // Technical info section with coordinates and reach ID at the bottom
   Widget _buildTechnicalInfoSection(ReachData reach) {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -466,7 +551,7 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
     );
   }
 
-  // NEW: Better initial loading state
+  // Better initial loading state showing correct river being loaded
   Widget _buildInitialLoadingState() {
     return Center(
       child: Column(
@@ -481,6 +566,16 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
               color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
+          if (_currentLoadingReachId != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Reach ID: $_currentLoadingReachId',
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Text(
             'This should only take a moment',

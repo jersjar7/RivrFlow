@@ -13,8 +13,7 @@ class ForecastCategoryGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<ReachDataProvider>(
       builder: (context, reachProvider, child) {
-        final availableTypes = reachProvider.getAvailableForecastTypes();
-
+        // Keep your original title and layout exactly the same
         return Container(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -29,7 +28,7 @@ class ForecastCategoryGrid extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              _buildVerticalCards(context, availableTypes, reachProvider),
+              _buildVerticalCards(context, reachProvider),
             ],
           ),
         );
@@ -37,9 +36,9 @@ class ForecastCategoryGrid extends StatelessWidget {
     );
   }
 
+  // UPDATED: Use individual loading states for each category
   Widget _buildVerticalCards(
     BuildContext context,
-    List<String> availableTypes,
     ReachDataProvider reachProvider,
   ) {
     final categories = _getForecastCategories();
@@ -48,8 +47,11 @@ class ForecastCategoryGrid extends StatelessWidget {
       children: categories.asMap().entries.map((entry) {
         final index = entry.key;
         final category = entry.value;
-        final isAvailable = availableTypes.contains(category.type);
-        final isLoading = reachProvider.isLoading;
+
+        // UPDATED: Get individual loading and availability states
+        final categoryState = _getCategoryState(category.type, reachProvider);
+        final isAvailable = categoryState['isAvailable'] as bool;
+        final isLoading = categoryState['isLoading'] as bool;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
@@ -65,6 +67,38 @@ class ForecastCategoryGrid extends StatelessWidget {
     );
   }
 
+  // NEW: Get individual state for each forecast category
+  Map<String, dynamic> _getCategoryState(
+    String forecastType,
+    ReachDataProvider reachProvider,
+  ) {
+    switch (forecastType) {
+      case 'short_range':
+        return {
+          'isAvailable': reachProvider.hasHourlyForecast,
+          'isLoading': reachProvider.isLoadingHourly,
+        };
+      case 'medium_range':
+        return {
+          'isAvailable': reachProvider.hasDailyForecast,
+          'isLoading': reachProvider.isLoadingDaily,
+        };
+      case 'long_range':
+        return {
+          'isAvailable': reachProvider.hasExtendedForecast,
+          'isLoading': reachProvider.isLoadingExtended,
+        };
+      default:
+        // Fallback for other forecast types (like analysis_assimilation)
+        final availableTypes = reachProvider.getAvailableForecastTypes();
+        return {
+          'isAvailable': availableTypes.contains(forecastType),
+          'isLoading': reachProvider.isLoading,
+        };
+    }
+  }
+
+  // KEPT EXACTLY THE SAME: Your beautiful category card design
   Widget _buildCategoryCard(
     BuildContext context,
     ForecastCategory category,
@@ -180,11 +214,13 @@ class ForecastCategoryGrid extends StatelessWidget {
 
                           const SizedBox(height: 4),
 
-                          // Description
+                          // UPDATED: Better status messages for progressive loading
                           Text(
-                            isAvailable
-                                ? category.description
-                                : 'Not available at this moment',
+                            _getCategoryStatusMessage(
+                              isAvailable,
+                              isLoading,
+                              category.description,
+                            ),
                             style: TextStyle(
                               color: CupertinoColors.white.withOpacity(0.7),
                               fontSize: 12,
@@ -248,6 +284,22 @@ class ForecastCategoryGrid extends StatelessWidget {
     );
   }
 
+  // NEW: Better status messages for progressive loading
+  String _getCategoryStatusMessage(
+    bool isAvailable,
+    bool isLoading,
+    String defaultDescription,
+  ) {
+    if (isLoading) {
+      return 'Loading forecast data...';
+    } else if (isAvailable) {
+      return defaultDescription;
+    } else {
+      return 'Data will load shortly...';
+    }
+  }
+
+  // KEPT EXACTLY THE SAME: Your original forecast categories
   List<ForecastCategory> _getForecastCategories() {
     return [
       ForecastCategory(
@@ -286,11 +338,13 @@ class ForecastCategoryGrid extends StatelessWidget {
     ];
   }
 
+  // KEPT EXACTLY THE SAME: Your original disabled colors
   List<Color> _getDisabledColors() {
     return [CupertinoColors.systemGrey, CupertinoColors.systemGrey2];
   }
 }
 
+// KEPT EXACTLY THE SAME: Your original ForecastCategory class
 class ForecastCategory {
   final String type;
   final String displayName;
@@ -309,6 +363,7 @@ class ForecastCategory {
   });
 }
 
+// KEPT EXACTLY THE SAME: Your original beautiful pattern painter
 class _PatternPainter extends CustomPainter {
   final Color color;
 
