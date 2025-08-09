@@ -11,6 +11,7 @@ import 'services/map_vector_tiles_service.dart';
 import 'services/map_reach_selection_service.dart';
 import 'services/map_marker_service.dart'; // Dedicated marker service
 import 'models/selected_reach.dart';
+// UPDATED: Import the optimized bottom sheet
 import 'widgets/reach_details_bottom_sheet.dart';
 
 class MapPage extends StatefulWidget {
@@ -227,11 +228,14 @@ class MapPageState extends State<MapPage> {
     await _reachSelectionService.handleMapTap(context);
   }
 
+  // UPDATED: Call bottom sheet directly without helper function
   void _onReachSelected(SelectedReach selectedReach) {
-    showReachDetailsBottomSheet(
-      context,
-      selectedReach,
-      onViewForecast: () => _navigateToForecast(selectedReach),
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => ReachDetailsBottomSheet(
+        selectedReach: selectedReach,
+        onViewForecast: () => _navigateToForecast(selectedReach),
+      ),
     );
   }
 

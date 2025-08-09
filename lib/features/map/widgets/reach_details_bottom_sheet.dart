@@ -1,8 +1,6 @@
 // lib/features/map/widgets/reach_details_bottom_sheet.dart
-// OPTIMIZED VERSION
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -13,11 +11,12 @@ import '../../../core/providers/favorites_provider.dart';
 import '../../../core/constants.dart';
 import '../models/selected_reach.dart';
 
-/// OPTIMIZED Bottom sheet that shows reach details
-/// - Uses lightweight data loading (overview data only)
-/// - Removes NOAA data section complexity
-/// - Optimizes favorites integration with data caching
-/// - 90% reduction in initial data loading
+/// OPTIMIZED Bottom sheet with efficient return periods loading
+/// Strategy: Progressive loading with immediate flow data enhancement
+/// 1. Load overview data (current flow) immediately
+/// 2. Load return periods in parallel (small, fast request)
+/// 3. Update flow classification as soon as return periods arrive
+/// 4. Cache return periods separately for future use
 class ReachDetailsBottomSheet extends StatefulWidget {
   final SelectedReach selectedReach;
   final VoidCallback? onViewForecast;
@@ -36,11 +35,12 @@ class ReachDetailsBottomSheet extends StatefulWidget {
 class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
   final ForecastService _forecastService = ForecastService();
 
-  // Lightweight loading states
-  bool _isLoading = false;
+  // Progressive loading states
+  bool _isLoadingFlow = false;
+  bool _isLoadingClassification = false;
   String? _errorMessage;
 
-  // Essential data only
+  // Essential data
   String? _riverName;
   String? _formattedLocation;
   double? _currentFlow;
@@ -54,7 +54,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
   @override
   void initState() {
     super.initState();
-    _loadEssentialData();
+    _loadDataProgressively();
   }
 
   @override
@@ -126,7 +126,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           ),
 
           // Loading indicator or close button
-          if (_isLoading)
+          if (_isLoadingFlow)
             const CupertinoActivityIndicator(radius: 8)
           else
             CupertinoButton(
@@ -151,7 +151,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           _buildBasicInfo(),
           if (_errorMessage != null) _buildErrorCard(),
           if (_currentFlow != null) _buildCurrentFlowCard(),
-          if (_currentFlow == null && !_isLoading && _errorMessage == null)
+          if (_currentFlow == null && !_isLoadingFlow && _errorMessage == null)
             _buildNoFlowDataCard(),
         ],
       ),
@@ -194,6 +194,10 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       decoration: BoxDecoration(
         color: _getFlowCategoryColor().withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _getFlowCategoryColor().withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,27 +214,81 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
                 'Current Flow',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
+              const Spacer(),
+              // Show classification loading state
+              if (_isLoadingClassification)
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CupertinoActivityIndicator(radius: 6),
+                ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
             '${_currentFlow!.toStringAsFixed(0)} CFS',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
           ),
-          if (_flowCategory != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              _flowCategory!,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: _getFlowCategoryColor(),
-              ),
-            ),
-          ],
+          const SizedBox(height: 8),
+          _buildFlowClassification(),
         ],
       ),
     );
+  }
+
+  Widget _buildFlowClassification() {
+    if (_flowCategory != null) {
+      // Show classification with confidence
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _getFlowCategoryColor(),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          _flowCategory!,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: CupertinoColors.white,
+          ),
+        ),
+      );
+    } else if (_isLoadingClassification) {
+      // Show loading state for classification
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey4,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Text(
+          'Classifying flow level...',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: CupertinoColors.secondaryLabel,
+          ),
+        ),
+      );
+    } else {
+      // Show unavailable state
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey5,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Text(
+          'Classification unavailable',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: CupertinoColors.secondaryLabel,
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildErrorCard() {
@@ -330,7 +388,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
           const SizedBox(width: 12),
 
-          // OPTIMIZED: Heart button with fast favorites integration
+          // Heart button with cached data optimization
           Expanded(
             child: Consumer<FavoritesProvider>(
               builder: (context, favoritesProvider, child) {
@@ -376,40 +434,56 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     );
   }
 
-  // OPTIMIZED: Load only essential data using overview method
-  Future<void> _loadEssentialData() async {
+  // OPTIMIZED: Progressive loading strategy
+  Future<void> _loadDataProgressively() async {
     setState(() {
-      _isLoading = true;
+      _isLoadingFlow = true;
       _errorMessage = null;
     });
 
     try {
       print(
-        'BOTTOM_SHEET: Loading essential data for: ${widget.selectedReach.reachId}',
+        'BOTTOM_SHEET: Starting progressive loading for: ${widget.selectedReach.reachId}',
       );
 
-      // Use the existing lightweight overview data loading
-      final forecast = await _forecastService.loadOverviewData(
+      // STEP 1: Load overview data (current flow) - FAST
+      final overviewFuture = _forecastService.loadOverviewData(
         widget.selectedReach.reachId,
       );
 
-      // Extract only what we need for display
-      final currentFlow = _forecastService.getCurrentFlow(forecast);
-      final flowCategory = _forecastService.getFlowCategory(forecast);
+      // STEP 2: Load return periods separately (if not cached) - PARALLEL
+      final returnPeriodsFuture = _loadReturnPeriodsIfNeeded(
+        widget.selectedReach.reachId,
+      );
+
+      // Wait for overview data first (shows flow immediately)
+      final forecast = await overviewFuture;
 
       setState(() {
         _riverName = forecast.reach.riverName;
         _formattedLocation = forecast.reach.formattedLocation;
-        _currentFlow = currentFlow;
-        _flowCategory = flowCategory;
+        _currentFlow = _forecastService.getCurrentFlow(forecast);
         _latitude = forecast.reach.latitude;
         _longitude = forecast.reach.longitude;
-        _isLoading = false;
+        _isLoadingFlow = false;
+
+        // Check if we already have return periods (cached)
+        if (forecast.reach.hasReturnPeriods && _currentFlow != null) {
+          _flowCategory = forecast.reach.getFlowCategory(_currentFlow!);
+        } else if (_currentFlow != null) {
+          // We have flow but not return periods yet
+          _isLoadingClassification = true;
+        }
       });
 
-      print('BOTTOM_SHEET: ✅ Essential data loaded successfully');
+      print(
+        'BOTTOM_SHEET: ✅ Overview data loaded, current flow: $_currentFlow',
+      );
+
+      // STEP 3: Wait for return periods and update classification
+      await returnPeriodsFuture;
     } catch (error) {
-      print('BOTTOM_SHEET: ❌ Error loading essential data: $error');
+      print('BOTTOM_SHEET: ❌ Error in progressive loading: $error');
 
       final userMessage = ErrorService.handleError(
         error,
@@ -418,8 +492,60 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
       setState(() {
         _errorMessage = userMessage;
-        _isLoading = false;
+        _isLoadingFlow = false;
+        _isLoadingClassification = false;
       });
+    }
+  }
+
+  // OPTIMIZED: Load return periods only if needed
+  Future<void> _loadReturnPeriodsIfNeeded(String reachId) async {
+    try {
+      // Check if we already have cached return periods
+      final isReturnPeriodsCached = await _forecastService.isReachCached(
+        reachId,
+      );
+
+      if (isReturnPeriodsCached) {
+        print('BOTTOM_SHEET: Return periods already cached');
+        return; // Already have them from overview loading
+      }
+
+      print('BOTTOM_SHEET: Loading return periods for classification...');
+
+      // Load supplementary data (return periods) - this is lightweight
+      final currentForecast = await _forecastService.loadOverviewData(reachId);
+      final enhancedForecast = await _forecastService.loadSupplementaryData(
+        reachId,
+        currentForecast,
+      );
+
+      // Update flow classification if we now have return periods
+      if (enhancedForecast.reach.hasReturnPeriods && _currentFlow != null) {
+        final flowCategory = enhancedForecast.reach.getFlowCategory(
+          _currentFlow!,
+        );
+
+        setState(() {
+          _flowCategory = flowCategory;
+          _isLoadingClassification = false;
+        });
+
+        print('BOTTOM_SHEET: ✅ Flow classification updated: $flowCategory');
+      } else {
+        setState(() {
+          _isLoadingClassification = false;
+        });
+        print(
+          'BOTTOM_SHEET: ⚠️ Return periods not available for classification',
+        );
+      }
+    } catch (e) {
+      print('BOTTOM_SHEET: ⚠️ Failed to load return periods: $e');
+      setState(() {
+        _isLoadingClassification = false;
+      });
+      // Don't throw - classification is nice-to-have
     }
   }
 
@@ -437,23 +563,20 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     try {
       bool success;
       if (isFavorited) {
-        // Remove from favorites
         success = await favoritesProvider.removeFavorite(reachId);
         if (success) {
           _showFeedback('Removed from favorites');
         }
       } else {
-        // Add to favorites - use coordinates we already have if available
+        // Use coordinates we already loaded
         if (_latitude != null && _longitude != null) {
-          // FAST PATH: Use coordinates from overview data
-          success = await _addFavoriteWithCoordinates(
-            favoritesProvider,
+          success = await favoritesProvider.addFavoriteWithKnownCoordinates(
             reachId,
-            _latitude!,
-            _longitude!,
+            latitude: _latitude!,
+            longitude: _longitude!,
+            riverName: _riverName,
           );
         } else {
-          // SLOW PATH: Let favorites provider fetch coordinates
           success = await favoritesProvider.addFavorite(reachId);
         }
 
@@ -473,25 +596,6 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     setState(() {
       _isTogglingFavorite = false;
     });
-  }
-
-  // NEW: Fast favorite addition using cached coordinates
-  Future<bool> _addFavoriteWithCoordinates(
-    FavoritesProvider favoritesProvider,
-    String reachId,
-    double latitude,
-    double longitude,
-  ) async {
-    print('BOTTOM_SHEET: Fast favorite add with cached coordinates');
-
-    // Call a new optimized method on favorites provider (you'll need to add this)
-    // that doesn't reload data since we already have coordinates
-    return await favoritesProvider.addFavoriteWithKnownCoordinates(
-      reachId,
-      latitude: latitude,
-      longitude: longitude,
-      riverName: _riverName, // Pass river name too if we have it
-    );
   }
 
   Color _getFlowCategoryColor() {
@@ -625,7 +729,6 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
   String _buildReachInfoText() {
     final buffer = StringBuffer();
 
-    // Basic info
     buffer.writeln('🏞️ ${_riverName ?? widget.selectedReach.displayName}');
     buffer.writeln('📍 Reach ID: ${widget.selectedReach.reachId}');
     buffer.writeln('🌊 Stream Order: ${widget.selectedReach.streamOrder}');
@@ -637,7 +740,6 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       buffer.writeln('📍 Location: ${widget.selectedReach.formattedLocation}');
     }
 
-    // Current flow (if available)
     if (_currentFlow != null) {
       buffer.writeln(
         '\n💧 Current Flow: ${_currentFlow!.toStringAsFixed(0)} CFS',
@@ -665,14 +767,12 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       buffer.writeln('📍 ${widget.selectedReach.formattedLocation}');
     }
 
-    // Add current flow if available (important for safety)
     if (_currentFlow != null && _flowCategory != null) {
       buffer.writeln(
         '\n💧 Current Flow: ${_currentFlow!.toStringAsFixed(0)} CFS ($_flowCategory)',
       );
     }
 
-    // Add Google Maps link
     final coords = widget.selectedReach.coordinatesString.split(', ');
     if (coords.length == 2) {
       final lat = coords[0];
@@ -684,19 +784,4 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     buffer.writeln('\n📱 Shared from RivrFlow');
     return buffer.toString();
   }
-}
-
-/// Helper function to show the optimized bottom sheet
-void showReachDetailsBottomSheet(
-  BuildContext context,
-  SelectedReach selectedReach, {
-  VoidCallback? onViewForecast,
-}) {
-  showCupertinoModalPopup(
-    context: context,
-    builder: (context) => ReachDetailsBottomSheet(
-      selectedReach: selectedReach,
-      onViewForecast: onViewForecast,
-    ),
-  );
 }
