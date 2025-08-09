@@ -193,26 +193,14 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
       return _buildSingleDataPointState();
     }
 
-    // Main hourly display
+    // Main hourly display - REMOVED the header section with "Hourly Flow Data" text
     return Container(
       height: widget.height,
       padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Hourly Flow Data',
-              style: CupertinoTheme.of(context).textTheme.navTitleTextStyle
-                  .copyWith(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Bar chart and value indicator row
+          // Bar chart and value indicator row - EXPANDED to take more space
           Expanded(
             child: Row(
               children: [
@@ -224,16 +212,27 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
                     minValue: _minFlow,
                     maxValue: _maxFlow,
                     reach: widget.reach,
+                    onBarTapped: (index) {
+                      // Add tap functionality to bars
+                      setState(() {
+                        _selectedHourIndex = index;
+                        _updateSelectedValues();
+                      });
+                    },
                   ),
                 ),
 
                 const SizedBox(width: 12),
 
-                // Flow value indicator
-                FlowValueIndicator(
-                  flowValue: _selectedFlow,
-                  time: _selectedTime,
-                  flowCategory: _selectedCategory,
+                // Flow value indicator - ENSURE it's visible by adding constraints
+                SizedBox(
+                  width: 120,
+                  child: FlowValueIndicator(
+                    flowValue: _selectedFlow,
+                    time: _selectedTime,
+                    flowCategory: _selectedCategory,
+                    size: 120,
+                  ),
                 ),
               ],
             ),
@@ -303,22 +302,14 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Header
-          Text(
-            'Hourly Flow Data',
-            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle
-                .copyWith(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Single data point display
+          // Single data point display - REMOVED the "Hourly Flow Data" header
           Expanded(
             child: Center(
               child: FlowValueIndicator(
                 flowValue: flow,
                 time: time,
                 flowCategory: category,
+                size: 100.0, // Larger size for single data point
               ),
             ),
           ),
