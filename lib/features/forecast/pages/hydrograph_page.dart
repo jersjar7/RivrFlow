@@ -671,22 +671,6 @@ class _HydrographPageState extends State<HydrographPage> {
               ),
             ],
           ),
-
-          const SizedBox(height: 2),
-
-          // Tap and drag to pan • Pinch to zoom
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Tap and drag to pan • Pinch to zoom',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

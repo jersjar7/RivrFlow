@@ -58,6 +58,17 @@ class _InteractiveChartState extends State<InteractiveChart> {
   Map<String, List<ChartData>> _ensembleChartData = {};
   final ForecastService _forecastService = ForecastService();
 
+  // Color palette for ensemble members
+  static const List<Color> _ensembleColors = [
+    CupertinoColors.systemOrange,
+    CupertinoColors.systemPurple,
+    CupertinoColors.systemTeal,
+    CupertinoColors.systemIndigo,
+    CupertinoColors.systemPink,
+    CupertinoColors.systemYellow,
+    CupertinoColors.systemBrown,
+  ];
+
   // User interaction behaviors
   late TrackballBehavior _trackballBehavior;
   late CrosshairBehavior _crosshairBehavior;
@@ -407,9 +418,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
               xValueMapper: (ChartData data, _) => data.x,
               yValueMapper: (ChartData data, _) => data.y,
               name: memberName,
-              color: CupertinoColors.systemGrey.withOpacity(
-                0.6,
-              ), // Muted member lines
+              color: _getEnsembleColor(memberName),
+              // Muted member lines
               width: 1.5, // Thinner than mean
               markerSettings: const MarkerSettings(
                 isVisible: false,
@@ -478,6 +488,84 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
 
     return seriesList;
+  }
+
+  Color _getEnsembleColor(String memberName) {
+    // Extract member number from memberName (e.g., "member_01" -> 1)
+    final memberNumber =
+        int.tryParse(memberName.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    return _ensembleColors[memberNumber % _ensembleColors.length].withOpacity(
+      0.7,
+    );
+  }
+
+  Widget _buildEnsembleLegend() {
+    if (!widget.showEnsembleMembers || _ensembleChartData.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final memberNames =
+        _ensembleChartData.keys
+            .where((key) => key.startsWith('member'))
+            .toList()
+          ..sort();
+
+    return Positioned(
+      top: 16,
+      right: 16,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground.resolveFrom(context),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: CupertinoColors.separator.resolveFrom(context),
+            width: 0.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.systemGrey.withOpacity(0.2),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...memberNames.take(6).map((memberName) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: _getEnsembleColor(memberName),
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      memberName.replaceAll('member', 'Member '),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: CupertinoColors.secondaryLabel.resolveFrom(
+                          context,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
   }
 
   List<PlotBand> _buildPlotBands() {
@@ -633,139 +721,144 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      child: SfCartesianChart(
-        primaryXAxis: NumericAxis(
-          minimum: _minX,
-          maximum: _maxX,
-          interval: (_maxX - _minX) / 6,
-          title: AxisTitle(
-            text: _getTimeAxisLabel(),
-            textStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          axisLabelFormatter: (AxisLabelRenderDetails details) {
-            return ChartAxisLabel(
-              _formatTimeValue(details.value.toDouble()),
-              TextStyle(
-                fontSize: 11,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+      child: Stack(
+        children: [
+          SfCartesianChart(
+            primaryXAxis: NumericAxis(
+              minimum: _minX,
+              maximum: _maxX,
+              interval: (_maxX - _minX) / 6,
+              title: AxisTitle(
+                text: _getTimeAxisLabel(),
+                textStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
               ),
-            );
-          },
-          // Enable interactive tooltip for crosshair
-          interactiveTooltip: InteractiveTooltip(
-            enable: true,
-            borderColor: CupertinoColors.systemBlue,
-            borderWidth: 1,
-            format: '{value}',
-            textStyle: TextStyle(
-              color: CupertinoColors.label.resolveFrom(context),
-              fontSize: 11,
-            ),
-          ),
-          plotBands: nowPosition != null
-              ? [
-                  PlotBand(
-                    start: nowPosition,
-                    end: nowPosition,
-                    borderColor: CupertinoColors.systemBrown,
-                    borderWidth: 1.7,
-                    dashArray: [2, 6],
-                    text: 'Now\n',
-                    textStyle: const TextStyle(
-                      color: CupertinoColors.systemBrown,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    verticalTextAlignment: TextAnchor.start,
+              axisLabelFormatter: (AxisLabelRenderDetails details) {
+                return ChartAxisLabel(
+                  _formatTimeValue(details.value.toDouble()),
+                  TextStyle(
+                    fontSize: 11,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
                   ),
-                ]
-              : [],
-        ),
-        primaryYAxis: NumericAxis(
-          minimum: _minY,
-          maximum: _maxY,
-          interval: (_maxY - _minY) / 6,
-          title: AxisTitle(
-            text: 'Flow (CFS)',
-            textStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          axisLabelFormatter: (AxisLabelRenderDetails details) {
-            return ChartAxisLabel(
-              _formatFlowValue(details.value.toDouble()),
-              TextStyle(
-                fontSize: 11,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                );
+              },
+              // Enable interactive tooltip for crosshair
+              interactiveTooltip: InteractiveTooltip(
+                enable: true,
+                borderColor: CupertinoColors.systemBlue,
+                borderWidth: 1,
+                format: '{value}',
+                textStyle: TextStyle(
+                  color: CupertinoColors.label.resolveFrom(context),
+                  fontSize: 11,
+                ),
               ),
-            );
-          },
-          // Enable interactive tooltip for crosshair
-          interactiveTooltip: InteractiveTooltip(
-            enable: true,
-            borderColor: CupertinoColors.systemBlue,
-            borderWidth: 1,
-            format: '{value} CFS',
-            textStyle: TextStyle(
-              color: CupertinoColors.label.resolveFrom(context),
-              fontSize: 11,
+              plotBands: nowPosition != null
+                  ? [
+                      PlotBand(
+                        start: nowPosition,
+                        end: nowPosition,
+                        borderColor: CupertinoColors.systemBrown,
+                        borderWidth: 1.7,
+                        dashArray: [2, 6],
+                        text: 'Now\n',
+                        textStyle: const TextStyle(
+                          color: CupertinoColors.systemBrown,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        verticalTextAlignment: TextAnchor.start,
+                      ),
+                    ]
+                  : [],
             ),
+            primaryYAxis: NumericAxis(
+              minimum: _minY,
+              maximum: _maxY,
+              interval: (_maxY - _minY) / 6,
+              title: AxisTitle(
+                text: 'Flow (CFS)',
+                textStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+              axisLabelFormatter: (AxisLabelRenderDetails details) {
+                return ChartAxisLabel(
+                  _formatFlowValue(details.value.toDouble()),
+                  TextStyle(
+                    fontSize: 11,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
+                );
+              },
+              // Enable interactive tooltip for crosshair
+              interactiveTooltip: InteractiveTooltip(
+                enable: true,
+                borderColor: CupertinoColors.systemBlue,
+                borderWidth: 1,
+                format: '{value} CFS',
+                textStyle: TextStyle(
+                  color: CupertinoColors.label.resolveFrom(context),
+                  fontSize: 11,
+                ),
+              ),
+              plotBands: [..._buildPlotBands(), ..._buildReturnPeriodLines()],
+            ),
+            series: _buildChartSeries(), // NEW: Use dynamic series building
+            // User interaction behaviors
+            trackballBehavior: _trackballBehavior,
+            crosshairBehavior: _crosshairBehavior,
+            zoomPanBehavior: _zoomPanBehavior,
+            tooltipBehavior: _tooltipBehavior,
+
+            // Event callbacks for enhanced interactions
+            onTrackballPositionChanging: (TrackballArgs args) {
+              // Customize trackball display
+              final flow = args.chartPointInfo.chartPoint?.y;
+              final time = args.chartPointInfo.chartPoint?.x;
+              if (flow != null && time != null) {
+                args.chartPointInfo.label =
+                    '${_formatFlowValue(flow.toDouble())} CFS\n${_formatTimeValue(time)}';
+              }
+            },
+
+            onCrosshairPositionChanging: (CrosshairRenderArgs args) {
+              // Customize crosshair tooltip based on axis
+              if (args.orientation == AxisOrientation.vertical) {
+                args.text = _formatTimeValue(args.value);
+              } else {
+                args.text = '${_formatFlowValue(args.value)} CFS';
+              }
+            },
+
+            onTooltipRender: (TooltipArgs args) {
+              // Enhanced tooltip formatting
+              // You can customize args.text here if needed
+              // args.text = 'Custom: ${args.text}';
+            },
+
+            onSelectionChanged: (SelectionArgs args) {
+              // Handle data point selection
+              print('Selection changed');
+            },
+
+            onZooming: (ZoomPanArgs args) {
+              // Handle zoom events
+              print('Chart is being zoomed');
+            },
+
+            onActualRangeChanged: (ActualRangeChangedArgs args) {
+              // Handle axis range changes during zoom/pan
+              print('Axis range changed');
+            },
           ),
-          plotBands: [..._buildPlotBands(), ..._buildReturnPeriodLines()],
-        ),
-        series: _buildChartSeries(), // NEW: Use dynamic series building
-        // User interaction behaviors
-        trackballBehavior: _trackballBehavior,
-        crosshairBehavior: _crosshairBehavior,
-        zoomPanBehavior: _zoomPanBehavior,
-        tooltipBehavior: _tooltipBehavior,
-
-        // Event callbacks for enhanced interactions
-        onTrackballPositionChanging: (TrackballArgs args) {
-          // Customize trackball display
-          final flow = args.chartPointInfo.chartPoint?.y;
-          final time = args.chartPointInfo.chartPoint?.x;
-          if (flow != null && time != null) {
-            args.chartPointInfo.label =
-                '${_formatFlowValue(flow.toDouble())} CFS\n${_formatTimeValue(time)}';
-          }
-        },
-
-        onCrosshairPositionChanging: (CrosshairRenderArgs args) {
-          // Customize crosshair tooltip based on axis
-          if (args.orientation == AxisOrientation.vertical) {
-            args.text = _formatTimeValue(args.value);
-          } else {
-            args.text = '${_formatFlowValue(args.value)} CFS';
-          }
-        },
-
-        onTooltipRender: (TooltipArgs args) {
-          // Enhanced tooltip formatting
-          // You can customize args.text here if needed
-          // args.text = 'Custom: ${args.text}';
-        },
-
-        onSelectionChanged: (SelectionArgs args) {
-          // Handle data point selection
-          print('Selection changed');
-        },
-
-        onZooming: (ZoomPanArgs args) {
-          // Handle zoom events
-          print('Chart is being zoomed');
-        },
-
-        onActualRangeChanged: (ActualRangeChangedArgs args) {
-          // Handle axis range changes during zoom/pan
-          print('Axis range changed');
-        },
+          _buildEnsembleLegend(),
+        ],
       ),
     );
   }
