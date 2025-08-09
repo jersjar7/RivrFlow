@@ -432,11 +432,6 @@ class _HydrographPageState extends State<HydrographPage> {
               onPressed: _showChartInfo,
               child: const Icon(CupertinoIcons.info_circle),
             ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _handleRefresh,
-              child: const Icon(CupertinoIcons.refresh),
-            ),
           ],
         ),
         backgroundColor: CupertinoColors.systemBackground.resolveFrom(context),

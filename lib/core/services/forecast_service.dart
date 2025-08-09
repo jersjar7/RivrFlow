@@ -467,19 +467,21 @@ class ForecastService {
         print('FORECAST_SERVICE: ✅ Cached reach data');
       }
 
-      // Step 2: Get ONLY current flow data (short-range only, no arrays)
+      // Step 2: Use the working loadOverviewData method instead
+      // This properly handles the forecast parsing
       final currentFlowData = await _apiService.fetchCurrentFlowOnly(reachId);
+
+      // Parse using the same parser that works in loadOverviewData
       final forecastResponse = ForecastResponse.fromJson(currentFlowData);
 
-      // Step 3: Create minimal response with only current flow
+      // Step 3: Create response with proper reach data
       final lightweightResponse = ForecastResponse(
-        reach: reach,
-        // Only include current flow data, skip forecast arrays
+        reach: reach, // Use our properly loaded reach with return periods
         analysisAssimilation: forecastResponse.analysisAssimilation,
-        shortRange: forecastResponse.shortRange, // Contains current flow
-        mediumRange: {}, // Empty - not needed for favorites
-        longRange: {}, // Empty - not needed for favorites
-        mediumRangeBlend: null, // Empty - not needed for favorites
+        shortRange: forecastResponse.shortRange,
+        mediumRange: {}, // Empty for efficiency
+        longRange: {}, // Empty for efficiency
+        mediumRangeBlend: null, // Empty for efficiency
       );
 
       print('FORECAST_SERVICE: ✅ Current flow only loaded successfully');
