@@ -161,7 +161,7 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
     final type = widget.forecastType.toLowerCase();
 
     if (type == 'medium_range') {
-      return '$count-Day Medium Range Forecast';
+      return '$count-Day Forecast';
     } else if (type == 'long_range') {
       return '$count-Day Long Range Forecast';
     } else {

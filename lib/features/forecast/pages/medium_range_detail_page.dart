@@ -118,14 +118,14 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
         return ForecastDetailTemplate(
           reachId: _reachId!,
           forecastType: 'medium_range',
-          title: 'Medium Range Forecast',
+          title: 'Daily Forecast',
           usageGuideOptions: FlowValuesUsageGuide.mediumRangeOptions(),
           onChartTap: _navigateToHydrograph,
           showCurrentFlow: false,
 
-          // NEW: Custom timeline widget using our DailyFlowForecastWidget
+          // Custom timeline widget using our DailyFlowForecastWidget
           customTimelineWidget: _buildDailyForecastWidget(reachProvider),
-          timelineSectionTitle: '10-Day Daily Forecast',
+          timelineSectionTitle: null,
           showTimelineSection: true,
 
           // Keep existing additional content
@@ -138,7 +138,7 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
   /// Build the new daily forecast widget
   Widget _buildDailyForecastWidget(ReachDataProvider reachProvider) {
     // Check if we have forecast data
-    if (!reachProvider.hasData || reachProvider.forecastResponse == null) {
+    if (!reachProvider.hasData || reachProvider.currentForecast == null) {
       return Container(
         padding: const EdgeInsets.all(24),
         child: Center(
@@ -163,7 +163,7 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
     }
 
     return DailyFlowForecastWidget(
-      forecastResponse: reachProvider.forecastResponse,
+      forecastResponse: reachProvider.currentForecast,
       forecastType: 'medium_range',
       onRefresh: _handleForecastRefresh,
       allowMultipleExpanded: false,
@@ -191,14 +191,14 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
 
   Widget _buildDataSourceInfo(ReachDataProvider reachProvider) {
     // Enhanced data source info that reflects our new processing
-    final forecastResponse = reachProvider.forecastResponse;
+    final currentForecast = reachProvider.currentForecast;
     String dataSourceDetail = 'NOAA National Water Model Medium Range Forecast';
     String updateInfo =
         'Updated every 6 hours • 10 days of forecast data available';
 
     // Add ensemble information if available
-    if (forecastResponse != null) {
-      final ensembleInfo = forecastResponse.mediumRange;
+    if (currentForecast != null) {
+      final ensembleInfo = currentForecast.mediumRange;
       if (ensembleInfo.containsKey('mean') &&
           ensembleInfo['mean']?.isNotEmpty == true) {
         updateInfo += ' • Using ensemble mean';
@@ -395,7 +395,7 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
           _buildInsightItem(
             'Interactive Daily View',
             'Tap any day above to see hourly flow patterns',
-            CupertinoIcons.hand_point_left_fill,
+            CupertinoIcons.hand_draw,
           ),
           const SizedBox(height: 8),
           _buildInsightItem(
