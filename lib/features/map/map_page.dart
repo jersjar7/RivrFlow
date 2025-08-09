@@ -5,6 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:rivrflow/core/widgets/navigation_button.dart';
 import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
+// NEW IMPORTS
+import 'package:rivrflow/features/map/widgets/map_control_buttons.dart';
+import 'package:rivrflow/features/map/widgets/base_layer_modal.dart';
+import 'package:rivrflow/features/map/services/map_controls_service.dart';
+// EXISTING IMPORTS
 import '../../core/config.dart';
 import '../../core/services/cache_service.dart';
 import 'services/map_vector_tiles_service.dart';
@@ -25,6 +30,7 @@ class MapPageState extends State<MapPage> {
   final _vectorTilesService = MapVectorTilesService();
   final _reachSelectionService = MapReachSelectionService();
   final _markerService = MapMarkerService(); // Marker service
+  final _controlsService = MapControlsService(); // NEW: Controls service
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -35,6 +41,14 @@ class MapPageState extends State<MapPage> {
     super.initState();
     _setupSelectionCallbacks();
     _initializeCacheService();
+  }
+
+  @override
+  void dispose() {
+    _vectorTilesService.dispose();
+    _markerService.dispose();
+    _controlsService.dispose(); // NEW: Clean up controls service
+    super.dispose();
   }
 
   void _setupSelectionCallbacks() {
@@ -83,9 +97,24 @@ class MapPageState extends State<MapPage> {
           top: 30,
           left: 0,
           child: FloatingBackButton(
-            backgroundColor: CupertinoColors.white.withValues(alpha: 0.95),
+            backgroundColor: CupertinoColors.white.withOpacity(0.95),
             iconColor: CupertinoColors.systemBlue,
-            margin: EdgeInsets.only(top: 8, left: 16),
+            margin: const EdgeInsets.only(top: 8, left: 16),
+          ),
+        ),
+
+        // NEW: Map control buttons in top-right
+        Positioned(
+          top: 30,
+          right: 0,
+          child: SafeArea(
+            child: Container(
+              margin: const EdgeInsets.only(top: 8, right: 16),
+              child: MapControlButtons(
+                onLayersPressed: _showLayersModal,
+                onRecenterPressed: _recenterToLocation,
+              ),
+            ),
           ),
         ),
 
@@ -183,6 +212,9 @@ class MapPageState extends State<MapPage> {
       // Initialize core map services
       _vectorTilesService.setMapboxMap(mapboxMap);
       _reachSelectionService.setMapboxMap(mapboxMap);
+      _controlsService.setMapboxMap(
+        mapboxMap,
+      ); // NEW: Initialize controls service
 
       print('🚀 Services initialized, loading vector tiles...');
 
@@ -191,6 +223,9 @@ class MapPageState extends State<MapPage> {
 
       // Initialize marker service
       await _markerService.initializeMarkers(mapboxMap);
+
+      // NEW: Initialize location for controls
+      await _controlsService.initializeLocation();
 
       print('✅ Map setup complete');
 
@@ -221,6 +256,23 @@ class MapPageState extends State<MapPage> {
         );
       },
     );
+  }
+
+  // NEW: Show layers modal
+  void _showLayersModal() {
+    showBaseLayerModal(
+      context,
+      currentLayer: _controlsService.currentLayer,
+      onLayerSelected: (layer) async {
+        await _controlsService.changeBaseLayer(layer);
+        print('🗺️ Layer changed to: ${layer.displayName}');
+      },
+    );
+  }
+
+  // NEW: Recenter to device location
+  void _recenterToLocation() async {
+    await _controlsService.recenterToDeviceLocation();
   }
 
   Future<void> _onMapTap(MapContentGestureContext context) async {
@@ -261,18 +313,12 @@ class MapPageState extends State<MapPage> {
 
     // Reset services and retry
     _vectorTilesService.dispose();
-    _markerService.dispose(); // NEW: Dispose marker service
+    _markerService.dispose();
+    _controlsService.dispose(); // NEW: Reset controls service too
 
     // Map will be recreated and _onMapCreated will be called again
   }
 
   // NEW: Expose marker service for wrapper widget
   MapMarkerService get markerService => _markerService;
-
-  @override
-  void dispose() {
-    _vectorTilesService.dispose();
-    _markerService.dispose(); // NEW: Dispose marker service
-    super.dispose();
-  }
 }
