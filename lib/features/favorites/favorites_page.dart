@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/features/auth/providers/auth_provider.dart';
 import 'package:rivrflow/features/favorites/widgets/favorite_river_card.dart';
 import 'package:rivrflow/features/favorites/widgets/favorites_search_bar.dart';
 import '../../../core/providers/favorites_provider.dart';
@@ -562,10 +563,55 @@ class _FavoritesPageState extends State<FavoritesPage> {
                 Navigator.pop(context);
                 Navigator.of(context).pushNamed('/sponsors');
               }),
+              _buildMenuDivider(color: CupertinoColors.systemGrey),
+              _buildSignOutOption(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSignOutOption() {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        return CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () async {
+            Navigator.pop(context); // Close menu first
+            await _handleSignOut(authProvider);
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
+              children: [
+                Text(
+                  'Sign Out',
+                  style: TextStyle(
+                    color: authProvider.isLoading
+                        ? CupertinoColors.systemGrey
+                        : CupertinoColors.systemRed, // Red color for sign out
+                    fontSize: 17,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const Spacer(),
+                authProvider.isLoading
+                    ? const CupertinoActivityIndicator(
+                        radius: 8,
+                        color: CupertinoColors.systemGrey,
+                      )
+                    : const Icon(
+                        CupertinoIcons.square_arrow_right,
+                        color: CupertinoColors.systemRed,
+                        size: 22,
+                      ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -594,11 +640,15 @@ class _FavoritesPageState extends State<FavoritesPage> {
     );
   }
 
-  Widget _buildMenuDivider() {
+  Widget _buildMenuDivider({Color? color}) {
     return Container(
       height: 1,
-      color: CupertinoColors.separator.withOpacity(0.3),
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      color:
+          color ??
+          CupertinoColors.separator.withOpacity(
+            0.3,
+          ), // Use provided color or default
+      margin: EdgeInsets.symmetric(horizontal: 16),
     );
   }
 
@@ -657,6 +707,55 @@ class _FavoritesPageState extends State<FavoritesPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleSignOut(AuthProvider authProvider) async {
+    // Show confirmation dialog
+    final shouldSignOut = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out of RivrFlow?'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('Sign Out'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+
+    // If user confirmed, proceed with sign out
+    if (shouldSignOut == true) {
+      try {
+        await authProvider.signOut();
+        // AuthCoordinator will automatically handle navigation back to auth
+      } catch (e) {
+        print('FAVORITES_PAGE: Error signing out: $e');
+
+        // Show error dialog
+        if (mounted) {
+          showCupertinoDialog(
+            context: context,
+            builder: (context) => CupertinoAlertDialog(
+              title: const Text('Sign Out Error'),
+              content: const Text('Unable to sign out. Please try again.'),
+              actions: [
+                CupertinoDialogAction(
+                  child: const Text('OK'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _showHelpDialog() {
