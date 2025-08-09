@@ -1,6 +1,7 @@
 // lib/core/providers/favorites_provider.dart
 
 import 'package:flutter/foundation.dart';
+import 'package:rivrflow/core/models/reach_data.dart';
 import '../models/favorite_river.dart';
 import '../services/favorites_service.dart';
 import '../services/forecast_service.dart';
@@ -106,10 +107,12 @@ class FavoritesProvider with ChangeNotifier {
         return false;
       }
 
-      // Fetch coordinates from API
+      // OPTIMIZED: Fetch coordinates from API using efficient loading
       double? latitude, longitude;
       try {
-        final forecast = await _forecastService.loadCompleteReachData(reachId);
+        final forecast = await _forecastService.loadCurrentFlowOnly(
+          reachId,
+        ); // ✅ EFFICIENT LOADING
         latitude = forecast.reach.latitude;
         longitude = forecast.reach.longitude;
         print(
@@ -361,14 +364,66 @@ class FavoritesProvider with ChangeNotifier {
     await _refreshSingleFavorite(reachId);
   }
 
-  /// Refresh a single favorite's flow data
+  /// NEW: Ultra-fast favorite addition for map integration (coordinates only)
+  /// Used when user hearts a river on map - gets basic info immediately
+  Future<bool> addFavoriteFromMap(String reachId, {String? customName}) async {
+    print('FAVORITES_PROVIDER: Adding favorite from map: $reachId');
+
+    try {
+      // Check if already exists using O(1) lookup
+      if (isFavorite(reachId)) {
+        print('FAVORITES_PROVIDER: ⚠️ Reach $reachId already favorited');
+        return false;
+      }
+
+      // Get basic reach info only (ultra-fast)
+      ReachData reach;
+      try {
+        reach = await _forecastService.loadBasicReachInfo(reachId);
+        print('FAVORITES_PROVIDER: ✅ Got basic info for $reachId');
+      } catch (e) {
+        print(
+          'FAVORITES_PROVIDER: ❌ Could not get basic info for $reachId: $e',
+        );
+        return false;
+      }
+
+      // Add to storage with coordinates (no flow data yet)
+      final success = await _favoritesService.addFavorite(
+        reachId,
+        customName: customName,
+        latitude: reach.latitude,
+        longitude: reach.longitude,
+      );
+      if (!success) return false;
+
+      // Reload from storage to get updated list
+      await _loadFavoritesFromStorage();
+
+      // Load flow data in background (non-blocking)
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _loadFavoriteDataInBackground(reachId);
+      });
+
+      print('FAVORITES_PROVIDER: ✅ Added favorite from map: $reachId');
+      return true;
+    } catch (e) {
+      print('FAVORITES_PROVIDER: ❌ Error adding favorite from map: $e');
+      _setError(e.toString());
+      return false;
+    }
+  }
+
+  /// OPTIMIZED: Refresh a single favorite's flow data
   Future<void> _refreshSingleFavorite(String reachId) async {
     try {
       _refreshingReachIds.add(reachId);
       notifyListeners();
 
-      // Use existing ForecastService to get fresh data
-      final forecast = await _forecastService.loadCompleteReachData(reachId);
+      // OPTIMIZED: Use efficient loading for favorites refresh
+      final forecast = await _forecastService.loadCurrentFlowOnly(
+        reachId,
+      ); // ✅ EFFICIENT LOADING
       final currentFlow = _forecastService.getCurrentFlow(forecast);
       final riverName = forecast.reach.riverName;
 

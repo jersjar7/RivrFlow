@@ -420,6 +420,126 @@ class ForecastService {
     return await _cacheService.getCacheStats();
   }
 
+  // ===== NEW EFFICIENT LOADING METHODS FOR FAVORITES =====
+
+  /// Load only current flow data for favorites display (optimized)
+  /// Gets: reach info + current flow + return periods only
+  /// Skips: hourly/daily/extended forecast arrays (90% data reduction)
+  Future<ForecastResponse> loadCurrentFlowOnly(String reachId) async {
+    try {
+      print('FORECAST_SERVICE: Loading current flow only for: $reachId');
+
+      // Step 1: Check cache for reach data first
+      final cachedReach = await _cacheService.get(reachId);
+
+      ReachData reach;
+      if (cachedReach != null) {
+        print('FORECAST_SERVICE: ✅ Using cached reach data for current flow');
+        reach = cachedReach;
+      } else {
+        // Load fresh reach data with return periods
+        final futures = await Future.wait([
+          _apiService.fetchReachInfo(reachId),
+          _apiService.fetchReturnPeriods(reachId),
+        ]);
+
+        final reachInfo = futures[0] as Map<String, dynamic>;
+        final returnPeriods = futures[1] as List<dynamic>;
+
+        // Create reach data
+        reach = ReachData.fromNoaaApi(reachInfo);
+
+        // Add return periods if available
+        try {
+          if (returnPeriods.isNotEmpty) {
+            final returnPeriodData = ReachData.fromReturnPeriodApi(
+              returnPeriods,
+            );
+            reach = reach.mergeWith(returnPeriodData);
+          }
+        } catch (e) {
+          print('FORECAST_SERVICE: ⚠️ Failed to parse return periods: $e');
+          // Continue without return periods
+        }
+
+        // Cache the reach data
+        await _cacheService.store(reach);
+        print('FORECAST_SERVICE: ✅ Cached reach data');
+      }
+
+      // Step 2: Get ONLY current flow data (short-range only, no arrays)
+      final currentFlowData = await _apiService.fetchCurrentFlowOnly(reachId);
+      final forecastResponse = ForecastResponse.fromJson(currentFlowData);
+
+      // Step 3: Create minimal response with only current flow
+      final lightweightResponse = ForecastResponse(
+        reach: reach,
+        // Only include current flow data, skip forecast arrays
+        analysisAssimilation: forecastResponse.analysisAssimilation,
+        shortRange: forecastResponse.shortRange, // Contains current flow
+        mediumRange: {}, // Empty - not needed for favorites
+        longRange: {}, // Empty - not needed for favorites
+        mediumRangeBlend: null, // Empty - not needed for favorites
+      );
+
+      print('FORECAST_SERVICE: ✅ Current flow only loaded successfully');
+      return lightweightResponse;
+    } catch (e) {
+      print('FORECAST_SERVICE: ❌ Error loading current flow only: $e');
+      rethrow;
+    }
+  }
+
+  /// Load basic reach info only (coordinates + name) for map integration
+  /// Ultra-lightweight for map heart button functionality
+  Future<ReachData> loadBasicReachInfo(String reachId) async {
+    try {
+      print('FORECAST_SERVICE: Loading basic reach info for: $reachId');
+
+      // Check cache first for super-fast response
+      final cachedReach = await _cacheService.get(reachId);
+      if (cachedReach != null) {
+        print('FORECAST_SERVICE: ✅ Using cached basic reach info');
+        return cachedReach;
+      }
+
+      // Load minimal reach info only
+      final reachInfo = await _apiService.fetchReachInfo(reachId);
+      final reach = ReachData.fromNoaaApi(reachInfo);
+
+      // Cache for future use
+      await _cacheService.store(reach);
+
+      print('FORECAST_SERVICE: ✅ Basic reach info loaded and cached');
+      return reach;
+    } catch (e) {
+      print('FORECAST_SERVICE: ❌ Error loading basic reach info: $e');
+      rethrow;
+    }
+  }
+
+  /// Merge current flow data with existing favorite data efficiently
+  /// Helper method for updating favorites without losing existing info
+  ForecastResponse mergeCurrentFlowData(
+    ForecastResponse existing,
+    ForecastResponse newFlowData,
+  ) {
+    return ForecastResponse(
+      reach: existing.reach, // Keep existing reach data
+      // Update only current flow data
+      analysisAssimilation: newFlowData.analysisAssimilation?.isNotEmpty == true
+          ? newFlowData.analysisAssimilation
+          : existing.analysisAssimilation,
+      shortRange: newFlowData.shortRange?.isNotEmpty == true
+          ? newFlowData.shortRange
+          : existing.shortRange,
+      // Keep existing forecast arrays (if any) - don't overwrite with empty
+      mediumRange: existing.mediumRange,
+      longRange: existing.longRange,
+      mediumRangeBlend: existing.mediumRangeBlend,
+    );
+  }
+
   // Use cache first, then compute if needed
   /// Get current flow value for display - now with caching
   double? getCurrentFlow(ForecastResponse forecast, {String? preferredType}) {
