@@ -91,14 +91,12 @@ class ForecastDetailTemplate extends StatefulWidget {
 }
 
 class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
-  late String _selectedUsageGuide;
   bool _isRefreshing = false;
   final ForecastService _forecastService = ForecastService();
 
   @override
   void initState() {
     super.initState();
-    _selectedUsageGuide = widget.usageGuideOptions.first.value;
   }
 
   Future<void> _handleRefresh() async {
@@ -121,12 +119,6 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
         });
       }
     }
-  }
-
-  void _onUsageGuideChanged(String newUsageGuide) {
-    setState(() {
-      _selectedUsageGuide = newUsageGuide;
-    });
   }
 
   void _navigateToHydrograph() {
@@ -206,25 +198,6 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
               ),
             ),
           ),
-
-        // Flow Values Usage Guide (always shown - core feature)
-        SliverToBoxAdapter(
-          child: Padding(
-            padding:
-                widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                FlowValuesUsageGuide(
-                  options: widget.usageGuideOptions,
-                  selectedValue: _selectedUsageGuide,
-                  onChanged: _onUsageGuideChanged,
-                ),
-              ],
-            ),
-          ),
-        ),
 
         // Timeline Section (customizable or hideable)
         // This section will use specialized widgets for each forecast type:

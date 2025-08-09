@@ -57,26 +57,16 @@ class BaseLayerModal extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
-            Container(
-              width: 36,
-              height: 5,
-              margin: const EdgeInsets.only(top: 8, bottom: 16),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey3.resolveFrom(context),
-                borderRadius: BorderRadius.circular(3),
+            // Title with reduced top spacing
+            Padding(
+              padding: const EdgeInsets.only(top: 0, bottom: 16),
+              child: Text(
+                'Map Layers',
+                style: CupertinoTheme.of(
+                  context,
+                ).textTheme.navLargeTitleTextStyle,
               ),
             ),
-
-            // Title
-            Text(
-              'Map Layers',
-              style: CupertinoTheme.of(
-                context,
-              ).textTheme.navLargeTitleTextStyle,
-            ),
-
-            const SizedBox(height: 16),
 
             // Layer options
             Flexible(
