@@ -23,6 +23,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
   String _searchQuery = '';
   bool _isRefreshing = false;
   bool _showSearch = false; // New state for search visibility
+  String _selectedFlowUnit = 'CFS';
 
   @override
   void initState() {
@@ -544,15 +545,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
                 Navigator.of(context).pushNamed('/notifications-settings');
               }),
               _buildMenuDivider(),
-              _buildMenuOption('CFS', CupertinoIcons.drop, () {
-                Navigator.pop(context);
-                // TODO: Future implementation - user flow unit selection
-              }),
-              _buildMenuDivider(),
-              _buildMenuOption('CMS', CupertinoIcons.drop_triangle, () {
-                Navigator.pop(context);
-                // TODO: Future implementation - user flow unit selection
-              }),
+              // NEW: Combined Flow Units Toggle
+              _buildFlowUnitsToggle(),
               _buildMenuDivider(),
               _buildMenuOption('App Theme', CupertinoIcons.moon, () {
                 Navigator.pop(context);
@@ -568,6 +562,56 @@ class _FavoritesPageState extends State<FavoritesPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // NEW: Combined Flow Units Toggle Widget
+  Widget _buildFlowUnitsToggle() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 16, 16, 16),
+      child: Row(
+        children: [
+          // Toggle control
+          Expanded(
+            child: CupertinoSlidingSegmentedControl<String>(
+              groupValue: _selectedFlowUnit,
+              onValueChanged: (String? value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedFlowUnit = value;
+                  });
+                  // TODO: Implement flow unit change logic
+                  print('Flow unit changed to: $value');
+                }
+              },
+              children: const {
+                'CFS': Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Text(
+                    'CFS',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                'CMS': Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Text(
+                    'CMS',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              },
+            ),
+          ),
+          const SizedBox(width: 80),
+          // Icon to the right
+          const Icon(
+            CupertinoIcons.drop,
+            color: CupertinoColors.white,
+            size: 22,
+          ),
+        ],
       ),
     );
   }
