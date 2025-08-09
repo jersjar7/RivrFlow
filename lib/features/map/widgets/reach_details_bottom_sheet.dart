@@ -599,18 +599,8 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
   }
 
   Color _getFlowCategoryColor() {
-    switch (_flowCategory?.toLowerCase()) {
-      case 'low':
-        return CupertinoColors.systemBlue;
-      case 'moderate':
-        return CupertinoColors.systemGreen;
-      case 'high':
-        return CupertinoColors.systemOrange;
-      case 'extreme':
-        return CupertinoColors.systemRed;
-      default:
-        return CupertinoColors.systemGrey;
-    }
+    // Use the existing AppConstants method for consistent colors
+    return AppConstants.getFlowCategoryColor(_flowCategory);
   }
 
   Widget _buildInfoRow(String label, String value) {
