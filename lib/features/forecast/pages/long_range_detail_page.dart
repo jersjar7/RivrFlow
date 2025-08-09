@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../widgets/forecast_detail_template.dart';
 import '../widgets/flow_values_usage_guide.dart';
+import '../widgets/long_range_calendar.dart';
 
 class LongRangeDetailPage extends StatefulWidget {
   final String? reachId;
@@ -104,6 +105,15 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
           usageGuideOptions: FlowValuesUsageGuide.longRangeOptions(),
           onChartTap: _navigateToHydrograph,
           showCurrentFlow: false,
+
+          // NEW: Replace flow timeline cards with calendar widget
+          customTimelineWidget: LongRangeCalendar(
+            reachId: _reachId!,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+            ), // Template handles padding
+          ),
+
           additionalContent: _buildLongRangeSpecificContent(reachProvider),
         );
       },
@@ -169,7 +179,7 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Updated daily • 8 weeks of forecast data available',
+            'Updated daily • Up to 30 days of forecast data available',
             style: TextStyle(
               fontSize: 12,
               color: CupertinoColors.secondaryLabel,
@@ -213,11 +223,9 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildConfidenceMetric(
-            'Weeks 1-2',
-            '55%',
-            CupertinoColors.systemGreen,
-          ),
+          _buildConfidenceMetric('Week 1', '65%', CupertinoColors.systemGreen),
+          const SizedBox(height: 8),
+          _buildConfidenceMetric('Week 2', '55%', CupertinoColors.systemYellow),
           const SizedBox(height: 8),
           _buildConfidenceMetric(
             'Weeks 3-4',
@@ -225,7 +233,11 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
             CupertinoColors.systemOrange,
           ),
           const SizedBox(height: 8),
-          _buildConfidenceMetric('Weeks 5-8', '35%', CupertinoColors.systemRed),
+          _buildConfidenceMetric(
+            'Beyond Week 4',
+            '35%',
+            CupertinoColors.systemRed,
+          ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(8),
@@ -243,7 +255,7 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Long range forecasts show general trends, not specific conditions',
+                    'Long range forecasts show general trends, not specific daily conditions',
                     style: TextStyle(
                       fontSize: 11,
                       color: CupertinoColors.secondaryLabel,
@@ -334,7 +346,7 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
           const SizedBox(height: 8),
           _buildTrendItem(
             'Peak Period',
-            'Highest flows likely in weeks 3-4',
+            'Review calendar for highest flow days',
             CupertinoIcons.arrow_up_circle,
             CupertinoColors.systemOrange,
           ),
@@ -436,25 +448,25 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
           const SizedBox(height: 12),
           _buildRecommendationItem(
             'Water Management',
-            'Monitor closely during weeks 3-4 for peak flows',
+            'Tap calendar days to view detailed hourly flow data',
             CupertinoIcons.drop_triangle,
           ),
           const SizedBox(height: 8),
           _buildRecommendationItem(
             'Recreation Planning',
-            'Best overall conditions expected in weeks 2-3',
+            'Use flow categories in calendar for optimal timing',
             CupertinoIcons.person_2,
           ),
           const SizedBox(height: 8),
           _buildRecommendationItem(
             'Infrastructure',
-            'Standard maintenance windows appear viable',
+            'Plan maintenance during normal flow periods',
             CupertinoIcons.wrench,
           ),
           const SizedBox(height: 8),
           _buildRecommendationItem(
             'Agriculture',
-            'Irrigation planning: adequate water supply likely',
+            'Monitor calendar for irrigation timing',
             CupertinoIcons.leaf_arrow_circlepath,
           ),
         ],
