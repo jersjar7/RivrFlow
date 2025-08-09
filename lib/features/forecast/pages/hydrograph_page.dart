@@ -646,13 +646,6 @@ class _HydrographPageState extends State<HydrographPage> {
                 ),
               ],
               const Spacer(),
-              Text(
-                'Tap and drag to pan • Pinch to zoom',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-              ),
             ],
           ),
 
@@ -660,6 +653,7 @@ class _HydrographPageState extends State<HydrographPage> {
 
           // Data Info
           Row(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Icon(
                 CupertinoIcons.location,
@@ -672,6 +666,22 @@ class _HydrographPageState extends State<HydrographPage> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 2),
+
+          // Tap and drag to pan • Pinch to zoom
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Tap and drag to pan • Pinch to zoom',
+                style: TextStyle(
+                  fontSize: 12,
                   color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
