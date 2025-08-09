@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:rivrflow/features/forecast/utils/export_functionality.dart';
 import '../../../core/providers/reach_data_provider.dart';
+import '../../../core/services/forecast_service.dart'; // NEW: Add forecast service import
 import '../widgets/interactive_chart.dart' hide ChartDataPoint;
 import '../widgets/flood_categories_info_sheet.dart';
 
@@ -31,6 +32,7 @@ class _HydrographPageState extends State<HydrographPage> {
   String? _pageTitle;
   bool _isInitialized = false;
   bool _showReturnPeriods = true;
+  bool _showEnsembleMembers = false; // NEW: Add ensemble toggle state
   final bool _showTooltips = true;
 
   // Add ChartController to control chart interactions
@@ -38,6 +40,9 @@ class _HydrographPageState extends State<HydrographPage> {
 
   // Add ScreenshotController for chart export
   final ScreenshotController _screenshotController = ScreenshotController();
+
+  // NEW: Add forecast service
+  final ForecastService _forecastService = ForecastService();
 
   @override
   void initState() {
@@ -107,6 +112,16 @@ class _HydrographPageState extends State<HydrographPage> {
     setState(() {
       _showReturnPeriods = !_showReturnPeriods;
     });
+  }
+
+  // NEW: Add ensemble toggle method
+  void _toggleEnsembleMembers() {
+    setState(() {
+      _showEnsembleMembers = !_showEnsembleMembers;
+    });
+
+    // Optional: Add haptic feedback
+    HapticFeedback.lightImpact();
   }
 
   void _resetZoom() {
@@ -416,6 +431,8 @@ class _HydrographPageState extends State<HydrographPage> {
                 forecastType: _forecastType!,
                 showReturnPeriods: _showReturnPeriods,
                 showTooltips: _showTooltips,
+                showEnsembleMembers:
+                    _showEnsembleMembers, // NEW: Pass ensemble state
                 reachProvider: reachProvider,
               ),
             ),
@@ -423,15 +440,23 @@ class _HydrographPageState extends State<HydrographPage> {
         ),
 
         // Chart Controls (moved below chart)
-        _buildChartControls(),
-
+        _buildChartControls(
+          reachProvider,
+        ), // NEW: Pass reachProvider for ensemble check
         // Chart Legend/Info (at bottom)
         _buildChartLegend(reachProvider),
       ],
     );
   }
 
-  Widget _buildChartControls() {
+  // UPDATED: Add ensemble toggle to chart controls
+  Widget _buildChartControls(ReachDataProvider reachProvider) {
+    // Check if ensemble data is available using our new method
+    final forecast = reachProvider.currentForecast;
+    final hasEnsemble =
+        forecast != null &&
+        _forecastService.hasMultipleEnsembleMembers(forecast, _forecastType!);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -469,6 +494,44 @@ class _HydrographPageState extends State<HydrographPage> {
               ),
             ),
           ),
+
+          const SizedBox(width: 8),
+
+          // NEW: Ensemble Members Toggle (only show for medium/long range with ensemble data)
+          if (hasEnsemble)
+            Expanded(
+              child: CupertinoButton(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                color: _showEnsembleMembers
+                    ? CupertinoColors.systemOrange
+                    : CupertinoColors.systemGrey5.resolveFrom(context),
+                onPressed: _toggleEnsembleMembers,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_showEnsembleMembers)
+                      const Icon(
+                        CupertinoIcons.checkmark,
+                        size: 16,
+                        color: CupertinoColors.white,
+                      ),
+                    if (_showEnsembleMembers) const SizedBox(width: 6),
+                    Text(
+                      'All Members',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _showEnsembleMembers
+                            ? CupertinoColors.white
+                            : CupertinoColors.label.resolveFrom(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           const SizedBox(width: 8),
 
@@ -518,6 +581,14 @@ class _HydrographPageState extends State<HydrographPage> {
               const SizedBox(width: 16),
               if (_showReturnPeriods)
                 _buildLegendItem('Return Periods', CupertinoColors.systemRed),
+              // NEW: Show ensemble legend when enabled
+              if (_showEnsembleMembers) ...[
+                const SizedBox(width: 16),
+                _buildLegendItem(
+                  'Ensemble Members',
+                  CupertinoColors.systemGrey,
+                ),
+              ],
               const Spacer(),
               Text(
                 'Tap and drag to pan • Pinch to zoom',

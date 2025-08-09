@@ -5,6 +5,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import 'dart:math' as math;
 import '../../../core/providers/reach_data_provider.dart';
 import '../../../core/constants.dart';
+import '../../../core/services/forecast_service.dart';
 
 // Simple controller for chart interactions
 class ChartController {
@@ -24,6 +25,7 @@ class InteractiveChart extends StatefulWidget {
   final String forecastType;
   final bool showReturnPeriods;
   final bool showTooltips;
+  final bool showEnsembleMembers; // NEW: Toggle for ensemble display
   final ReachDataProvider reachProvider;
   final ChartController? controller;
 
@@ -33,6 +35,7 @@ class InteractiveChart extends StatefulWidget {
     required this.forecastType,
     required this.showReturnPeriods,
     required this.showTooltips,
+    this.showEnsembleMembers = false, // NEW: Default to false
     required this.reachProvider,
     this.controller,
   });
@@ -47,8 +50,13 @@ class _InteractiveChartState extends State<InteractiveChart> {
   double _minY = 0;
   double _maxY = 0;
   bool _isInitialized = false;
-  List<ChartData> _chartData = [];
+  List<ChartData> _chartData =
+      []; // Keep for backward compatibility (mean line)
   List<ChartDataPoint> _forecastData = [];
+
+  // NEW: Store ensemble data for multiple series
+  Map<String, List<ChartData>> _ensembleChartData = {};
+  final ForecastService _forecastService = ForecastService();
 
   // User interaction behaviors
   late TrackballBehavior _trackballBehavior;
@@ -77,7 +85,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
   void didUpdateWidget(InteractiveChart oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.forecastType != widget.forecastType ||
-        oldWidget.showReturnPeriods != widget.showReturnPeriods) {
+        oldWidget.showReturnPeriods != widget.showReturnPeriods ||
+        oldWidget.showEnsembleMembers != widget.showEnsembleMembers) {
+      // NEW: React to ensemble toggle
       _initializeChart();
     }
     if (oldWidget.showTooltips != widget.showTooltips) {
@@ -170,7 +180,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     _extractChartData();
 
     // ONLY proceed if we actually have forecast data
-    if (_forecastData.isEmpty) {
+    if (_forecastData.isEmpty && _ensembleChartData.isEmpty) {
       setState(() {
         _isInitialized = false; // Mark as not ready
       });
@@ -188,12 +198,67 @@ class _InteractiveChartState extends State<InteractiveChart> {
     if (!widget.reachProvider.hasData) {
       _chartData = [];
       _forecastData = [];
+      _ensembleChartData = {};
       return;
     }
 
-    // Get forecast data once and store it
-    _forecastData = _getForecastData();
-    _chartData = _convertToChartData(_forecastData);
+    // NEW: Check if we should load ensemble data
+    if (widget.showEnsembleMembers &&
+        (widget.forecastType == 'medium_range' ||
+            widget.forecastType == 'long_range')) {
+      _loadEnsembleData();
+    } else {
+      // Load single series (existing logic)
+      _forecastData = _getForecastData();
+      _chartData = _convertToChartData(_forecastData);
+      _ensembleChartData = {}; // Clear ensemble data
+    }
+  }
+
+  // NEW: Load all ensemble members
+  void _loadEnsembleData() {
+    final forecast = widget.reachProvider.currentForecast;
+    if (forecast == null) {
+      _ensembleChartData = {};
+      _forecastData = [];
+      _chartData = [];
+      return;
+    }
+
+    // Get all ensemble data using our new method
+    final ensembleData = _forecastService.getAllEnsembleChartData(
+      forecast,
+      widget.forecastType,
+    );
+
+    if (ensembleData.isEmpty) {
+      _ensembleChartData = {};
+      _forecastData = [];
+      _chartData = [];
+      return;
+    }
+
+    // Convert each member to chart data
+    _ensembleChartData = {};
+    _forecastData = []; // Use first available series for bounds calculation
+
+    for (final entry in ensembleData.entries) {
+      final memberName = entry.key;
+      final memberData = entry.value;
+
+      if (memberData.isNotEmpty) {
+        final chartData = _convertToChartData(memberData);
+        _ensembleChartData[memberName] = chartData;
+
+        // Use first series for forecast data (for bounds calculation)
+        if (_forecastData.isEmpty) {
+          _forecastData = memberData;
+        }
+      }
+    }
+
+    // Clear single series data when showing ensemble
+    _chartData = [];
   }
 
   List<ChartDataPoint> _getForecastData() {
@@ -245,7 +310,19 @@ class _InteractiveChartState extends State<InteractiveChart> {
   }
 
   void _calculateAxisBounds() {
-    if (_chartData.isEmpty) {
+    // Determine data source for bounds calculation
+    List<ChartData> boundsData;
+    if (_ensembleChartData.isNotEmpty) {
+      // Use all ensemble data for bounds calculation
+      boundsData = [];
+      for (final series in _ensembleChartData.values) {
+        boundsData.addAll(series);
+      }
+    } else {
+      boundsData = _chartData;
+    }
+
+    if (boundsData.isEmpty) {
       _minX = 0;
       _maxX = 24;
       _minY = 0;
@@ -253,10 +330,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
       return;
     }
 
-    _minX = _chartData.map((data) => data.x).reduce(math.min);
-    _maxX = _chartData.map((data) => data.x).reduce(math.max);
-    _minY = _chartData.map((data) => data.y).reduce(math.min);
-    _maxY = _chartData.map((data) => data.y).reduce(math.max);
+    _minX = boundsData.map((data) => data.x).reduce(math.min);
+    _maxX = boundsData.map((data) => data.x).reduce(math.max);
+    _minY = boundsData.map((data) => data.y).reduce(math.min);
+    _maxY = boundsData.map((data) => data.y).reduce(math.max);
 
     // Include return period values in bounds calculation when toggle is ON
     if (widget.showReturnPeriods && widget.reachProvider.hasData) {
@@ -292,6 +369,98 @@ class _InteractiveChartState extends State<InteractiveChart> {
     if (_maxY < 100) _maxY = 100;
 
     print('DEBUG: Final chart bounds Y: $_minY to $_maxY');
+  }
+
+  // NEW: Build chart series based on current mode
+  List<CartesianSeries> _buildChartSeries() {
+    final seriesList = <CartesianSeries>[];
+
+    if (_ensembleChartData.isNotEmpty) {
+      // Ensemble mode: Show mean + members
+
+      // Add member lines first (so they appear behind mean)
+      for (final entry in _ensembleChartData.entries) {
+        final memberName = entry.key;
+        final memberData = entry.value;
+
+        if (memberName.startsWith('member')) {
+          seriesList.add(
+            LineSeries<ChartData, double>(
+              dataSource: memberData,
+              xValueMapper: (ChartData data, _) => data.x,
+              yValueMapper: (ChartData data, _) => data.y,
+              name: memberName,
+              color: CupertinoColors.systemGrey.withOpacity(
+                0.6,
+              ), // Muted member lines
+              width: 1.5, // Thinner than mean
+              markerSettings: const MarkerSettings(
+                isVisible: false,
+              ), // No markers for members
+              enableTrackball: false, // Don't show trackball for members
+            ),
+          );
+        }
+      }
+
+      // Add mean line last (appears on top)
+      if (_ensembleChartData.containsKey('mean')) {
+        final meanData = _ensembleChartData['mean']!;
+        seriesList.add(
+          LineSeries<ChartData, double>(
+            dataSource: meanData,
+            xValueMapper: (ChartData data, _) => data.x,
+            yValueMapper: (ChartData data, _) => data.y,
+            name: 'Mean',
+            color: CupertinoColors.systemBlue, // Prominent mean line
+            width: 3, // Thick mean line
+            markerSettings: MarkerSettings(
+              isVisible: meanData.length <= 20,
+              shape: DataMarkerType.circle,
+              width: 6,
+              height: 6,
+              color: CupertinoColors.systemBlue,
+              borderWidth: 2,
+              borderColor: CupertinoColors.systemBackground.resolveFrom(
+                context,
+              ),
+            ),
+            enableTrackball: true, // Only mean line shows trackball
+          ),
+        );
+      }
+    } else {
+      // Single series mode (existing logic)
+      seriesList.add(
+        LineSeries<ChartData, double>(
+          dataSource: _chartData,
+          xValueMapper: (ChartData data, _) => data.x,
+          yValueMapper: (ChartData data, _) => data.y,
+          color: CupertinoColors.systemBlue,
+          width: 3,
+          markerSettings: MarkerSettings(
+            isVisible: _chartData.length <= 20,
+            shape: DataMarkerType.circle,
+            width: 6,
+            height: 6,
+            color: CupertinoColors.systemBlue,
+            borderWidth: 2,
+            borderColor: CupertinoColors.systemBackground.resolveFrom(context),
+          ),
+          selectionBehavior: SelectionBehavior(
+            enable: true,
+            selectedColor: CupertinoColors.systemOrange,
+            unselectedColor: CupertinoColors.systemBlue.withOpacity(0.5),
+            selectedBorderColor: CupertinoColors.systemRed,
+            selectedBorderWidth: 2,
+            toggleSelection: true,
+          ),
+          enableTrackball: true,
+        ),
+      );
+    }
+
+    return seriesList;
   }
 
   List<PlotBand> _buildPlotBands() {
@@ -437,7 +606,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
   @override
   Widget build(BuildContext context) {
     // DON'T render chart until we have actual forecast data
-    if (!_isInitialized || _chartData.isEmpty || _forecastData.isEmpty) {
+    if (!_isInitialized ||
+        (_chartData.isEmpty && _ensembleChartData.isEmpty) ||
+        _forecastData.isEmpty) {
       return _buildEmptyChart();
     }
 
@@ -531,38 +702,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
           ),
           plotBands: [..._buildPlotBands(), ..._buildReturnPeriodLines()],
         ),
-        series: [
-          LineSeries<ChartData, double>(
-            dataSource: _chartData,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-            color: CupertinoColors.systemBlue,
-            width: 3,
-            markerSettings: MarkerSettings(
-              isVisible: _chartData.length <= 20,
-              shape: DataMarkerType.circle,
-              width: 6,
-              height: 6,
-              color: CupertinoColors.systemBlue,
-              borderWidth: 2,
-              borderColor: CupertinoColors.systemBackground.resolveFrom(
-                context,
-              ),
-            ),
-            // Enable selection for the series
-            selectionBehavior: SelectionBehavior(
-              enable: true,
-              selectedColor: CupertinoColors.systemOrange,
-              unselectedColor: CupertinoColors.systemBlue.withOpacity(0.5),
-              selectedBorderColor: CupertinoColors.systemRed,
-              selectedBorderWidth: 2,
-              toggleSelection: true,
-            ),
-            // Enable trackball for this series
-            enableTrackball: true,
-          ),
-        ],
-
+        series: _buildChartSeries(), // NEW: Use dynamic series building
         // User interaction behaviors
         trackballBehavior: _trackballBehavior,
         crosshairBehavior: _crosshairBehavior,
@@ -714,4 +854,12 @@ class ChartDataPoint {
     this.confidence,
     this.metadata,
   });
+}
+
+// Simple data class for chart points
+class ChartData {
+  final double x;
+  final double y;
+
+  ChartData(this.x, this.y);
 }

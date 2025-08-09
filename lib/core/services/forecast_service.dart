@@ -2,6 +2,8 @@
 
 import 'package:rivrflow/features/forecast/widgets/horizontal_flow_timeline.dart';
 import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
+import '../../features/forecast/widgets/interactive_chart.dart'
+    show ChartDataPoint;
 
 import '../models/reach_data.dart';
 import 'noaa_api_service.dart';
@@ -632,10 +634,135 @@ class ForecastService {
     return hourlyData;
   }
 
+  /// Get all ensemble members for chart display (medium/long range only)
+  /// Returns Map<String, List<ChartDataPoint>> where key is member name ('mean', 'member01', etc.)
+  Map<String, List<ChartDataPoint>> getAllEnsembleChartData(
+    ForecastResponse forecast,
+    String forecastType,
+  ) {
+    final ensembleData = forecast.getAllEnsembleData(forecastType);
+    final chartSeries = <String, List<ChartDataPoint>>{};
+
+    for (final entry in ensembleData.entries) {
+      final memberName = entry.key;
+      final series = entry.value;
+
+      if (series.isEmpty) continue;
+
+      final chartData = series.data
+          .map(
+            (point) => ChartDataPoint(
+              time: point.validTime.toLocal(),
+              flow: point.flow,
+            ),
+          )
+          .toList();
+
+      chartSeries[memberName] = chartData;
+    }
+
+    return chartSeries;
+  }
+
+  /// Get ensemble statistics for uncertainty visualization
+  /// Returns min, max, and mean values at each time point
+  List<EnsembleStatPoint> getEnsembleStatistics(
+    ForecastResponse forecast,
+    String forecastType,
+  ) {
+    final ensembleData = forecast.getAllEnsembleData(forecastType);
+
+    // Get only the member data (exclude mean if present, we'll calculate our own)
+    final members = ensembleData.entries
+        .where((e) => e.key.startsWith('member'))
+        .map((e) => e.value)
+        .where((series) => series.isNotEmpty)
+        .toList();
+
+    if (members.isEmpty) return [];
+
+    // Group by time point
+    final timeGroups = <DateTime, List<double>>{};
+
+    for (final member in members) {
+      for (final point in member.data) {
+        final time = point.validTime.toLocal();
+        timeGroups[time] ??= [];
+        timeGroups[time]!.add(point.flow);
+      }
+    }
+
+    // Calculate statistics for each time point
+    final stats = <EnsembleStatPoint>[];
+    final sortedTimes = timeGroups.keys.toList()..sort();
+
+    for (final time in sortedTimes) {
+      final flows = timeGroups[time]!;
+      if (flows.isNotEmpty) {
+        flows.sort();
+        stats.add(
+          EnsembleStatPoint(
+            time: time,
+            minFlow: flows.first,
+            maxFlow: flows.last,
+            meanFlow: flows.reduce((a, b) => a + b) / flows.length,
+            memberCount: flows.length,
+          ),
+        );
+      }
+    }
+
+    return stats;
+  }
+
+  /// Check if forecast has multiple ensemble members (for UI decisions)
+  bool hasMultipleEnsembleMembers(
+    ForecastResponse forecast,
+    String forecastType,
+  ) {
+    final ensembleData = forecast.getAllEnsembleData(forecastType);
+    final memberCount = ensembleData.keys
+        .where((k) => k.startsWith('member'))
+        .length;
+    return memberCount > 1;
+  }
+
   // NEW: Clear all caches (useful for testing)
   void clearComputedCaches() {
     _currentFlowCache.clear();
     _flowCategoryCache.clear();
     print('FORECAST_SERVICE: Cleared computed value caches');
   }
+}
+
+// Simple data classes for ensemble display
+class EnsembleStatPoint {
+  final DateTime time;
+  final double minFlow;
+  final double maxFlow;
+  final double meanFlow;
+  final int memberCount;
+
+  const EnsembleStatPoint({
+    required this.time,
+    required this.minFlow,
+    required this.maxFlow,
+    required this.meanFlow,
+    required this.memberCount,
+  });
+}
+
+// Reuse existing ChartDataPoint class or define if needed
+class ChartDataPoint {
+  final DateTime time;
+  final double flow;
+  final double? confidence;
+  final Map<String, dynamic>? metadata;
+
+  const ChartDataPoint({
+    required this.time,
+    required this.flow,
+    this.confidence,
+    this.metadata,
+  });
 }
