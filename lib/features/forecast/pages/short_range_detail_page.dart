@@ -143,6 +143,12 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
         children: [
           Row(
             children: [
+              const Icon(
+                CupertinoIcons.info_circle,
+                size: 16,
+                color: CupertinoColors.systemBlue,
+              ),
+              const SizedBox(width: 8),
               const Text(
                 'Data Source',
                 style: TextStyle(
