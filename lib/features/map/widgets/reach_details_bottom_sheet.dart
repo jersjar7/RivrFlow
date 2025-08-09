@@ -106,13 +106,44 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.selectedReach.displayName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                // Show loading state until we have the real river name
+                if (_riverName != null)
+                  Text(
+                    _riverName!,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                else if (_isLoadingFlow)
+                  Row(
+                    children: [
+                      Container(
+                        width: 120,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: CupertinoColors.systemGrey5,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CupertinoActivityIndicator(radius: 6),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    widget
+                        .selectedReach
+                        .displayName, // Fallback if loading failed
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
                 const SizedBox(height: 4),
                 Text(
                   widget.selectedReach.streamOrderDescription,
@@ -378,8 +409,8 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
               onPressed: () {
                 Navigator.pushNamed(
                   context,
-                  '/reach-overview',
-                  arguments: {'reachId': widget.selectedReach.reachId},
+                  '/forecast',
+                  arguments: widget.selectedReach.reachId,
                 );
               },
               child: const Text('View Forecast'),
