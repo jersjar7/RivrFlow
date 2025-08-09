@@ -1,4 +1,7 @@
 // lib/core/models/reach_data.dart
+
+import '../services/flow_unit_preference_service.dart';
+
 class ReachData {
   // NOAA reach info
   final String reachId; // "23021904"
@@ -259,8 +262,41 @@ class ReachData {
     return DateTime.now().difference(cachedAt) > maxAge;
   }
 
-  // Get flow category based on return periods (flow in CFS, return periods in CMS)
-  String getFlowCategory(double flowCfs) {
+  /// NEW: Get return periods converted to specified unit
+  Map<int, double>? getReturnPeriodsInUnit(String targetUnit) {
+    if (returnPeriods == null) return null;
+
+    final converter = FlowUnitPreferenceService();
+    return returnPeriods!.map(
+      (year, cmsValue) =>
+          MapEntry(year, converter.convertFlow(cmsValue, 'CMS', targetUnit)),
+    );
+  }
+
+  /// UPDATED: Get flow category based on return periods (unit-agnostic)
+  String getFlowCategory(double flowValue, String flowUnit) {
+    if (!hasReturnPeriods) return 'Unknown';
+
+    // Get return periods in the same unit as the flow value
+    final periods = getReturnPeriodsInUnit(flowUnit);
+    if (periods == null) return 'Unknown';
+
+    final sortedPeriods = periods.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    for (final period in sortedPeriods) {
+      if (flowValue < period.value) {
+        if (period.key == 2) return 'Normal';
+        if (period.key <= 5) return 'Elevated';
+        return 'High';
+      }
+    }
+
+    return 'Flood Risk';
+  }
+
+  /// ORIGINAL METHOD PRESERVED: Get flow category based on return periods (flow in CFS, return periods in CMS)
+  String getFlowCategoryOriginal(double flowCfs) {
     if (!hasReturnPeriods) return 'Unknown';
 
     // Convert CFS to CMS for comparison (1 CFS = 0.0283168 CMS)
@@ -340,6 +376,34 @@ class ForecastSeries {
   final List<ForecastPoint> data;
 
   ForecastSeries({this.referenceTime, required this.units, required this.data});
+
+  /// NEW: Factory constructor for unit conversion
+  factory ForecastSeries.withPreferredUnits({
+    required String originalUnits,
+    required String preferredUnits,
+    required List<ForecastPoint> originalData,
+    DateTime? referenceTime,
+  }) {
+    final converter = FlowUnitPreferenceService();
+    final convertedData = originalData
+        .map(
+          (point) => ForecastPoint(
+            validTime: point.validTime,
+            flow: converter.convertFlow(
+              point.flow,
+              originalUnits,
+              preferredUnits,
+            ),
+          ),
+        )
+        .toList();
+
+    return ForecastSeries(
+      referenceTime: referenceTime,
+      units: preferredUnits,
+      data: convertedData,
+    );
+  }
 
   factory ForecastSeries.fromJson(Map<String, dynamic> json) {
     return ForecastSeries(

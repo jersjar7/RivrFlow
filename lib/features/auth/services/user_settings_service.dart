@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/models/user_settings.dart';
 import '../../../core/services/error_service.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 
 /// Simple service for managing UserSettings with Firestore
 class UserSettingsService {
@@ -11,6 +12,8 @@ class UserSettingsService {
   UserSettingsService._internal();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FlowUnitPreferenceService _flowUnitService =
+      FlowUnitPreferenceService();
 
   // Simple in-memory cache
   UserSettings? _cachedSettings;
@@ -184,6 +187,9 @@ class UserSettingsService {
         return null;
       }
 
+      // Sync flow unit preference to FlowUnitPreferenceService
+      _syncFlowUnitToService(settings.preferredFlowUnit);
+
       // Update last login date
       final updatedSettings = settings.copyWith(lastLoginDate: DateTime.now());
       await saveUserSettings(updatedSettings);
@@ -257,6 +263,9 @@ class UserSettingsService {
       final updatedSettings = settings.copyWith(preferredFlowUnit: flowUnit);
       await saveUserSettings(updatedSettings);
 
+      // Sync the change to FlowUnitPreferenceService immediately
+      _syncFlowUnitToService(flowUnit);
+
       return updatedSettings;
     } catch (e) {
       print('USER_SETTINGS_SERVICE: Error updating flow unit: $e');
@@ -290,6 +299,9 @@ class UserSettingsService {
     print('USER_SETTINGS_SERVICE: Clearing cache');
     _cachedSettings = null;
     _cachedUserId = null;
+
+    // Reset flow unit to default when user signs out
+    _flowUnitService.resetToDefault();
   }
 
   /// Get cached settings (if available)
@@ -310,6 +322,26 @@ class UserSettingsService {
         'USER_SETTINGS_SERVICE: Error checking user settings existence: $e',
       );
       return false;
+    }
+  }
+
+  /// Sync flow unit preference from UserSettings to FlowUnitPreferenceService
+  void _syncFlowUnitToService(FlowUnit flowUnit) {
+    final unitString = flowUnit == FlowUnit.cms ? 'CMS' : 'CFS';
+    _flowUnitService.setFlowUnit(unitString);
+    print('USER_SETTINGS_SERVICE: Synced flow unit preference: $unitString');
+  }
+
+  /// Public method to manually sync flow unit preference
+  Future<void> syncFlowUnitPreference(String userId) async {
+    try {
+      final settings = await getUserSettings(userId);
+      if (settings?.preferredFlowUnit != null) {
+        _syncFlowUnitToService(settings!.preferredFlowUnit);
+      }
+    } catch (e) {
+      print('USER_SETTINGS_SERVICE: Error syncing flow unit preference: $e');
+      // Don't throw - this is not critical
     }
   }
 }

@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:csv/csv.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 
 /// Data model for chart points - simplified without confidence values
 class ChartDataPoint {
@@ -173,7 +174,7 @@ class ExportFunctionality {
     return enhancedImageBytes;
   }
 
-  /// Export chart data as CSV file
+  /// Export chart data as CSV file with dynamic units
   static Future<void> exportDataAsCSV({
     required List<ChartDataPoint> chartData,
     required String reachName,
@@ -181,6 +182,10 @@ class ExportFunctionality {
     required Map<int, double>? returnPeriods,
   }) async {
     try {
+      // Get current unit for headers and display
+      final unitService = FlowUnitPreferenceService();
+      final currentUnit = unitService.currentFlowUnit;
+
       // Prepare CSV data
       final List<List<dynamic>> csvData = [];
 
@@ -190,12 +195,13 @@ class ExportFunctionality {
       csvData.add(['Forecast Type', _formatForecastType(forecastType)]);
       csvData.add(['Export Date', _formatDateTime(DateTime.now())]);
       csvData.add(['Total Data Points', chartData.length.toString()]);
+      csvData.add(['Flow Unit', currentUnit]); // Add unit metadata
       csvData.add([]); // Empty row
 
-      // Add main data header (without confidence column)
-      csvData.add(['Date/Time', 'Flow (CFS)']);
+      // Dynamic header based on current unit
+      csvData.add(['Date/Time', 'Flow ($currentUnit)']);
 
-      // Add chart data rows
+      // Add chart data rows (data already converted by services)
       for (final point in chartData) {
         csvData.add([
           point.time.toIso8601String(),
@@ -203,21 +209,20 @@ class ExportFunctionality {
         ]);
       }
 
-      // Add return periods data if available
+      // Return periods data with dynamic units
       if (returnPeriods != null && returnPeriods.isNotEmpty) {
         csvData.add([]); // Empty row separator
         csvData.add(['Return Periods (Flood Categories)']);
-        csvData.add(['Return Period (Years)', 'Flow Threshold (CFS)']);
+        csvData.add(['Return Period (Years)', 'Flow Threshold ($currentUnit)']);
 
-        // Convert CMS to CFS if needed (assuming your return periods are in CMS)
-        const cmsToCs = 35.3147;
+        // REMOVED: Manual conversion - return periods are already converted by ReachData methods
         final sortedPeriods = returnPeriods.entries.toList()
           ..sort((a, b) => a.key.compareTo(b.key));
 
         for (final entry in sortedPeriods) {
           csvData.add([
             '${entry.key} year',
-            (entry.value * cmsToCs).toStringAsFixed(2),
+            entry.value.toStringAsFixed(2), // Already in correct unit
           ]);
         }
       }

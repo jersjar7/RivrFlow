@@ -1,6 +1,7 @@
 // lib/features/forecast/services/daily_forecast_processor.dart
 
 import '../../../core/models/reach_data.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 import '../domain/entities/daily_flow_forecast.dart';
 
 /// Service for processing ensemble forecast data into daily summaries
@@ -16,6 +17,7 @@ class DailyForecastProcessor {
   /// [forecastType] - Type identifier ('medium_range' or 'long_range') for tracking
   ///
   /// Returns a list of DailyFlowForecast objects, one per day covered by the forecast
+  /// NOTE: Flow values are already converted to user's preferred unit by NoaaApiService
   static List<DailyFlowForecast> processForecastData({
     required Map<String, ForecastSeries> forecastData,
     required ReachData reach,
@@ -36,8 +38,12 @@ class DailyForecastProcessor {
     final dataSource = selectedData['source'] as String;
     final forecastSeries = selectedData['series'] as ForecastSeries;
 
+    // NEW: Get the current unit from the forecast series (already converted by NoaaApiService)
+    final dataUnit =
+        forecastSeries.units; // Will be CFS or CMS based on user preference
+
     print(
-      'DAILY_PROCESSOR: Using $dataSource for $forecastType (${forecastSeries.data.length} points)',
+      'DAILY_PROCESSOR: Using $dataSource for $forecastType (${forecastSeries.data.length} points, $dataUnit)',
     );
 
     // Step 2: Group hourly data by calendar date
@@ -58,6 +64,7 @@ class DailyForecastProcessor {
           hourlyData: hourlyData,
           dataSource: dataSource,
           reach: reach,
+          dataUnit: dataUnit, // Pass the unit information
         );
 
         if (dailyForecast != null) {
@@ -73,7 +80,7 @@ class DailyForecastProcessor {
     dailyForecasts.sort((a, b) => a.date.compareTo(b.date));
 
     print(
-      'DAILY_PROCESSOR: Generated ${dailyForecasts.length} daily forecasts from $dataSource',
+      'DAILY_PROCESSOR: Generated ${dailyForecasts.length} daily forecasts from $dataSource ($dataUnit)',
     );
     return dailyForecasts;
   }
@@ -192,40 +199,44 @@ class DailyForecastProcessor {
       // Initialize day group if needed
       dailyGroups[dateKey] ??= <DateTime, double>{};
 
-      // Add hourly data point
+      // Add hourly data point (flow already converted to preferred unit)
       dailyGroups[dateKey]![localTime] = point.flow;
     }
 
     return dailyGroups;
   }
 
-  /// Process a single day's hourly data into a DailyFlowForecast
+  /// UPDATED: Process a single day's hourly data into a DailyFlowForecast
+  /// Now unit-aware for flow categorization
   static DailyFlowForecast? _processDailyData({
     required DateTime date,
     required Map<DateTime, double> hourlyData,
     required String dataSource,
     required ReachData reach,
+    required String dataUnit, // NEW: Unit information
   }) {
     if (hourlyData.isEmpty) return null;
 
-    // Calculate daily statistics
+    // Calculate daily statistics (flow values already in correct unit)
     final flows = hourlyData.values.toList();
     final minFlow = flows.reduce((a, b) => a < b ? a : b);
     final maxFlow = flows.reduce((a, b) => a > b ? a : b);
     final avgFlow = flows.reduce((a, b) => a + b) / flows.length;
 
-    // Determine flow category using existing reach logic
+    // UPDATED: Use unit-aware flow category calculation
     // Use the maximum flow of the day for category determination (most conservative)
     final flowCategory = reach.hasReturnPeriods
-        ? reach.getFlowCategory(maxFlow)
+        ? reach.getFlowCategory(maxFlow, dataUnit) // Now unit-aware!
         : 'Unknown';
 
     return DailyFlowForecast(
       date: date,
-      minFlow: minFlow,
-      maxFlow: maxFlow,
-      avgFlow: avgFlow,
-      hourlyData: Map.from(hourlyData), // Create a copy
+      minFlow: minFlow, // Already in correct unit
+      maxFlow: maxFlow, // Already in correct unit
+      avgFlow: avgFlow, // Already in correct unit
+      hourlyData: Map.from(
+        hourlyData,
+      ), // Create a copy (already in correct unit)
       flowCategory: flowCategory,
       dataSource: dataSource,
     );
@@ -258,12 +269,16 @@ class DailyForecastProcessor {
     return invalidCount == 0;
   }
 
-  /// Debug helper to print processing summary
+  /// UPDATED: Debug helper to print processing summary with dynamic units
   static void printProcessingSummary(List<DailyFlowForecast> forecasts) {
     if (forecasts.isEmpty) {
       print('DAILY_PROCESSOR: No forecasts to summarize');
       return;
     }
+
+    // Get current unit for display
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
 
     print('DAILY_PROCESSOR: Processing Summary:');
     print(
@@ -286,7 +301,7 @@ class DailyForecastProcessor {
 
     final bounds = getFlowBounds(forecasts);
     print(
-      '  🌊 Flow range: ${bounds['min']?.toStringAsFixed(1)} - ${bounds['max']?.toStringAsFixed(1)} CFS',
+      '  🌊 Flow range: ${bounds['min']?.toStringAsFixed(1)} - ${bounds['max']?.toStringAsFixed(1)} $currentUnit',
     );
   }
 }

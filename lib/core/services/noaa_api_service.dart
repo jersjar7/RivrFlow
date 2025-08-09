@@ -3,7 +3,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config.dart';
+import '../models/reach_data.dart';
 import 'error_service.dart';
+import 'flow_unit_preference_service.dart';
 
 /// Service for fetching data from NOAA APIs
 /// Integrates with existing AppConfig and ErrorService
@@ -14,6 +16,7 @@ class NoaaApiService {
   NoaaApiService._internal();
 
   final http.Client _client = http.Client();
+  final FlowUnitPreferenceService _unitService = FlowUnitPreferenceService();
 
   // Different timeout durations for different request priorities
   static const Duration _quickTimeout = Duration(
@@ -166,10 +169,11 @@ class NoaaApiService {
     }
   }
 
-  // Forecast Fetching (OPTIMIZED with priority support)
+  // Forecast Fetching (OPTIMIZED with priority support + UNIT CONVERSION)
   /// Fetch streamflow forecast data from NOAA API for a specific series
   /// Returns data in format expected by ForecastResponse.fromJson()
   /// Now with priority handling for overview vs detailed loading
+  /// UPDATED: Now includes unit conversion for all forecast data
   Future<Map<String, dynamic>> fetchForecast(
     String reachId,
     String series, {
@@ -202,8 +206,14 @@ class NoaaApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        print('NOAA_API: Successfully fetched $series forecast');
-        return data;
+
+        // NEW: Apply unit conversion to all forecast data before returning
+        final convertedData = _convertForecastResponse(data);
+
+        print(
+          'NOAA_API: Successfully fetched and converted $series forecast to ${_unitService.currentFlowUnit}',
+        );
+        return convertedData;
       } else if (response.statusCode == 404) {
         throw Exception('$series forecast not available for reach: $reachId');
       } else {
@@ -221,6 +231,7 @@ class NoaaApiService {
   // Optimized overview data fetching
   /// Fetch minimal data needed for overview page: reach info + current flow
   /// Optimized for speed with shorter timeouts and priority headers
+  /// UPDATED: Now includes unit conversion
   Future<Map<String, dynamic>> fetchOverviewData(String reachId) async {
     print('NOAA_API: Fetching overview data for reach: $reachId');
 
@@ -228,17 +239,21 @@ class NoaaApiService {
       // Fetch reach info and short-range forecast in parallel with overview priority
       final futures = await Future.wait([
         fetchReachInfo(reachId, isOverview: true),
-        fetchCurrentFlowOnly(reachId),
+        fetchCurrentFlowOnly(
+          reachId,
+        ), // This already gets converted by fetchForecast
       ]);
 
       final reachInfo = futures[0];
-      final flowData = futures[1];
+      final flowData = futures[1]; // Already converted
 
       // Combine into overview response format
       final overviewResponse = Map<String, dynamic>.from(flowData);
       overviewResponse['reach'] = reachInfo;
 
-      print('NOAA_API: ✅ Successfully fetched overview data');
+      print(
+        'NOAA_API: ✅ Successfully fetched overview data with unit conversion',
+      );
       return overviewResponse;
     } catch (e) {
       print('NOAA_API: ❌ Error fetching overview data: $e');
@@ -250,6 +265,7 @@ class NoaaApiService {
   /// Fetch all available forecast types for a reach
   /// Orchestrates multiple API calls to get complete forecast data
   /// Returns combined data with all available forecasts
+  /// UPDATED: Now includes unit conversion for all forecast types
   Future<Map<String, dynamic>> fetchAllForecasts(String reachId) async {
     print('NOAA_API: Fetching all forecasts for reach: $reachId');
 
@@ -275,9 +291,13 @@ class NoaaApiService {
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
-          results[forecastType] = data;
-          combinedResponse ??= data;
-          print('NOAA_API: ✅ Successfully fetched $forecastType');
+
+          // NEW: Convert forecast data to preferred units
+          final convertedData = _convertForecastResponse(data);
+          results[forecastType] = convertedData;
+          combinedResponse ??= convertedData;
+
+          print('NOAA_API: ✅ Successfully fetched and converted $forecastType');
         } else {
           print(
             'NOAA_API: ⚠️ Failed to fetch $forecastType: ${response.statusCode}',
@@ -321,7 +341,7 @@ class NoaaApiService {
 
     final successCount = results.values.where((r) => r != null).length;
     print(
-      'NOAA_API: ✅ Successfully combined $successCount/$forecastTypes.length forecast types for reach $reachId',
+      'NOAA_API: ✅ Successfully combined $successCount/${forecastTypes.length} forecast types for reach $reachId with unit conversion',
     );
 
     return mergedResponse;
@@ -356,6 +376,99 @@ class NoaaApiService {
           target['longRange'] = source['longRange'];
         }
         break;
+    }
+  }
+
+  /// NEW: Convert forecast response to user's preferred units
+  Map<String, dynamic> _convertForecastResponse(
+    Map<String, dynamic> rawResponse,
+  ) {
+    try {
+      final convertedResponse = Map<String, dynamic>.from(rawResponse);
+
+      // Convert all forecast sections that contain series data
+      final sectionsToConvert = [
+        'analysisAssimilation',
+        'shortRange',
+        'mediumRange',
+        'longRange',
+        'mediumRangeBlend',
+      ];
+
+      for (final section in sectionsToConvert) {
+        if (convertedResponse[section] != null) {
+          convertedResponse[section] = _convertForecastSection(
+            convertedResponse[section],
+          );
+        }
+      }
+
+      return convertedResponse;
+    } catch (e) {
+      print('NOAA_API: Warning - Failed to convert units: $e');
+      // Return original data if conversion fails
+      return rawResponse;
+    }
+  }
+
+  /// NEW: Convert a forecast section (handles both single series and ensemble data)
+  dynamic _convertForecastSection(dynamic section) {
+    if (section == null || section is! Map<String, dynamic>) {
+      return section;
+    }
+
+    final convertedSection = Map<String, dynamic>.from(section);
+
+    // Handle 'series' data (single forecast series)
+    if (convertedSection['series'] != null) {
+      convertedSection['series'] = _convertSingleSeries(
+        convertedSection['series'],
+      );
+    }
+
+    // Handle 'mean' data (ensemble mean)
+    if (convertedSection['mean'] != null) {
+      convertedSection['mean'] = _convertSingleSeries(convertedSection['mean']);
+    }
+
+    // Handle ensemble members (member01, member02, etc.)
+    final memberKeys = convertedSection.keys
+        .where((key) => key.startsWith('member'))
+        .toList();
+    for (final memberKey in memberKeys) {
+      if (convertedSection[memberKey] != null) {
+        convertedSection[memberKey] = _convertSingleSeries(
+          convertedSection[memberKey],
+        );
+      }
+    }
+
+    return convertedSection;
+  }
+
+  /// NEW: Convert a single forecast series
+  Map<String, dynamic> _convertSingleSeries(dynamic seriesData) {
+    if (seriesData == null || seriesData is! Map<String, dynamic>) {
+      return seriesData ?? {};
+    }
+
+    try {
+      // Parse the series to get the data structure
+      final originalSeries = ForecastSeries.fromJson(seriesData);
+
+      // Convert to preferred units
+      final convertedSeries = ForecastSeries.withPreferredUnits(
+        originalUnits: originalSeries.units,
+        preferredUnits: _unitService.currentFlowUnit,
+        originalData: originalSeries.data,
+        referenceTime: originalSeries.referenceTime,
+      );
+
+      // Convert back to JSON format
+      return convertedSeries.toJson();
+    } catch (e) {
+      print('NOAA_API: Warning - Failed to convert series: $e');
+      return Map<String, dynamic>.from(seriesData);
     }
   }
 }

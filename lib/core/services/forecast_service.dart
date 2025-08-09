@@ -2,12 +2,10 @@
 
 import 'package:rivrflow/features/forecast/widgets/horizontal_flow_timeline.dart';
 import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
-// REMOVED: Conflicting import that was causing type issues
-// import '../../features/forecast/widgets/interactive_chart.dart' show ChartDataPoint;
-
 import '../models/reach_data.dart';
 import 'noaa_api_service.dart';
 import 'reach_cache_service.dart';
+import 'flow_unit_preference_service.dart';
 
 /// Simple service for loading complete forecast data
 /// Combines reach info, return periods, and all forecast types
@@ -19,6 +17,7 @@ class ForecastService {
 
   final NoaaApiService _apiService = NoaaApiService();
   final ReachCacheService _cacheService = ReachCacheService();
+  final FlowUnitPreferenceService _unitService = FlowUnitPreferenceService();
 
   // Cache computed values to avoid repeated calculations
   final Map<String, double?> _currentFlowCache = {};
@@ -126,7 +125,7 @@ class ForecastService {
         print('FORECAST_SERVICE: ✅ Cached reach data with location info');
       }
 
-      // Step 6: Get only short-range forecast for current flow
+      // Step 6: Get only short-range forecast for current flow (already converted by NoaaApiService)
       final shortRangeData = await _apiService.fetchCurrentFlowOnly(reachId);
       final forecastResponse = ForecastResponse.fromJson(shortRangeData);
 
@@ -185,6 +184,7 @@ class ForecastService {
       }
 
       // Load medium-range summary for forecast grid (don't need full data)
+      // Data is already converted by NoaaApiService
       ForecastResponse enhancedResponse = existingData;
       try {
         final mediumRangeData = await _apiService.fetchForecast(
@@ -216,11 +216,16 @@ class ForecastService {
         );
       }
 
-      // Update cached flow category now that we have return periods
+      // UPDATED: Use unit-aware flow category calculation
       if (reach.hasReturnPeriods) {
         final currentFlow = getCurrentFlow(enhancedResponse);
         if (currentFlow != null) {
-          _flowCategoryCache[reachId] = reach.getFlowCategory(currentFlow);
+          // Use the current unit from service - forecast data is already converted
+          final currentUnit = _unitService.currentFlowUnit;
+          _flowCategoryCache[reachId] = reach.getFlowCategory(
+            currentFlow,
+            currentUnit,
+          );
         }
       }
 
@@ -290,6 +295,7 @@ class ForecastService {
       }
 
       // Step 5: Always get fresh forecast data (this changes frequently)
+      // Data is already converted by NoaaApiService
       final forecastData = await _apiService.fetchAllForecasts(reachId);
       print('FORECAST_SERVICE: ✅ Loaded fresh forecast data');
 
@@ -304,12 +310,17 @@ class ForecastService {
         mediumRangeBlend: forecastResponse.mediumRangeBlend,
       );
 
-      // Update caches
+      // UPDATED: Update caches with unit-aware flow category
       final currentFlow = getCurrentFlow(completeResponse);
       if (currentFlow != null) {
         _currentFlowCache[reachId] = currentFlow;
         if (reach.hasReturnPeriods) {
-          _flowCategoryCache[reachId] = reach.getFlowCategory(currentFlow);
+          // Use the current unit from service - forecast data is already converted
+          final currentUnit = _unitService.currentFlowUnit;
+          _flowCategoryCache[reachId] = reach.getFlowCategory(
+            currentFlow,
+            currentUnit,
+          );
         }
       }
 
@@ -342,7 +353,7 @@ class ForecastService {
         );
         reach = cachedReach;
 
-        // Only fetch the specific forecast
+        // Only fetch the specific forecast (already converted by NoaaApiService)
         final forecastData = await _apiService.fetchForecast(
           reachId,
           forecastType,
@@ -376,7 +387,7 @@ class ForecastService {
         reach = ReachData.fromNoaaApi(reachInfo);
         await _cacheService.store(reach);
 
-        // Parse forecast response
+        // Parse forecast response (already converted)
         final forecastResponse = ForecastResponse.fromJson(forecastData);
         final specificResponse = ForecastResponse(
           reach: reach,
@@ -420,7 +431,7 @@ class ForecastService {
     return await _cacheService.getCacheStats();
   }
 
-  // ===== NEW EFFICIENT LOADING METHODS FOR FAVORITES =====
+  // ===== EFFICIENT LOADING METHODS FOR FAVORITES =====
 
   /// Load only current flow data for favorites display (optimized)
   /// Gets: reach info + current flow + return periods only
@@ -468,7 +479,7 @@ class ForecastService {
       }
 
       // Step 2: Use the working loadOverviewData method instead
-      // This properly handles the forecast parsing
+      // This properly handles the forecast parsing (already converted by NoaaApiService)
       final currentFlowData = await _apiService.fetchCurrentFlowOnly(reachId);
 
       // Parse using the same parser that works in loadOverviewData
@@ -528,7 +539,7 @@ class ForecastService {
   ) {
     return ForecastResponse(
       reach: existing.reach, // Keep existing reach data
-      // Update only current flow data
+      // Update only current flow data (already converted by NoaaApiService)
       analysisAssimilation: newFlowData.analysisAssimilation?.isNotEmpty == true
           ? newFlowData.analysisAssimilation
           : existing.analysisAssimilation,
@@ -544,6 +555,7 @@ class ForecastService {
 
   // Use cache first, then compute if needed
   /// Get current flow value for display - now with caching
+  /// NOTE: Flow values are already converted by NoaaApiService
   double? getCurrentFlow(ForecastResponse forecast, {String? preferredType}) {
     final reachId = forecast.reach.reachId;
 
@@ -562,7 +574,9 @@ class ForecastService {
       // 🔧 Filter out missing data values
       if (flow != null && flow > -9000) {
         // Check for missing data sentinel values
-        print('FORECAST_SERVICE: Using $type for current flow: $flow');
+        print(
+          'FORECAST_SERVICE: Using $type for current flow: $flow ${_unitService.currentFlowUnit}',
+        );
 
         // Cache the result
         _currentFlowCache[reachId] = flow;
@@ -576,7 +590,7 @@ class ForecastService {
   }
 
   // Use cache first, then compute if needed
-  /// Get flow category with return period context - now with caching
+  /// UPDATED: Get flow category with return period context - now unit-aware
   String getFlowCategory(ForecastResponse forecast, {String? preferredType}) {
     final reachId = forecast.reach.reachId;
 
@@ -588,7 +602,10 @@ class ForecastService {
     final flow = getCurrentFlow(forecast, preferredType: preferredType);
     if (flow == null) return 'Unknown';
 
-    final category = forecast.reach.getFlowCategory(flow);
+    // UPDATED: Use unit-aware flow category calculation
+    // Flow values are already in the correct unit from NoaaApiService
+    final currentUnit = _unitService.currentFlowUnit;
+    final category = forecast.reach.getFlowCategory(flow, currentUnit);
 
     // Cache the result
     _flowCategoryCache[reachId] = category;
@@ -649,6 +666,7 @@ class ForecastService {
 
   /// Extract hourly data points for short-range forecast with trends
   /// Filters out past hours - only shows current hour and future
+  /// NOTE: Flow values are already converted by NoaaApiService
   List<HourlyFlowDataPoint> getShortRangeHourlyData(ForecastResponse forecast) {
     if (forecast.shortRange == null || forecast.shortRange!.isEmpty) {
       return [];
@@ -685,7 +703,7 @@ class ForecastService {
         final changePercent = (change / previousFlow) * 100;
 
         if (change.abs() > 5) {
-          // 5 CFS threshold for trend detection
+          // 5 unit threshold for trend detection (works for both CFS and CMS)
           trend = change > 0 ? FlowTrend.rising : FlowTrend.falling;
           trendPercentage = changePercent.abs();
         } else {
@@ -697,7 +715,7 @@ class ForecastService {
       hourlyData.add(
         HourlyFlowDataPoint(
           validTime: point.validTime.toLocal(), // Convert UTC to local time
-          flow: point.flow,
+          flow: point.flow, // Already converted to preferred unit
           trend: trend,
           trendPercentage: trendPercentage,
           confidence: 0.95 - (i * 0.02), // Decreasing confidence over time
@@ -710,6 +728,7 @@ class ForecastService {
 
   /// Get ALL short-range hourly data (including past hours) for charts
   /// This is the unfiltered version needed for complete visualization
+  /// NOTE: Flow values are already converted by NoaaApiService
   List<HourlyFlowDataPoint> getAllShortRangeHourlyData(
     ForecastResponse forecast,
   ) {
@@ -734,7 +753,7 @@ class ForecastService {
         final changePercent = (change / previousFlow) * 100;
 
         if (change.abs() > 5) {
-          // 5 CFS threshold for trend detection
+          // 5 unit threshold for trend detection (works for both CFS and CMS)
           trend = change > 0 ? FlowTrend.rising : FlowTrend.falling;
           trendPercentage = changePercent.abs();
         } else {
@@ -746,7 +765,7 @@ class ForecastService {
       hourlyData.add(
         HourlyFlowDataPoint(
           validTime: point.validTime.toLocal(), // Convert UTC to local time
-          flow: point.flow,
+          flow: point.flow, // Already converted to preferred unit
           trend: trend,
           trendPercentage: trendPercentage,
           confidence: 0.95 - (i * 0.02), // Decreasing confidence over time
@@ -758,6 +777,7 @@ class ForecastService {
 
   /// Get ensemble statistics for uncertainty visualization
   /// Returns min, max, and mean values at each time point
+  /// NOTE: Flow values are already converted by NoaaApiService
   List<EnsembleStatPoint> getEnsembleStatistics(
     ForecastResponse forecast,
     String forecastType,
@@ -780,7 +800,7 @@ class ForecastService {
       for (final point in member.data) {
         final time = point.validTime.toLocal();
         timeGroups[time] ??= [];
-        timeGroups[time]!.add(point.flow);
+        timeGroups[time]!.add(point.flow); // Already converted
       }
     }
 
@@ -821,9 +841,10 @@ class ForecastService {
 
   // ===== NEW METHODS FOR CHART DISPLAY (NO CONFLICTS) =====
 
-  /// NEW: Get all ensemble data ready for chart display
-  /// Returns Map<String, List<ChartData>> where ChartData has x,y coordinates
+  /// Get all ensemble data ready for chart display
+  /// Returns Map<String, List<ChartData where ChartData has x,y coordinates
   /// This replaces the conflicting getAllEnsembleChartData method
+  /// NOTE: Flow values are already converted by NoaaApiService
   Map<String, List<ChartData>> getEnsembleSeriesForChart(
     ForecastResponse forecast,
     String forecastType,
@@ -858,20 +879,21 @@ class ForecastService {
             .inHours
             .toDouble();
 
-        return ChartData(hoursDiff, point.flow);
+        return ChartData(hoursDiff, point.flow); // Already converted
       }).toList();
 
       chartSeries[memberName] = chartData;
     }
 
     print(
-      'FORECAST_SERVICE: Generated ${chartSeries.length} chart series for $forecastType',
+      'FORECAST_SERVICE: Generated ${chartSeries.length} chart series for $forecastType (${_unitService.currentFlowUnit})',
     );
     return chartSeries;
   }
 
-  /// NEW: Get ensemble data as time-based points (for bounds calculation in charts)
+  /// Get ensemble data as time-based points (for bounds calculation in charts)
   /// Returns the first available series as ChartDataPoint (DateTime, flow) for interactive_chart.dart
+  /// NOTE: Flow values are already converted by NoaaApiService
   List<ChartDataPoint> getEnsembleReferenceData(
     ForecastResponse forecast,
     String forecastType,
@@ -886,7 +908,7 @@ class ForecastService {
             .map(
               (point) => ChartDataPoint(
                 time: point.validTime.toLocal(),
-                flow: point.flow,
+                flow: point.flow, // Already converted
               ),
             )
             .toList();
@@ -896,7 +918,7 @@ class ForecastService {
     return [];
   }
 
-  // NEW: Clear all caches (useful for testing)
+  // Clear all caches (useful for testing)
   void clearComputedCaches() {
     _currentFlowCache.clear();
     _flowCategoryCache.clear();
