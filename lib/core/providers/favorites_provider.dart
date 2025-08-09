@@ -146,6 +146,98 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
+  /// OPTIMIZED: Add favorite with known coordinates (avoids duplicate loading)
+  /// Use this when coordinates are already available from bottom sheet data
+  Future<bool> addFavoriteWithKnownCoordinates(
+    String reachId, {
+    String? customName,
+    required double latitude,
+    required double longitude,
+    String? riverName,
+  }) async {
+    print(
+      'FAVORITES_PROVIDER: Adding favorite with known coordinates: $reachId',
+    );
+
+    try {
+      // Check if already exists using O(1) lookup
+      if (isFavorite(reachId)) {
+        print('FAVORITES_PROVIDER: ⚠️ Reach $reachId already favorited');
+        return false;
+      }
+
+      // Add to storage with provided coordinates - NO API CALL NEEDED
+      final success = await _favoritesService.addFavorite(
+        reachId,
+        customName: customName,
+        latitude: latitude,
+        longitude: longitude,
+      );
+      if (!success) return false;
+
+      // Reload from storage to get updated list
+      await _loadFavoritesFromStorage();
+
+      // Optional: Start background data loading for flow data only (lightweight)
+      if (riverName != null) {
+        // If we have river name, we can update the favorite with it immediately
+        _updateFavoriteWithRiverName(reachId, riverName);
+      } else {
+        // Otherwise, load just the river name in background
+        _loadFavoriteRiverNameInBackground(reachId);
+      }
+
+      print(
+        'FAVORITES_PROVIDER: ✅ Added favorite with known coordinates: $reachId',
+      );
+      return true;
+    } catch (e) {
+      print('FAVORITES_PROVIDER: ❌ Error adding favorite with coordinates: $e');
+      _setError(e.toString());
+      return false;
+    }
+  }
+
+  /// OPTIMIZED: Load only river name in background (much lighter than complete data)
+  Future<void> _loadFavoriteRiverNameInBackground(String reachId) async {
+    try {
+      // Use the lightweight overview data loading instead of complete data
+      final forecast = await _forecastService.loadOverviewData(reachId);
+      final riverName = forecast.reach.riverName;
+
+      // Update just the river name
+      await _favoritesService.updateFavorite(reachId, riverName: riverName);
+
+      // Update local list
+      final index = _favorites.indexWhere((f) => f.reachId == reachId);
+      if (index != -1) {
+        _favorites[index] = _favorites[index].copyWith(riverName: riverName);
+        notifyListeners();
+      }
+
+      print(
+        'FAVORITES_PROVIDER: ✅ Updated river name for $reachId: $riverName',
+      );
+    } catch (e) {
+      print(
+        'FAVORITES_PROVIDER: ⚠️ Failed to load river name for $reachId: $e',
+      );
+      // This is not critical, so don't throw
+    }
+  }
+
+  /// Update favorite with river name immediately (when we already have it)
+  void _updateFavoriteWithRiverName(String reachId, String riverName) {
+    final index = _favorites.indexWhere((f) => f.reachId == reachId);
+    if (index != -1) {
+      _favorites[index] = _favorites[index].copyWith(riverName: riverName);
+      notifyListeners();
+
+      // Also update in storage
+      _favoritesService.updateFavorite(reachId, riverName: riverName);
+    }
+  }
+
   /// Remove a favorite river
   Future<bool> removeFavorite(String reachId) async {
     print('FAVORITES_PROVIDER: Removing favorite: $reachId');
