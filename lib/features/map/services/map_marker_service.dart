@@ -1,4 +1,4 @@
-// lib/features/map/services/map_marker_service.dart
+// lib/features/map/services/map_marker_service.dart (ENHANCED)
 
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -6,6 +6,7 @@ import '../../../core/models/favorite_river.dart';
 
 /// Dedicated service for managing map markers efficiently
 /// Uses single annotation manager pattern with diff-based updates
+/// Enhanced to handle style changes properly
 class MapMarkerService {
   // Single annotation manager for all heart markers
   PointAnnotationManager? _annotationManager;
@@ -16,6 +17,9 @@ class MapMarkerService {
 
   // Track which reach IDs currently have markers
   final Set<String> _currentMarkerReachIds = {};
+
+  // NEW: Store current favorites to re-add after style changes
+  List<FavoriteRiver> _currentFavorites = [];
 
   bool _isInitialized = false;
 
@@ -31,6 +35,15 @@ class MapMarkerService {
           .createPointAnnotationManager();
 
       _isInitialized = true;
+
+      // NEW: Re-add any existing favorites if this is a re-initialization
+      if (_currentFavorites.isNotEmpty) {
+        print(
+          'MAP_MARKER_SERVICE: Re-adding ${_currentFavorites.length} favorites after style change',
+        );
+        await _reAddAllMarkers();
+      }
+
       print('MAP_MARKER_SERVICE: ✅ Marker service initialized');
     } catch (e) {
       print('MAP_MARKER_SERVICE: ❌ Error initializing markers: $e');
@@ -51,6 +64,9 @@ class MapMarkerService {
       print(
         'MAP_MARKER_SERVICE: Updating heart markers for ${favorites.length} favorites',
       );
+
+      // NEW: Store current favorites for style change recovery
+      _currentFavorites = List.from(favorites);
 
       // Get favorites that have coordinates and can be displayed
       final favoritesWithCoords = favorites
@@ -84,6 +100,30 @@ class MapMarkerService {
       );
     } catch (e) {
       print('MAP_MARKER_SERVICE: ❌ Error updating heart markers: $e');
+    }
+  }
+
+  /// NEW: Re-add all current favorites (for style changes)
+  Future<void> _reAddAllMarkers() async {
+    try {
+      // Clear existing marker tracking
+      _heartMarkers.clear();
+      _currentMarkerReachIds.clear();
+
+      // Re-add all current favorites
+      final favoritesWithCoords = _currentFavorites
+          .where((f) => f.hasCoordinates)
+          .toList();
+
+      for (final favorite in favoritesWithCoords) {
+        await _addMarker(favorite);
+      }
+
+      print(
+        'MAP_MARKER_SERVICE: ✅ Re-added ${favoritesWithCoords.length} markers after style change',
+      );
+    } catch (e) {
+      print('MAP_MARKER_SERVICE: ❌ Error re-adding markers: $e');
     }
   }
 
@@ -271,6 +311,7 @@ class MapMarkerService {
 
     _heartMarkers.clear();
     _currentMarkerReachIds.clear();
+    _currentFavorites.clear(); // NEW: Clear stored favorites
     _annotationManager = null;
     _mapboxMap = null;
     _isInitialized = false;

@@ -139,6 +139,7 @@ class MapPageState extends State<MapPage> {
       textureView: true,
       onMapCreated: _onMapCreated,
       onTapListener: _onMapTap,
+      onStyleLoadedListener: _onStyleLoaded, // NEW: Style loaded listener
     );
   }
 
@@ -207,8 +208,6 @@ class MapPageState extends State<MapPage> {
       // Wait a moment for map to fully initialize
       await Future.delayed(const Duration(milliseconds: 500));
 
-      print('🎨 Checking map style...');
-
       // Initialize core map services
       _vectorTilesService.setMapboxMap(mapboxMap);
       _reachSelectionService.setMapboxMap(mapboxMap);
@@ -216,9 +215,9 @@ class MapPageState extends State<MapPage> {
         mapboxMap,
       ); // NEW: Initialize controls service
 
-      print('🚀 Services initialized, loading vector tiles...');
+      print('🚀 Services initialized, loading initial content...');
 
-      // Load vector tiles
+      // Load vector tiles for initial style
       await _vectorTilesService.loadRiverReaches();
 
       // Initialize marker service
@@ -238,6 +237,51 @@ class MapPageState extends State<MapPage> {
         _isLoading = false;
         _errorMessage = 'Failed to load river data: ${e.toString()}';
       });
+    }
+  }
+
+  /// Called automatically when map style finishes loading
+  /// This ensures vector tiles are always reloaded after base layer changes
+  void _onStyleLoaded(StyleLoadedEventData data) {
+    // Don't reload on the initial style load (already loaded in _onMapCreated)
+    if (!_isLoading) {
+      _reloadVectorTilesAfterStyleChange();
+    }
+  }
+
+  /// Reload vector tiles after style change (async to avoid blocking style load)
+  Future<void> _reloadVectorTilesAfterStyleChange() async {
+    try {
+      print('🎨 Style loaded, reloading vector tiles...');
+
+      // Reset the vector tiles service state since the style changed
+      _vectorTilesService.dispose();
+      _vectorTilesService.setMapboxMap(_mapboxMap!);
+
+      // Reload vector tiles on the new style
+      await _vectorTilesService.loadRiverReaches();
+
+      print('✅ Vector tiles automatically reloaded after style change');
+
+      // NEW: Re-initialize marker service to ensure hearts stay on top
+      await _reAddHeartMarkersOnTop();
+    } catch (e) {
+      print('❌ Error reloading vector tiles after style change: $e');
+    }
+  }
+
+  /// Re-add heart markers to ensure they stay on top of vector tiles
+  Future<void> _reAddHeartMarkersOnTop() async {
+    try {
+      // Re-initialize the marker service - this will automatically
+      // re-add all current favorites that were stored in the service
+      await _markerService.initializeMarkers(_mapboxMap!);
+
+      print(
+        '🔄 Heart markers re-initialized and will appear on top of vector tiles',
+      );
+    } catch (e) {
+      print('❌ Error re-initializing heart markers: $e');
     }
   }
 
@@ -264,6 +308,7 @@ class MapPageState extends State<MapPage> {
       context,
       currentLayer: _controlsService.currentLayer,
       onLayerSelected: (layer) async {
+        // Simply change the base layer - vector tiles will be automatically reloaded
         await _controlsService.changeBaseLayer(layer);
         print('🗺️ Layer changed to: ${layer.displayName}');
       },
