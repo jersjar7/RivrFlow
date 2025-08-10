@@ -7,7 +7,7 @@ import 'package:flutter/cupertino.dart';
 /// Shows flow value, time, and visual styling based on flow category.
 /// Uses Cupertino design patterns with clean, accessible layout.
 class FlowValueIndicator extends StatelessWidget {
-  /// The flow value to display (in CFS)
+  /// The flow value to display
   final double? flowValue;
 
   /// The time this flow value represents
@@ -22,6 +22,9 @@ class FlowValueIndicator extends StatelessWidget {
   /// Optional color override
   final Color? borderColor;
 
+  /// Flow units (CFS, CMS, etc.)
+  final String units;
+
   const FlowValueIndicator({
     super.key,
     this.flowValue,
@@ -29,6 +32,7 @@ class FlowValueIndicator extends StatelessWidget {
     this.flowCategory,
     this.size = 80.0,
     this.borderColor,
+    this.units = 'CFS', // Default to CFS for backward compatibility
   });
 
   @override
@@ -78,9 +82,9 @@ class FlowValueIndicator extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
 
-            // Unit label
+            // Unit label - NOW DYNAMIC
             Text(
-              'CFS',
+              units,
               style: TextStyle(
                 fontSize: _getUnitTextSize(),
                 fontWeight: FontWeight.w500,
@@ -237,12 +241,14 @@ class CompactFlowValueIndicator extends StatelessWidget {
   final double? flowValue;
   final DateTime? time;
   final String? flowCategory;
+  final String units;
 
   const CompactFlowValueIndicator({
     super.key,
     this.flowValue,
     this.time,
     this.flowCategory,
+    this.units = 'CFS', // Default to CFS for backward compatibility
   });
 
   @override
@@ -252,6 +258,7 @@ class CompactFlowValueIndicator extends StatelessWidget {
       time: time,
       flowCategory: flowCategory,
       size: 60.0,
+      units: units,
     );
   }
 }
@@ -261,12 +268,14 @@ class LargeFlowValueIndicator extends StatelessWidget {
   final double? flowValue;
   final DateTime? time;
   final String? flowCategory;
+  final String units;
 
   const LargeFlowValueIndicator({
     super.key,
     this.flowValue,
     this.time,
     this.flowCategory,
+    this.units = 'CFS', // Default to CFS for backward compatibility
   });
 
   @override
@@ -276,6 +285,7 @@ class LargeFlowValueIndicator extends StatelessWidget {
       time: time,
       flowCategory: flowCategory,
       size: 100.0,
+      units: units,
     );
   }
 }

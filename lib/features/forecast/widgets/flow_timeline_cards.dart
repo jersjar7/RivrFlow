@@ -2,7 +2,9 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/models/user_settings.dart';
 import '../../../core/providers/reach_data_provider.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 
 class FlowTimelineCards extends StatelessWidget {
   final String forecastType;
@@ -17,6 +19,12 @@ class FlowTimelineCards extends StatelessWidget {
     this.height = 140,
     this.padding,
   });
+
+  // Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == FlowUnit.cms ? 'CMS' : 'CFS';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +86,7 @@ class FlowTimelineCards extends StatelessWidget {
     final flowCategory = _getFlowCategory(dataPoint.flow, reachProvider);
     final categoryColor = _getCategoryColor(flowCategory);
     final isCurrentTime = _isCurrentOrNearCurrent(dataPoint.validTime);
+    final currentUnit = _getCurrentFlowUnit(); // Get current unit
 
     return Container(
       width: 100,
@@ -141,9 +150,10 @@ class FlowTimelineCards extends StatelessWidget {
               ),
             ),
 
-            const Text(
-              'CFS',
-              style: TextStyle(
+            // UPDATED: Now dynamic units
+            Text(
+              currentUnit,
+              style: const TextStyle(
                 fontSize: 11,
                 color: CupertinoColors.secondaryLabel,
               ),
@@ -333,13 +343,12 @@ class FlowTimelineCards extends StatelessWidget {
     final reach = reachProvider.currentReach!;
     if (!reach.hasReturnPeriods) return 'Unknown';
 
-    // Convert CFS to CMS for comparison with return periods
-    final flowCms = flow * 0.0283168;
+    // Data is already in user's preferred unit, so use it directly
     final periods = reach.returnPeriods!.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
     for (final period in periods) {
-      if (flowCms < period.value) {
+      if (flow < period.value) {
         if (period.key == 2) return 'Normal';
         if (period.key <= 5) return 'Elevated';
         return 'High';
@@ -433,7 +442,7 @@ class FlowTimelineCards extends StatelessWidget {
 // Data models for flow timeline
 class FlowDataPoint {
   final DateTime validTime;
-  final double flow; // in CFS
+  final double flow; // in user's preferred unit (CFS or CMS)
   final FlowTrend? trend;
   final double? confidence;
   final Map<String, dynamic>? metadata;
@@ -448,7 +457,7 @@ class FlowDataPoint {
 
   @override
   String toString() {
-    return 'FlowDataPoint(time: $validTime, flow: ${flow.toStringAsFixed(1)} CFS, trend: $trend)';
+    return 'FlowDataPoint(time: $validTime, flow: ${flow.toStringAsFixed(1)}, trend: $trend)';
   }
 }
 

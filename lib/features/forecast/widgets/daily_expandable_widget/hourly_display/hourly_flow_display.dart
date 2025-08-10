@@ -5,6 +5,7 @@ import 'package:rivrflow/core/models/reach_data.dart';
 import 'package:rivrflow/features/forecast/widgets/daily_expandable_widget/hourly_display/flow_value_indicator.dart';
 import 'package:rivrflow/features/forecast/widgets/daily_expandable_widget/hourly_display/micro_bar_chart.dart';
 import 'package:rivrflow/features/forecast/widgets/daily_expandable_widget/hourly_display/time_slider.dart';
+import '../../../../../core/services/flow_unit_preference_service.dart';
 import '../../../domain/entities/daily_flow_forecast.dart';
 
 /// Main widget that displays hourly flow data for a selected day
@@ -49,6 +50,12 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
   DateTime? _selectedTime;
   double? _selectedFlow;
   String? _selectedCategory;
+
+  // Get current flow units
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == 'CMS' ? 'CMS' : 'CFS';
+  }
 
   @override
   void initState() {
@@ -153,7 +160,11 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
 
     // Get flow category for the selected hour
     if (widget.reach?.hasReturnPeriods == true && _selectedFlow != null) {
-      _selectedCategory = widget.reach!.getFlowCategory(_selectedFlow!);
+      final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+      _selectedCategory = widget.reach!.getFlowCategory(
+        _selectedFlow!,
+        currentUnit,
+      );
     } else {
       _selectedCategory = widget.forecast.flowCategory;
     }
@@ -192,6 +203,8 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
     if (_sortedHourlyData.length == 1) {
       return _buildSingleDataPointState();
     }
+
+    final currentUnit = _getCurrentFlowUnit();
 
     // NEW LAYOUT: Row with Column (chart/slider/time) + FlowValueIndicator
     return Container(
@@ -245,6 +258,7 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
                 time: _selectedTime,
                 flowCategory: _selectedCategory,
                 size: 100.0,
+                units: currentUnit, // Pass dynamic units
               ),
               Spacer(),
             ],
@@ -288,10 +302,12 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
     final entry = _sortedHourlyData.first;
     final time = entry.key;
     final flow = entry.value;
+    final currentUnit = _getCurrentFlowUnit();
 
     String? category;
     if (widget.reach?.hasReturnPeriods == true) {
-      category = widget.reach!.getFlowCategory(flow);
+      final flowUnit = FlowUnitPreferenceService().currentFlowUnit;
+      category = widget.reach!.getFlowCategory(flow, flowUnit);
     } else {
       category = widget.forecast.flowCategory;
     }
@@ -310,6 +326,7 @@ class _HourlyFlowDisplayState extends State<HourlyFlowDisplay> {
                 time: time,
                 flowCategory: category,
                 size: 120.0, // Updated size for single data point
+                units: currentUnit, // Pass dynamic units
               ),
             ),
           ),

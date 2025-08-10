@@ -2,7 +2,9 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/models/user_settings.dart';
 import '../../../core/providers/reach_data_provider.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 import 'dart:math' as math;
 
 enum FlowTimelineViewMode { hourCards, flowWave }
@@ -42,6 +44,12 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   void dispose() {
     _scrollController?.dispose();
     super.dispose();
+  }
+
+  // Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == FlowUnit.cms ? 'CMS' : 'CFS';
   }
 
   @override
@@ -170,6 +178,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     final categoryColor = _getCategoryColor(flowCategory);
     final isCurrentHour = _isCurrentOrNearCurrentHour(dataPoint.validTime);
     final trendPercentage = _calculateTrendPercentage(dataPoint);
+    final currentUnit = _getCurrentFlowUnit(); // Get current unit
 
     return Container(
       width: 100,
@@ -233,9 +242,10 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
               ),
             ),
 
-            const Text(
-              'CFS',
-              style: TextStyle(
+            // UPDATED: Now dynamic units
+            Text(
+              currentUnit,
+              style: const TextStyle(
                 fontSize: 11,
                 color: CupertinoColors.secondaryLabel,
               ),
@@ -322,13 +332,12 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     final reach = reachProvider.currentReach!;
     if (!reach.hasReturnPeriods) return 'Unknown';
 
-    // Convert CFS to CMS for comparison with return periods
-    final flowCms = flow * 0.0283168;
+    // Data is already in user's preferred unit, so use it directly
     final periods = reach.returnPeriods!.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
     for (final period in periods) {
-      if (flowCms < period.value) {
+      if (flow < period.value) {
         if (period.key == 2) return 'Normal';
         if (period.key <= 5) return 'Elevated';
         return 'High';
@@ -630,7 +639,7 @@ class FlowWavePainter extends CustomPainter {
 // Enhanced data model for hourly flow data
 class HourlyFlowDataPoint {
   final DateTime validTime;
-  final double flow; // in CFS
+  final double flow; // in user's preferred unit (CFS or CMS)
   final FlowTrend? trend;
   final double? trendPercentage; // Percentage change from previous hour
   final double? confidence;
@@ -647,7 +656,7 @@ class HourlyFlowDataPoint {
 
   @override
   String toString() {
-    return 'HourlyFlowDataPoint(time: $validTime, flow: ${flow.toStringAsFixed(1)} CFS, trend: $trend, change: ${trendPercentage?.toStringAsFixed(1)}%)';
+    return 'HourlyFlowDataPoint(time: $validTime, flow: ${flow.toStringAsFixed(1)}, trend: $trend, change: ${trendPercentage?.toStringAsFixed(1)}%)';
   }
 }
 

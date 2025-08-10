@@ -2,7 +2,9 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/models/user_settings.dart';
 import '../../../core/providers/reach_data_provider.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 
 class CurrentFlowStatusCard extends StatefulWidget {
   final VoidCallback? onTap;
@@ -37,6 +39,12 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
   void dispose() {
     _pulseController.dispose();
     super.dispose();
+  }
+
+  // Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == FlowUnit.cms ? 'CMS' : 'CFS';
   }
 
   @override
@@ -168,6 +176,9 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
       );
     }
 
+    // Get current flow unit dynamically
+    final currentUnit = _getCurrentFlowUnit();
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -179,11 +190,11 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
             fontWeight: FontWeight.bold,
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.only(bottom: 4, left: 4),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4, left: 4),
           child: Text(
-            'CFS',
-            style: TextStyle(
+            currentUnit, // UPDATED: Now dynamic
+            style: const TextStyle(
               color: CupertinoColors.white,
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -284,15 +295,10 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
   }
 
   Widget _buildFlowIndicator(
-    double currentFlow, // in CFS
-    Map<int, double> returnPeriods, // in CMS from API
+    double currentFlow, // Already in user's preferred unit
+    Map<int, double> returnPeriods, // Already in user's preferred unit
   ) {
-    // Convert return periods from CMS to CFS for consistency
-    final returnPeriodsCfs = returnPeriods.map(
-      (year, cms) => MapEntry(year, cms * 35.3147), // 1 CMS = 35.3147 CFS
-    );
-
-    final maxReturnPeriod = returnPeriodsCfs.values.reduce(
+    final maxReturnPeriod = returnPeriods.values.reduce(
       (a, b) => a > b ? a : b,
     );
     final scale = maxReturnPeriod * 1.1; // 10% padding
@@ -317,7 +323,7 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
             children: [
               // Current flow marker
               Positioned(
-                // Now we're comparing CFS to CFS ✅
+                // Now we're comparing same units to same units ✅
                 left:
                     (currentFlow /
                             scale *
@@ -549,6 +555,9 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
       100,
     ].where((year) => returnPeriods.containsKey(year)).toList();
 
+    // Get current flow unit for table header
+    final currentUnit = _getCurrentFlowUnit();
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -569,10 +578,10 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
                   ),
                 ),
               ),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Flow (CFS)',
-                  style: TextStyle(
+                  'Flow ($currentUnit)', // UPDATED: Now dynamic
+                  style: const TextStyle(
                     color: CupertinoColors.white,
                     fontWeight: FontWeight.bold,
                   ),
@@ -584,8 +593,7 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
           const SizedBox(height: 8),
           ...periods.map((year) {
             final flow = returnPeriods[year]!;
-            // Convert from CMS to CFS (1 CMS = 35.3147 CFS)
-            final flowCfs = flow * 35.3147;
+            // Data is already in user's preferred unit from the backend
 
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
@@ -602,7 +610,7 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
                   ),
                   Expanded(
                     child: Text(
-                      _formatFlow(flowCfs),
+                      _formatFlow(flow),
                       style: TextStyle(
                         color: CupertinoColors.white.withOpacity(0.9),
                       ),

@@ -2,13 +2,14 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:rivrflow/core/models/reach_data.dart';
+import '../../../../../core/services/flow_unit_preference_service.dart';
 
 /// A compact bar chart that displays hourly flow data with selection highlighting
 ///
 /// Shows each hour as a small bar with colors based on flow categories.
 /// Supports touch interaction for hour selection with Cupertino styling.
 class MicroBarChart extends StatelessWidget {
-  /// Hourly data to display (sorted by time)
+  /// Hourly data to display (sorted by time) - values in user's preferred unit
   final List<MapEntry<DateTime, double>> hourlyData;
 
   /// Index of currently selected hour
@@ -134,7 +135,9 @@ class MicroBarChart extends StatelessWidget {
   /// Get color for flow value based on category
   Color _getColorForFlow(double flow) {
     if (reach?.hasReturnPeriods == true) {
-      final category = reach!.getFlowCategory(flow);
+      // Flow data is already in user's preferred unit
+      final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+      final category = reach!.getFlowCategory(flow, currentUnit);
       return _getColorForCategory(category);
     } else {
       // Fallback to gradient based on relative value
@@ -292,7 +295,9 @@ class _MicroBarChartPainter extends CustomPainter {
   /// Get color for flow value
   Color _getColorForFlow(double flow) {
     if (reach?.hasReturnPeriods == true) {
-      final category = reach!.getFlowCategory(flow);
+      // Flow data is already in user's preferred unit
+      final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+      final category = reach!.getFlowCategory(flow, currentUnit);
       return _getColorForCategory(category);
     } else {
       return _getGradientColor(flow);

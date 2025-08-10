@@ -222,6 +222,7 @@ class ChartPreviewWidget extends StatelessWidget {
 
       try {
         // Use ALL data points (no filtering by time - includes past hours)
+        // Flow data is already in user's preferred unit from backend
         final data = forecastSeries.data;
 
         for (final point in data) {
@@ -264,7 +265,7 @@ class ChartPreviewWidget extends StatelessWidget {
       for (int i = 0; i < data.length && i < 50; i++) {
         // Limit points for preview
         final point = data[i];
-        final flow = point.flow;
+        final flow = point.flow; // Already in user's preferred unit
 
         if (flow > -9000) {
           // Filter out missing data sentinel values
@@ -302,7 +303,7 @@ class ChartPreviewWidget extends StatelessWidget {
 
 class ChartDataPoint {
   final double x;
-  final double y;
+  final double y; // Flow value in user's preferred unit (CFS or CMS)
 
   ChartDataPoint({required this.x, required this.y});
 }

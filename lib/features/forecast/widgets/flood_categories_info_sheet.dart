@@ -1,13 +1,21 @@
 // lib/features/forecast/widgets/flood_categories_info_sheet.dart
 
 import 'package:flutter/cupertino.dart';
+import 'package:rivrflow/core/models/user_settings.dart';
 import '../../../core/constants.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 
 /// Educational bottom sheet that explains flood risk categories based on return periods
 class FloodCategoriesInfoSheet extends StatelessWidget {
   final Map<int, double>? returnPeriods;
 
   const FloodCategoriesInfoSheet({super.key, this.returnPeriods});
+
+  // Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == FlowUnit.cms ? 'CMS' : 'CFS';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -147,12 +155,10 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
     Color backgroundColor,
     Color iconColor,
     IconData icon,
-    double? thresholdFlowCms,
+    double? thresholdFlow, // Already in user's preferred unit
   ) {
-    const cmsToCs = 35.3147; // Convert CMS to CFS
-    final thresholdFlowCfs = thresholdFlowCms != null
-        ? thresholdFlowCms * cmsToCs
-        : null;
+    // Get current flow unit for display
+    final currentUnit = _getCurrentFlowUnit();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -180,10 +186,10 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                         color: iconColor,
                       ),
                     ),
-                    if (thresholdFlowCfs != null) ...[
+                    if (thresholdFlow != null) ...[
                       const Spacer(),
                       Text(
-                        '${_formatFlowValue(thresholdFlowCfs)} CFS',
+                        '${_formatFlowValue(thresholdFlow)} $currentUnit', // UPDATED: Now dynamic
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,

@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import '../../../core/providers/reach_data_provider.dart';
 import '../../../core/constants.dart';
 import '../../../core/services/forecast_service.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 
 // Simple controller for chart interactions
 class ChartController {
@@ -75,6 +76,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
   late ZoomPanBehavior _zoomPanBehavior;
   late TooltipBehavior _tooltipBehavior;
 
+  // Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == 'CMS' ? 'CMS' : 'CFS';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -107,6 +114,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
   }
 
   void _initializeBehaviors() {
+    final currentUnit = _getCurrentFlowUnit(); // Get current unit
+
     // Trackball - Shows tooltip for nearest data point
     _trackballBehavior = TrackballBehavior(
       enable: true,
@@ -124,7 +133,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
         color: CupertinoColors.systemBackground.resolveFrom(context),
         borderColor: CupertinoColors.separator.resolveFrom(context),
         borderWidth: 1,
-        format: 'point.y CFS',
+        format: 'point.y $currentUnit', // UPDATED: Now dynamic
         textStyle: TextStyle(
           color: CupertinoColors.label.resolveFrom(context),
           fontSize: 12,
@@ -176,7 +185,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       borderColor: CupertinoColors.separator.resolveFrom(context),
       borderWidth: 1,
       opacity: 0.9,
-      format: 'point.y CFS',
+      format: 'point.y $currentUnit', // UPDATED: Now dynamic
       textStyle: TextStyle(
         color: CupertinoColors.label.resolveFrom(context),
         fontSize: 12,
@@ -364,17 +373,17 @@ class _InteractiveChartState extends State<InteractiveChart> {
     _maxY = boundsData.map((data) => data.y).reduce(math.max);
 
     // Include return period values in bounds calculation when toggle is ON
+    // Data is already in user's preferred unit from backend
     if (widget.showReturnPeriods && widget.reachProvider.hasData) {
       final reach = widget.reachProvider.currentReach;
       if (reach?.returnPeriods != null) {
         final returnPeriods = reach!.returnPeriods!;
-        const cmsToCs = 35.3147; // Convert CMS to CFS
 
         for (final entry in returnPeriods.entries) {
-          final flowCfs = entry.value * cmsToCs;
+          final flowValue = entry.value; // Already in preferred unit
           // Include return period values in Y bounds
-          if (flowCfs > _maxY) _maxY = flowCfs;
-          if (flowCfs < _minY) _minY = flowCfs;
+          if (flowValue > _maxY) _maxY = flowValue;
+          if (flowValue < _minY) _minY = flowValue;
         }
 
         print(
@@ -577,12 +586,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
     if (reach?.returnPeriods == null) return [];
 
     final returnPeriods = reach!.returnPeriods!;
-    const cmsToCs = 35.3147; // Convert CMS to CFS
+    // Data is already in user's preferred unit
 
-    // Convert return periods to CFS and sort
+    // Sort return periods
     final sortedReturnPeriods = <int, double>{};
     for (final entry in returnPeriods.entries) {
-      sortedReturnPeriods[entry.key] = entry.value * cmsToCs;
+      sortedReturnPeriods[entry.key] = entry.value;
     }
 
     final plotBands = <PlotBand>[];
@@ -655,7 +664,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     if (reach?.returnPeriods == null) return [];
 
     final returnPeriods = reach!.returnPeriods!;
-    const cmsToCs = 35.3147; // Convert CMS to CFS
+    // Data is already in user's preferred unit
 
     final lines = <PlotBand>[];
     final sortedEntries = returnPeriods.entries.toList()
@@ -669,14 +678,14 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
       // Only show lines for specified years
       if (yearsToShow.contains(year)) {
-        final flowCfs = entry.value * cmsToCs;
+        final flowValue = entry.value; // Already in preferred unit
         final label = AppConstants.getReturnPeriodLabel(year);
 
         // Create a line (start == end) with label
         lines.add(
           PlotBand(
-            start: flowCfs,
-            end: flowCfs,
+            start: flowValue,
+            end: flowValue,
             borderColor: CupertinoColors.label,
             borderWidth: 0,
             dashArray: [5, 5],
@@ -718,6 +727,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
 
     final nowPosition = _getNowLinePosition();
+    final currentUnit = _getCurrentFlowUnit(); // Get current unit
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -780,7 +790,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
               maximum: _maxY,
               interval: (_maxY - _minY) / 6,
               title: AxisTitle(
-                text: 'Flow (CFS)',
+                text: 'Flow ($currentUnit)', // UPDATED: Now dynamic
                 textStyle: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -801,7 +811,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                 enable: true,
                 borderColor: CupertinoColors.systemBlue,
                 borderWidth: 1,
-                format: '{value} CFS',
+                format: '{value} $currentUnit', // UPDATED: Now dynamic
                 textStyle: TextStyle(
                   color: CupertinoColors.label.resolveFrom(context),
                   fontSize: 11,
@@ -823,7 +833,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
               final time = args.chartPointInfo.chartPoint?.x;
               if (flow != null && time != null) {
                 args.chartPointInfo.label =
-                    '${_formatFlowValue(flow.toDouble())} CFS\n${_formatTimeValue(time)}';
+                    '${_formatFlowValue(flow.toDouble())} $currentUnit\n${_formatTimeValue(time)}'; // UPDATED: Now dynamic
               }
             },
 
@@ -832,7 +842,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
               if (args.orientation == AxisOrientation.vertical) {
                 args.text = _formatTimeValue(args.value);
               } else {
-                args.text = '${_formatFlowValue(args.value)} CFS';
+                args.text =
+                    '${_formatFlowValue(args.value)} $currentUnit'; // UPDATED: Now dynamic
               }
             },
 
@@ -954,7 +965,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
 // Data models for chart
 class ChartDataPoint {
   final DateTime time;
-  final double flow;
+  final double flow; // In user's preferred unit (CFS or CMS)
   final double? confidence;
   final Map<String, dynamic>? metadata;
 
@@ -969,7 +980,7 @@ class ChartDataPoint {
 // Simple data class for chart points
 class ChartData {
   final double x;
-  final double y;
+  final double y; // Flow value in user's preferred unit
 
   ChartData(this.x, this.y);
 }

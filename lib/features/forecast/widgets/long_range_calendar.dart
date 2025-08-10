@@ -246,6 +246,7 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
       isToday: _isToday(calendarDay.date),
       isCurrentMonth: calendarDay.isCurrentMonth,
       cellSize: 50,
+      // Units will be handled by CalendarDayCell if it displays flow values
     );
   }
 

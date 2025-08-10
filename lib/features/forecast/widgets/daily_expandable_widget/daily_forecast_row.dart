@@ -2,8 +2,10 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:rivrflow/core/models/reach_data.dart';
+import 'package:rivrflow/core/models/user_settings.dart';
 import 'package:rivrflow/features/forecast/widgets/daily_expandable_widget/flow_condition_icon.dart';
 import 'package:rivrflow/features/forecast/widgets/daily_expandable_widget/flow_range_bar.dart';
+import '../../../../core/services/flow_unit_preference_service.dart';
 import '../../domain/entities/daily_flow_forecast.dart';
 import '../../services/daily_forecast_processor.dart';
 import 'hourly_display/hourly_flow_display.dart';
@@ -98,6 +100,12 @@ class _DailyForecastRowState extends State<DailyForecastRow>
         _animationController.reverse();
       }
     }
+  }
+
+  // Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == FlowUnit.cms ? 'CMS' : 'CFS';
   }
 
   /// Toggle the expansion state
@@ -346,6 +354,8 @@ class _DailyForecastRowState extends State<DailyForecastRow>
 
   /// Build individual statistic item
   Widget _buildStatItem(BuildContext context, String label, double value) {
+    final currentUnit = _getCurrentFlowUnit(); // Get current unit
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -366,7 +376,7 @@ class _DailyForecastRowState extends State<DailyForecastRow>
         ),
         const SizedBox(height: 4),
         Text(
-          '${_formatFlow(value)} CFS',
+          '${_formatFlow(value)} $currentUnit', // UPDATED: Now dynamic
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
