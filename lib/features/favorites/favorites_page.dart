@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/services/flow_unit_preference_service.dart';
 import 'package:rivrflow/features/auth/providers/auth_provider.dart';
 import 'package:rivrflow/features/favorites/widgets/favorite_river_card.dart';
 import 'package:rivrflow/features/favorites/widgets/favorites_search_bar.dart';
@@ -495,80 +496,101 @@ class _FavoritesPageState extends State<FavoritesPage> {
     );
   }
 
-  // ADD: Handle flow unit change asynchronously
-  void _handleFlowUnitChange(String value) {
-    setState(() {
-      _selectedFlowUnit = value;
-      _isUpdatingFlowUnit = true;
-    });
-
-    // Handle async operations without blocking the callback
-    _updateFlowUnitAsync(value);
-  }
-
+  // Enhanced error handling in the async method
   Future<void> _updateFlowUnitAsync(String value) async {
+    print('=== FLOW UNIT UPDATE START ===');
+    print('Requested value: $value');
+    print('Current _selectedFlowUnit: $_selectedFlowUnit');
+    print('_isUpdatingFlowUnit: $_isUpdatingFlowUnit');
+
     try {
-      // Get current user ID
+      print('Step 1: Getting auth provider...');
       final authProvider = context.read<AuthProvider>();
+      print('Step 2: Got auth provider');
+
       final userId = authProvider.currentUser?.uid;
+      print('Step 3: User ID: $userId');
 
       if (userId != null) {
+        print('Step 4: User ID exists, updating settings...');
+
         // Update user settings with new flow unit
-        await UserSettingsService().updateFlowUnit(
-          userId,
-          value == 'CMS' ? FlowUnit.cms : FlowUnit.cfs,
+        final flowUnit = value == 'CMS' ? FlowUnit.cms : FlowUnit.cfs;
+        print('Step 5: FlowUnit enum value: $flowUnit');
+
+        print('Step 6: Calling UserSettingsService.updateFlowUnit...');
+        await UserSettingsService().updateFlowUnit(userId, flowUnit);
+        print(
+          'Step 7: UserSettingsService.updateFlowUnit completed successfully',
         );
+
+        print('Step 8: Updating FlowUnitPreferenceService...');
+        FlowUnitPreferenceService().setFlowUnit(value);
+        print('Step 9: FlowUnitPreferenceService updated');
 
         print('FAVORITES_PAGE: Flow unit updated to: $value');
 
         // Trigger app refresh by refreshing favorites (they'll show in new units)
         if (mounted) {
+          print('Step 10: Widget is mounted, getting favorites provider...');
           final favoritesProvider = context.read<FavoritesProvider>();
+          print(
+            'Step 11: Got favorites provider, calling refreshAllFavorites...',
+          );
+
           await favoritesProvider.refreshAllFavorites();
+          print('Step 12: refreshAllFavorites completed successfully');
+        } else {
+          print('Step 10: Widget NOT mounted, skipping favorites refresh');
         }
       } else {
-        print('FAVORITES_PAGE: No user ID available for flow unit update');
+        print('ERROR: No user ID available for flow unit update');
         // Revert UI state if no user
         if (mounted) {
+          print('Reverting UI state due to missing user ID');
           setState(() {
             _selectedFlowUnit = _selectedFlowUnit == 'CFS' ? 'CMS' : 'CFS';
           });
         }
       }
-    } catch (e) {
-      print('FAVORITES_PAGE: Error updating flow unit: $e');
+    } catch (e, stackTrace) {
+      print('=== ERROR IN FLOW UNIT UPDATE ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
 
       // Revert UI state on error
       if (mounted) {
+        print('Reverting UI state due to error');
         setState(() {
           _selectedFlowUnit = _selectedFlowUnit == 'CFS' ? 'CMS' : 'CFS';
         });
+        print('UI state reverted. New _selectedFlowUnit: $_selectedFlowUnit');
 
         // Show error to user
-        if (mounted) {
-          showCupertinoDialog(
-            context: context,
-            builder: (context) => CupertinoAlertDialog(
-              title: const Text('Update Failed'),
-              content: const Text(
-                'Unable to update flow unit preference. Please try again.',
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('Update Failed'),
+            content: Text('Error: $e'),
+            actions: [
+              CupertinoDialogAction(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
               ),
-              actions: [
-                CupertinoDialogAction(
-                  child: const Text('OK'),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          );
-        }
+            ],
+          ),
+        );
       }
     } finally {
+      print('=== FLOW UNIT UPDATE FINALLY BLOCK ===');
       if (mounted) {
+        print('Setting _isUpdatingFlowUnit = false');
         setState(() {
           _isUpdatingFlowUnit = false;
         });
+        print('Final _selectedFlowUnit: $_selectedFlowUnit');
       }
+      print('=== FLOW UNIT UPDATE END ===');
     }
   }
 
@@ -627,99 +649,96 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Widget _buildDropdownMenu() {
-    return SafeArea(
-      child: Align(
-        alignment: Alignment.topRight,
-        child: Container(
-          margin: const EdgeInsets.only(top: 30, right: 30),
-          width: 250,
-          decoration: BoxDecoration(
-            color: const Color(0xFF2C2C2E), // Dark modal background
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: CupertinoColors.black.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.topRight,
+            child: Container(
+              margin: const EdgeInsets.only(top: 30, right: 30),
+              width: 250,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2C2C2E),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: CupertinoColors.black.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildMenuOption('Notifications', CupertinoIcons.bell, () {
+                    Navigator.pop(context);
+                    Navigator.of(context).pushNamed('/notifications-settings');
+                  }),
+                  _buildMenuDivider(),
+                  _buildFlowUnitsToggleWithModalState(setModalState),
+                  _buildMenuDivider(),
+                  _buildMenuOption('App Theme', CupertinoIcons.moon, () {
+                    Navigator.pop(context);
+                    Navigator.of(context).pushNamed('/app-theme-settings');
+                  }),
+                  _buildMenuDivider(),
+                  _buildMenuOption('Sponsors', CupertinoIcons.creditcard, () {
+                    Navigator.pop(context);
+                    Navigator.of(context).pushNamed('/sponsors');
+                  }),
+                  _buildMenuDivider(color: CupertinoColors.systemGrey),
+                  _buildSignOutOption(),
+                ],
+              ),
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildMenuOption('Notifications', CupertinoIcons.bell, () {
-                Navigator.pop(context);
-                Navigator.of(context).pushNamed('/notifications-settings');
-              }),
-              _buildMenuDivider(),
-              // UPDATED: Connected Flow Units Toggle
-              _buildFlowUnitsToggle(),
-              _buildMenuDivider(),
-              _buildMenuOption('App Theme', CupertinoIcons.moon, () {
-                Navigator.pop(context);
-                Navigator.of(context).pushNamed('/app-theme-settings');
-              }),
-              _buildMenuDivider(),
-              _buildMenuOption('Sponsors', CupertinoIcons.creditcard, () {
-                Navigator.pop(context);
-                Navigator.of(context).pushNamed('/sponsors');
-              }),
-              _buildMenuDivider(color: CupertinoColors.systemGrey),
-              _buildSignOutOption(),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  // UPDATED: Connected Flow Units Toggle Widget
-  Widget _buildFlowUnitsToggle() {
+  Widget _buildFlowUnitsToggleWithModalState(StateSetter setModalState) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 16),
       child: Row(
         children: [
-          // Toggle control
-          Expanded(
-            child: CupertinoSlidingSegmentedControl<String>(
-              groupValue: _selectedFlowUnit,
-              onValueChanged: (String? value) {
-                if (_isUpdatingFlowUnit) return;
-                if (value != null) {
-                  _handleFlowUnitChange(value);
-                }
-              },
-              children: const {
-                'CFS': Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Text(
-                    'CFS',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                  ),
-                ),
-                'CMS': Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Text(
-                    'CMS',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              },
-            ),
+          CupertinoSlidingSegmentedControl<String>(
+            groupValue: _selectedFlowUnit,
+            onValueChanged: (String? value) {
+              if (value != null &&
+                  value != _selectedFlowUnit &&
+                  !_isUpdatingFlowUnit) {
+                // Update both the page state AND modal state
+                setState(() {
+                  _selectedFlowUnit = value;
+                  _isUpdatingFlowUnit = true;
+                });
+                setModalState(() {
+                  _selectedFlowUnit = value;
+                  _isUpdatingFlowUnit = true;
+                });
+                _updateFlowUnitAsync(value);
+              }
+            },
+            children: const {
+              'CFS': Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('CFS', style: TextStyle(fontSize: 13)),
+              ),
+              'CMS': Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('CMS', style: TextStyle(fontSize: 13)),
+              ),
+            },
           ),
-          const SizedBox(width: 80),
-          // Icon to the right - show loading indicator when updating
-          _isUpdatingFlowUnit
-              ? const CupertinoActivityIndicator(
-                  radius: 11,
-                  color: CupertinoColors.white,
-                )
-              : const Icon(
-                  CupertinoIcons.drop,
-                  color: CupertinoColors.white,
-                  size: 22,
-                ),
+          const Spacer(),
+          Icon(CupertinoIcons.drop, color: CupertinoColors.white, size: 22),
+          if (_isUpdatingFlowUnit) ...[
+            const SizedBox(width: 8),
+            const CupertinoActivityIndicator(radius: 8),
+          ],
         ],
       ),
     );
