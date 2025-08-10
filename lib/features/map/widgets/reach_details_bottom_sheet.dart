@@ -57,6 +57,13 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     _loadDataProgressively();
   }
 
+  // Simple flow formatting with unit conversion
+  String _formatFlow(double flowCfs) {
+    // TODO: Get user preference and convert if needed
+    // For now, default to CFS like other widgets
+    return '${flowCfs.toStringAsFixed(0)} CFS';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -257,7 +264,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           ),
           const SizedBox(height: 12),
           Text(
-            '${_currentFlow!.toStringAsFixed(0)} CFS',
+            _formatFlow(_currentFlow!),
             style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
@@ -500,7 +507,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
         // Check if we already have return periods (cached)
         if (forecast.reach.hasReturnPeriods && _currentFlow != null) {
-          _flowCategory = forecast.reach.getFlowCategory(_currentFlow!);
+          _flowCategory = _forecastService.getFlowCategory(forecast);
         } else if (_currentFlow != null) {
           // We have flow but not return periods yet
           _isLoadingClassification = true;
@@ -553,9 +560,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
       // Update flow classification if we now have return periods
       if (enhancedForecast.reach.hasReturnPeriods && _currentFlow != null) {
-        final flowCategory = enhancedForecast.reach.getFlowCategory(
-          _currentFlow!,
-        );
+        final flowCategory = _forecastService.getFlowCategory(enhancedForecast);
 
         setState(() {
           _flowCategory = flowCategory;
@@ -762,9 +767,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     }
 
     if (_currentFlow != null) {
-      buffer.writeln(
-        '\n💧 Current Flow: ${_currentFlow!.toStringAsFixed(0)} CFS',
-      );
+      buffer.writeln('\n💧 Current Flow: ${_formatFlow(_currentFlow!)}');
       if (_flowCategory != null) {
         buffer.writeln('⚠️ Risk Level: $_flowCategory');
       }
@@ -790,7 +793,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
     if (_currentFlow != null && _flowCategory != null) {
       buffer.writeln(
-        '\n💧 Current Flow: ${_currentFlow!.toStringAsFixed(0)} CFS ($_flowCategory)',
+        '\n💧 Current Flow: ${_formatFlow(_currentFlow!)} ($_flowCategory)',
       );
     }
 

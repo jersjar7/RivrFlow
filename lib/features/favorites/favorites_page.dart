@@ -9,6 +9,9 @@ import 'package:rivrflow/features/favorites/widgets/favorite_river_card.dart';
 import 'package:rivrflow/features/favorites/widgets/favorites_search_bar.dart';
 import '../../../core/providers/favorites_provider.dart';
 import '../../../core/models/favorite_river.dart';
+// ADD: Import the services and models for flow unit handling
+import '../../../features/auth/services/user_settings_service.dart';
+import '../../../core/models/user_settings.dart';
 
 /// Main favorites page - serves as app home screen
 /// Features: reorderable list, pull-to-refresh, search, empty state
@@ -24,6 +27,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
   bool _isRefreshing = false;
   bool _showSearch = false; // New state for search visibility
   String _selectedFlowUnit = 'CFS';
+  bool _isUpdatingFlowUnit =
+      false; // ADD: Track loading state for flow unit updates
 
   @override
   void initState() {
@@ -31,12 +36,37 @@ class _FavoritesPageState extends State<FavoritesPage> {
     // Initialize favorites when page loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeFavorites();
+      _loadUserFlowUnitPreference(); // ADD: Load user's current preference
     });
   }
 
   Future<void> _initializeFavorites() async {
     final favoritesProvider = context.read<FavoritesProvider>();
     await favoritesProvider.initializeAndRefresh();
+  }
+
+  // ADD: Load user's current flow unit preference
+  Future<void> _loadUserFlowUnitPreference() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final userId = authProvider.currentUser?.uid;
+
+      if (userId != null) {
+        final userSettings = await UserSettingsService().getUserSettings(
+          userId,
+        );
+        if (userSettings != null && mounted) {
+          setState(() {
+            _selectedFlowUnit = userSettings.preferredFlowUnit == FlowUnit.cms
+                ? 'CMS'
+                : 'CFS';
+          });
+        }
+      }
+    } catch (e) {
+      print('FAVORITES_PAGE: Error loading flow unit preference: $e');
+      // Keep default CFS if loading fails
+    }
   }
 
   @override
@@ -465,6 +495,83 @@ class _FavoritesPageState extends State<FavoritesPage> {
     );
   }
 
+  // ADD: Handle flow unit change asynchronously
+  void _handleFlowUnitChange(String value) {
+    setState(() {
+      _selectedFlowUnit = value;
+      _isUpdatingFlowUnit = true;
+    });
+
+    // Handle async operations without blocking the callback
+    _updateFlowUnitAsync(value);
+  }
+
+  Future<void> _updateFlowUnitAsync(String value) async {
+    try {
+      // Get current user ID
+      final authProvider = context.read<AuthProvider>();
+      final userId = authProvider.currentUser?.uid;
+
+      if (userId != null) {
+        // Update user settings with new flow unit
+        await UserSettingsService().updateFlowUnit(
+          userId,
+          value == 'CMS' ? FlowUnit.cms : FlowUnit.cfs,
+        );
+
+        print('FAVORITES_PAGE: Flow unit updated to: $value');
+
+        // Trigger app refresh by refreshing favorites (they'll show in new units)
+        if (mounted) {
+          final favoritesProvider = context.read<FavoritesProvider>();
+          await favoritesProvider.refreshAllFavorites();
+        }
+      } else {
+        print('FAVORITES_PAGE: No user ID available for flow unit update');
+        // Revert UI state if no user
+        if (mounted) {
+          setState(() {
+            _selectedFlowUnit = _selectedFlowUnit == 'CFS' ? 'CMS' : 'CFS';
+          });
+        }
+      }
+    } catch (e) {
+      print('FAVORITES_PAGE: Error updating flow unit: $e');
+
+      // Revert UI state on error
+      if (mounted) {
+        setState(() {
+          _selectedFlowUnit = _selectedFlowUnit == 'CFS' ? 'CMS' : 'CFS';
+        });
+
+        // Show error to user
+        if (mounted) {
+          showCupertinoDialog(
+            context: context,
+            builder: (context) => CupertinoAlertDialog(
+              title: const Text('Update Failed'),
+              content: const Text(
+                'Unable to update flow unit preference. Please try again.',
+              ),
+              actions: [
+                CupertinoDialogAction(
+                  child: const Text('OK'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingFlowUnit = false;
+        });
+      }
+    }
+  }
+
   // Event handlers
   Future<void> _handleRefresh(FavoritesProvider favoritesProvider) async {
     if (_isRefreshing) return;
@@ -545,7 +652,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                 Navigator.of(context).pushNamed('/notifications-settings');
               }),
               _buildMenuDivider(),
-              // NEW: Combined Flow Units Toggle
+              // UPDATED: Connected Flow Units Toggle
               _buildFlowUnitsToggle(),
               _buildMenuDivider(),
               _buildMenuOption('App Theme', CupertinoIcons.moon, () {
@@ -566,7 +673,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     );
   }
 
-  // NEW: Combined Flow Units Toggle Widget
+  // UPDATED: Connected Flow Units Toggle Widget
   Widget _buildFlowUnitsToggle() {
     return Container(
       width: double.infinity,
@@ -578,12 +685,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
             child: CupertinoSlidingSegmentedControl<String>(
               groupValue: _selectedFlowUnit,
               onValueChanged: (String? value) {
+                if (_isUpdatingFlowUnit) return;
                 if (value != null) {
-                  setState(() {
-                    _selectedFlowUnit = value;
-                  });
-                  // TODO: Implement flow unit change logic
-                  print('Flow unit changed to: $value');
+                  _handleFlowUnitChange(value);
                 }
               },
               children: const {
@@ -605,12 +709,17 @@ class _FavoritesPageState extends State<FavoritesPage> {
             ),
           ),
           const SizedBox(width: 80),
-          // Icon to the right
-          const Icon(
-            CupertinoIcons.drop,
-            color: CupertinoColors.white,
-            size: 22,
-          ),
+          // Icon to the right - show loading indicator when updating
+          _isUpdatingFlowUnit
+              ? const CupertinoActivityIndicator(
+                  radius: 11,
+                  color: CupertinoColors.white,
+                )
+              : const Icon(
+                  CupertinoIcons.drop,
+                  color: CupertinoColors.white,
+                  size: 22,
+                ),
         ],
       ),
     );
