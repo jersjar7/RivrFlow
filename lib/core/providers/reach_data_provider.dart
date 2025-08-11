@@ -1,6 +1,7 @@
 // lib/core/providers/reach_data_provider.dart
 
 import 'package:flutter/foundation.dart';
+import 'package:rivrflow/core/services/flow_unit_preference_service.dart';
 import 'package:rivrflow/features/forecast/widgets/horizontal_flow_timeline.dart';
 import '../models/reach_data.dart';
 import '../services/forecast_service.dart';
@@ -465,13 +466,20 @@ class ReachDataProvider with ChangeNotifier {
 
     // Return cached value if available
     if (_currentFlowCache.containsKey(cacheKey)) {
-      return _currentFlowCache[cacheKey];
+      final cachedValue = _currentFlowCache[cacheKey];
+      print(
+        'REACH_PROVIDER: Using cached flow value: $cachedValue ${FlowUnitPreferenceService().currentFlowUnit}',
+      );
+      return cachedValue;
     }
 
     // Compute and cache
     final flow = _forecastService.getCurrentFlow(
       _currentForecast!,
       preferredType: preferredType,
+    );
+    print(
+      'REACH_PROVIDER: Computed new flow value: $flow ${FlowUnitPreferenceService().currentFlowUnit}',
     );
     _currentFlowCache[cacheKey] = flow;
     return flow;

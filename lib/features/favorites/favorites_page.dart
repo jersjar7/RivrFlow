@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/providers/reach_data_provider.dart';
 import 'package:rivrflow/core/services/flow_unit_preference_service.dart';
 import 'package:rivrflow/features/auth/providers/auth_provider.dart';
 import 'package:rivrflow/features/favorites/widgets/favorite_river_card.dart';
@@ -507,10 +508,15 @@ class _FavoritesPageState extends State<FavoritesPage> {
         await UserSettingsService().updateFlowUnit(userId, flowUnit);
         FlowUnitPreferenceService().setFlowUnit(value);
 
-        // Force UI rebuild to show new units immediately
+        // Clear unit-dependent caches
+        // This forces the Current Flow Status Card to recalculate with new units
+        final reachProvider = context.read<ReachDataProvider>();
+        reachProvider.clearUnitDependentCaches();
+
+        // Force UI rebuild
         if (mounted) {
           setState(() {
-            // This setState triggers rebuild of all widgets that use formattedFlow
+            // This triggers rebuild of favorites page river cards
           });
         }
       } else {

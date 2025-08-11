@@ -116,16 +116,20 @@ class FavoriteRiver {
   }
 
   /// Get formatted flow display with proper unit conversion
-  /// Get formatted flow display - data already converted by API layer
   String get formattedFlow {
     if (lastKnownFlow == null) return 'No data';
 
     final unitService = FlowUnitPreferenceService();
     final currentUnit = unitService.currentFlowUnit;
 
-    // Just display the value with current unit label
-    // Flow values are already in the correct unit from NoaaApiService
-    return '${lastKnownFlow!.toStringAsFixed(0)} $currentUnit';
+    // Convert from stored unit (assume CFS) to user's preferred unit
+    final convertedFlow = unitService.convertFlow(
+      lastKnownFlow!,
+      'CFS',
+      currentUnit,
+    );
+
+    return '${convertedFlow.toStringAsFixed(0)} $currentUnit';
   }
 
   @override
