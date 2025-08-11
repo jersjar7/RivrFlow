@@ -1,6 +1,7 @@
 // lib/features/forecast/domain/entities/daily_flow_forecast.dart
 
 import 'package:flutter/cupertino.dart';
+import 'package:rivrflow/core/services/flow_unit_preference_service.dart';
 
 /// Represents a single day's flow forecast data processed from ensemble forecasts
 ///
@@ -11,18 +12,18 @@ class DailyFlowForecast {
   /// The date this forecast represents (local date, time component ignored)
   final DateTime date;
 
-  /// Minimum flow value for this day (CFS)
+  /// ✅ UPDATED: Minimum flow value for this day (in user's preferred unit: CFS or CMS)
   final double minFlow;
 
-  /// Maximum flow value for this day (CFS)
+  /// ✅ UPDATED: Maximum flow value for this day (in user's preferred unit: CFS or CMS)
   final double maxFlow;
 
-  /// Average flow value for this day (CFS)
+  /// ✅ UPDATED: Average flow value for this day (in user's preferred unit: CFS or CMS)
   final double avgFlow;
 
-  /// Hourly flow data for this day
+  /// ✅ UPDATED: Hourly flow data for this day (values in user's preferred unit: CFS or CMS)
   /// Key: DateTime (hour-level precision)
-  /// Value: Flow in CFS
+  /// Value: Flow in user's preferred unit
   final Map<DateTime, double> hourlyData;
 
   /// Flow category based on return period thresholds
@@ -66,6 +67,40 @@ class DailyFlowForecast {
       flowCategory: flowCategory ?? this.flowCategory,
       dataSource: dataSource ?? this.dataSource,
     );
+  }
+
+  /// ✅ NEW: Get the current flow unit for display purposes
+  String get currentUnit {
+    final unitService = FlowUnitPreferenceService();
+    return unitService.currentFlowUnit;
+  }
+
+  /// ✅ NEW: Format flow value with current unit for display
+  String formatFlowWithUnit(double flowValue) {
+    final formattedValue = _formatFlow(flowValue);
+    return '$formattedValue $currentUnit';
+  }
+
+  /// ✅ NEW: Get formatted min flow with unit
+  String get formattedMinFlow => formatFlowWithUnit(minFlow);
+
+  /// ✅ NEW: Get formatted max flow with unit
+  String get formattedMaxFlow => formatFlowWithUnit(maxFlow);
+
+  /// ✅ NEW: Get formatted average flow with unit
+  String get formattedAvgFlow => formatFlowWithUnit(avgFlow);
+
+  /// ✅ NEW: Private helper to format flow values consistently
+  String _formatFlow(double flow) {
+    if (flow >= 1000000) {
+      return '${(flow / 1000000).toStringAsFixed(1)}M';
+    } else if (flow >= 1000) {
+      return '${(flow / 1000).toStringAsFixed(1)}K';
+    } else if (flow >= 100) {
+      return flow.toStringAsFixed(0);
+    } else {
+      return flow.toStringAsFixed(1);
+    }
   }
 
   /// Get the color associated with this day's flow category
@@ -131,6 +166,12 @@ class DailyFlowForecast {
     return closestTime != null ? hourlyData[closestTime] : null;
   }
 
+  /// ✅ NEW: Get formatted flow at a specific hour with unit
+  String? getFormattedFlowAt(DateTime targetTime) {
+    final flow = getFlowAt(targetTime);
+    return flow != null ? formatFlowWithUnit(flow) : null;
+  }
+
   /// Get sorted list of hourly data entries for easy iteration
   List<MapEntry<DateTime, double>> get sortedHourlyData {
     final entries = hourlyData.entries.toList();
@@ -163,10 +204,11 @@ class DailyFlowForecast {
         dataSource.isNotEmpty;
   }
 
+  /// ✅ UPDATED: String representation with current unit information
   @override
   String toString() {
     return 'DailyFlowForecast{date: ${date.toIso8601String().split('T')[0]}, '
-        'flows: $minFlow-$maxFlow (avg: $avgFlow), '
+        'flows: ${_formatFlow(minFlow)}-${_formatFlow(maxFlow)} (avg: ${_formatFlow(avgFlow)}) $currentUnit, '
         'category: $flowCategory, '
         'source: $dataSource, '
         'hourlyPoints: ${hourlyData.length}}';
@@ -211,6 +253,12 @@ class DailyForecastCollection {
     required this.sourceType,
   });
 
+  /// ✅ NEW: Get the current flow unit for the collection
+  String get currentUnit {
+    final unitService = FlowUnitPreferenceService();
+    return unitService.currentFlowUnit;
+  }
+
   /// Get forecast for a specific date
   DailyFlowForecast? getForecastForDate(DateTime date) {
     final targetDate = DateTime(date.year, date.month, date.day);
@@ -227,7 +275,7 @@ class DailyForecastCollection {
     return sorted;
   }
 
-  /// Get overall flow bounds for the entire collection (useful for scaling)
+  /// ✅ UPDATED: Get overall flow bounds for the entire collection (values in current unit)
   Map<String, double> get flowBounds {
     if (forecasts.isEmpty) return {'min': 0.0, 'max': 100.0};
 
@@ -240,6 +288,27 @@ class DailyForecastCollection {
     }
 
     return {'min': min, 'max': max};
+  }
+
+  /// ✅ NEW: Get formatted flow bounds with unit information
+  String get formattedFlowBounds {
+    final bounds = flowBounds;
+    final minFormatted = _formatFlow(bounds['min']!);
+    final maxFormatted = _formatFlow(bounds['max']!);
+    return '$minFormatted - $maxFormatted $currentUnit';
+  }
+
+  /// ✅ NEW: Private helper to format flow values consistently
+  String _formatFlow(double flow) {
+    if (flow >= 1000000) {
+      return '${(flow / 1000000).toStringAsFixed(1)}M';
+    } else if (flow >= 1000) {
+      return '${(flow / 1000).toStringAsFixed(1)}K';
+    } else if (flow >= 100) {
+      return flow.toStringAsFixed(0);
+    } else {
+      return flow.toStringAsFixed(1);
+    }
   }
 
   /// Check if collection is empty
@@ -259,9 +328,10 @@ class DailyForecastCollection {
     return {'start': sorted.first.date, 'end': sorted.last.date};
   }
 
+  /// ✅ UPDATED: String representation with unit information
   @override
   String toString() {
     return 'DailyForecastCollection{type: $sourceType, days: ${forecasts.length}, '
-        'created: ${createdAt.toIso8601String()}}';
+        'unit: $currentUnit, created: ${createdAt.toIso8601String()}}';
   }
 }

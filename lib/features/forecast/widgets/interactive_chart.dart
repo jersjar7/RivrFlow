@@ -54,6 +54,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
   List<ChartData> _chartData =
       []; // Keep for backward compatibility (mean line)
   List<ChartDataPoint> _forecastData = [];
+  String _lastKnownUnit = 'CFS'; // ✅ NEW: Track unit changes
 
   // NEW: Store ensemble data for multiple series
   Map<String, List<ChartData>> _ensembleChartData = {};
@@ -82,9 +83,19 @@ class _InteractiveChartState extends State<InteractiveChart> {
     return currentUnit == 'CMS' ? 'CMS' : 'CFS';
   }
 
+  // ✅ NEW: Convert flow value to current unit preference
+  double _convertFlowToCurrentUnit(double flowValue) {
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
+
+    // Assume stored data is in CFS (API default) and convert if needed
+    return unitService.convertFlow(flowValue, 'CFS', currentUnit);
+  }
+
   @override
   void initState() {
     super.initState();
+    _lastKnownUnit = _getCurrentFlowUnit(); // ✅ NEW: Initialize unit tracking
     _initializeChart();
   }
 
@@ -102,13 +113,28 @@ class _InteractiveChartState extends State<InteractiveChart> {
   @override
   void didUpdateWidget(InteractiveChart oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // ✅ NEW: Check for unit changes
+    final currentUnit = _getCurrentFlowUnit();
+    final unitChanged = currentUnit != _lastKnownUnit;
+
     if (oldWidget.forecastType != widget.forecastType ||
         oldWidget.showReturnPeriods != widget.showReturnPeriods ||
-        oldWidget.showEnsembleMembers != widget.showEnsembleMembers) {
-      // NEW: React to ensemble toggle
+        oldWidget.showEnsembleMembers != widget.showEnsembleMembers ||
+        unitChanged) {
+      // ✅ NEW: React to unit changes
+
+      if (unitChanged) {
+        print(
+          'INTERACTIVE_CHART: Unit changed from $_lastKnownUnit to $currentUnit - refreshing chart',
+        );
+        _lastKnownUnit = currentUnit; // ✅ NEW: Update tracked unit
+      }
+
       _initializeChart();
     }
-    if (oldWidget.showTooltips != widget.showTooltips) {
+    if (oldWidget.showTooltips != widget.showTooltips || unitChanged) {
+      // ✅ NEW: Update tooltips on unit change
       _initializeBehaviors();
     }
   }
@@ -258,43 +284,43 @@ class _InteractiveChartState extends State<InteractiveChart> {
       return;
     }
 
-    // FIXED: Convert between the different ChartData types
+    // ✅ UPDATED: Convert between the different ChartData types with unit conversion
     _ensembleChartData = {};
     for (final entry in ensembleData.entries) {
       final memberName = entry.key;
       final serviceChartData = entry.value;
 
-      // Convert from forecast_service.ChartData to interactive_chart.ChartData
-      final convertedData = serviceChartData
-          .map((point) => ChartData(point.x, point.y))
-          .toList();
+      // Convert from forecast_service.ChartData to interactive_chart.ChartData with unit conversion
+      final convertedData = serviceChartData.map((point) {
+        final convertedFlow = _convertFlowToCurrentUnit(point.y);
+        return ChartData(point.x, convertedFlow);
+      }).toList();
 
       _ensembleChartData[memberName] = convertedData;
     }
 
-    // FIXED: Convert between the different ChartDataPoint types
+    // ✅ UPDATED: Convert between the different ChartDataPoint types with unit conversion
     final serviceReferenceData = _forecastService.getEnsembleReferenceData(
       forecast,
       widget.forecastType,
     );
 
     // Convert from forecast_service.ChartDataPoint to interactive_chart.ChartDataPoint
-    _forecastData = serviceReferenceData
-        .map(
-          (point) => ChartDataPoint(
-            time: point.time,
-            flow: point.flow,
-            confidence: point.confidence,
-            metadata: point.metadata,
-          ),
-        )
-        .toList();
+    _forecastData = serviceReferenceData.map((point) {
+      final convertedFlow = _convertFlowToCurrentUnit(point.flow);
+      return ChartDataPoint(
+        time: point.time,
+        flow: convertedFlow, // ✅ NEW: Apply unit conversion
+        confidence: point.confidence,
+        metadata: point.metadata,
+      );
+    }).toList();
 
     // Clear single series data when showing ensemble
     _chartData = [];
 
     print(
-      'INTERACTIVE_CHART: Loaded ${_ensembleChartData.length} ensemble series',
+      'INTERACTIVE_CHART: Loaded ${_ensembleChartData.length} ensemble series with unit conversion',
     );
   }
 
@@ -307,27 +333,27 @@ class _InteractiveChartState extends State<InteractiveChart> {
       final forecastSeries = forecast.getPrimaryForecast('short_range');
       if (forecastSeries == null || forecastSeries.isEmpty) return [];
 
-      // Use ALL data points (including past hours)
-      return forecastSeries.data
-          .map(
-            (point) => ChartDataPoint(
-              time: point.validTime.toLocal(),
-              flow: point.flow,
-            ),
-          )
-          .toList();
+      // ✅ UPDATED: Use ALL data points (including past hours) with unit conversion
+      return forecastSeries.data.map((point) {
+        final convertedFlow = _convertFlowToCurrentUnit(point.flow);
+        return ChartDataPoint(
+          time: point.validTime.toLocal(),
+          flow: convertedFlow, // ✅ NEW: Convert to current unit
+        );
+      }).toList();
     }
 
-    // For other forecast types, use existing logic but with real data
+    // ✅ UPDATED: For other forecast types, use existing logic but with real data and unit conversion
     final forecastSeries = forecast.getPrimaryForecast(widget.forecastType);
     if (forecastSeries == null || forecastSeries.isEmpty) return [];
 
-    return forecastSeries.data
-        .map(
-          (point) =>
-              ChartDataPoint(time: point.validTime.toLocal(), flow: point.flow),
-        )
-        .toList();
+    return forecastSeries.data.map((point) {
+      final convertedFlow = _convertFlowToCurrentUnit(point.flow);
+      return ChartDataPoint(
+        time: point.validTime.toLocal(),
+        flow: convertedFlow, // ✅ NEW: Convert to current unit
+      );
+    }).toList();
   }
 
   List<ChartData> _convertToChartData(List<ChartDataPoint> data) {
@@ -342,7 +368,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       // Convert to hours since the earliest time
       final hoursSinceStart =
           point.time.difference(earliestTime).inMinutes / 60.0;
-      return ChartData(hoursSinceStart, point.flow);
+      return ChartData(hoursSinceStart, point.flow); // ✅ Flow already converted
     }).toList();
   }
 
@@ -372,40 +398,56 @@ class _InteractiveChartState extends State<InteractiveChart> {
     _minY = boundsData.map((data) => data.y).reduce(math.min);
     _maxY = boundsData.map((data) => data.y).reduce(math.max);
 
-    // Include return period values in bounds calculation when toggle is ON
-    // Data is already in user's preferred unit from backend
+    // ✅ CONDITIONAL: Only include return periods in bounds when toggle is ON
     if (widget.showReturnPeriods && widget.reachProvider.hasData) {
       final reach = widget.reachProvider.currentReach;
       if (reach?.returnPeriods != null) {
-        final returnPeriods = reach!.returnPeriods!;
+        final currentUnit = _getCurrentFlowUnit();
 
-        for (final entry in returnPeriods.entries) {
-          final flowValue = entry.value; // Already in preferred unit
-          // Include return period values in Y bounds
-          if (flowValue > _maxY) _maxY = flowValue;
-          if (flowValue < _minY) _minY = flowValue;
-        }
-
-        print(
-          'DEBUG: Bounds adjusted for return periods - Y: $_minY to $_maxY',
+        // Get return periods in current unit using reach method
+        final convertedReturnPeriods = reach!.getReturnPeriodsInUnit(
+          currentUnit,
         );
+        if (convertedReturnPeriods != null &&
+            convertedReturnPeriods.isNotEmpty) {
+          // When return periods are ON, include them in bounds (expected scaling down)
+          for (final value in convertedReturnPeriods.values) {
+            if (value > _maxY) _maxY = value;
+            if (value < _minY) _minY = value;
+          }
+          print(
+            'DEBUG: Return periods included in bounds - Y: $_minY to $_maxY',
+          );
+        }
       }
     }
 
-    // Add padding
-    final xRange = _maxX - _minX;
+    // ✅ IMPROVED: Add generous padding for better visualization
     final yRange = _maxY - _minY;
+    final xRange = _maxX - _minX;
 
-    _minX -= xRange * 0.05;
-    _maxX += xRange * 0.05;
-    _minY -= yRange * 0.1;
-    _maxY += yRange * 0.1;
+    // When return periods are OFF, give generous padding for flow data focus
+    // When return periods are ON, use smaller padding since we want to see everything
+    final paddingMultiplier = widget.showReturnPeriods ? 0.1 : 0.2;
 
-    // Ensure minimum bounds
-    if (_minY < 0) _minY = 0;
-    if (_maxY < 100) _maxY = 100;
+    _minY = _minY - yRange * paddingMultiplier;
+    _maxY = _maxY + yRange * paddingMultiplier;
 
-    print('DEBUG: Final chart bounds Y: $_minY to $_maxY');
+    // Only force minimum to 0 if we're actually near 0
+    if (_minY < 0 && _minY > -(yRange * 0.1)) {
+      _minY = 0;
+    }
+
+    // X-axis padding
+    _minX = _minX - xRange * 0.02;
+    _maxX = _maxX + xRange * 0.02;
+
+    final mode = widget.showReturnPeriods
+        ? 'with return periods'
+        : 'flow data only';
+    print(
+      'DEBUG: Chart bounds ($mode) - Y: $_minY to $_maxY (range: ${(_maxY - _minY).toStringAsFixed(1)})',
+    );
   }
 
   // NEW: Build chart series based on current mode
@@ -585,19 +627,18 @@ class _InteractiveChartState extends State<InteractiveChart> {
     final reach = widget.reachProvider.currentReach;
     if (reach?.returnPeriods == null) return [];
 
-    final returnPeriods = reach!.returnPeriods!;
-    // Data is already in user's preferred unit
+    final currentUnit = _getCurrentFlowUnit();
 
-    // Sort return periods
-    final sortedReturnPeriods = <int, double>{};
-    for (final entry in returnPeriods.entries) {
-      sortedReturnPeriods[entry.key] = entry.value;
+    // ✅ UPDATED: Get return periods in current unit using reach method
+    final convertedReturnPeriods = reach!.getReturnPeriodsInUnit(currentUnit);
+    if (convertedReturnPeriods == null || convertedReturnPeriods.isEmpty) {
+      return [];
     }
 
     final plotBands = <PlotBand>[];
 
     // Normal zone (chart min to 2yr)
-    final twoYearFlow = sortedReturnPeriods[2];
+    final twoYearFlow = convertedReturnPeriods[2];
     if (twoYearFlow != null) {
       plotBands.add(
         AppConstants.createFloodZonePlotBand(_minY, twoYearFlow, 'normal'),
@@ -605,7 +646,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
 
     // Action zone (2yr to 5yr)
-    final fiveYearFlow = sortedReturnPeriods[5];
+    final fiveYearFlow = convertedReturnPeriods[5];
     if (twoYearFlow != null && fiveYearFlow != null) {
       plotBands.add(
         AppConstants.createFloodZonePlotBand(
@@ -617,7 +658,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
 
     // Moderate zone (5yr to 10yr)
-    final tenYearFlow = sortedReturnPeriods[10];
+    final tenYearFlow = convertedReturnPeriods[10];
     if (fiveYearFlow != null && tenYearFlow != null) {
       plotBands.add(
         AppConstants.createFloodZonePlotBand(
@@ -629,7 +670,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     }
 
     // Major zone (10yr to 25yr)
-    final twentyFiveYearFlow = sortedReturnPeriods[25];
+    final twentyFiveYearFlow = convertedReturnPeriods[25];
     if (tenYearFlow != null && twentyFiveYearFlow != null) {
       plotBands.add(
         AppConstants.createFloodZonePlotBand(
@@ -651,7 +692,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       );
     }
 
-    print('DEBUG: Added ${plotBands.length} plot bands');
+    print('DEBUG: Added ${plotBands.length} plot bands ($currentUnit)');
     return plotBands;
   }
 
@@ -663,11 +704,16 @@ class _InteractiveChartState extends State<InteractiveChart> {
     final reach = widget.reachProvider.currentReach;
     if (reach?.returnPeriods == null) return [];
 
-    final returnPeriods = reach!.returnPeriods!;
-    // Data is already in user's preferred unit
+    final currentUnit = _getCurrentFlowUnit();
+
+    // ✅ UPDATED: Get return periods in current unit using reach method
+    final convertedReturnPeriods = reach!.getReturnPeriodsInUnit(currentUnit);
+    if (convertedReturnPeriods == null || convertedReturnPeriods.isEmpty) {
+      return [];
+    }
 
     final lines = <PlotBand>[];
-    final sortedEntries = returnPeriods.entries.toList()
+    final sortedEntries = convertedReturnPeriods.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
     // Define which years to show
@@ -678,7 +724,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
       // Only show lines for specified years
       if (yearsToShow.contains(year)) {
-        final flowValue = entry.value; // Already in preferred unit
+        final flowValue = entry.value; // Already converted to current unit
         final label = AppConstants.getReturnPeriodLabel(year);
 
         // Create a line (start == end) with label
@@ -790,7 +836,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
               maximum: _maxY,
               interval: (_maxY - _minY) / 6,
               title: AxisTitle(
-                text: 'Flow ($currentUnit)', // UPDATED: Now dynamic
+                text: 'Flow ($currentUnit)', // ✅ UPDATED: Now dynamic
                 textStyle: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -811,7 +857,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                 enable: true,
                 borderColor: CupertinoColors.systemBlue,
                 borderWidth: 1,
-                format: '{value} $currentUnit', // UPDATED: Now dynamic
+                format: '{value} $currentUnit', // ✅ UPDATED: Now dynamic
                 textStyle: TextStyle(
                   color: CupertinoColors.label.resolveFrom(context),
                   fontSize: 11,
@@ -833,7 +879,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
               final time = args.chartPointInfo.chartPoint?.x;
               if (flow != null && time != null) {
                 args.chartPointInfo.label =
-                    '${_formatFlowValue(flow.toDouble())} $currentUnit\n${_formatTimeValue(time)}'; // UPDATED: Now dynamic
+                    '${_formatFlowValue(flow.toDouble())} $currentUnit\n${_formatTimeValue(time)}'; // ✅ UPDATED: Now dynamic
               }
             },
 
@@ -843,7 +889,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                 args.text = _formatTimeValue(args.value);
               } else {
                 args.text =
-                    '${_formatFlowValue(args.value)} $currentUnit'; // UPDATED: Now dynamic
+                    '${_formatFlowValue(args.value)} $currentUnit'; // ✅ UPDATED: Now dynamic
               }
             },
 

@@ -2,6 +2,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:rivrflow/core/models/reach_data.dart';
+import 'package:rivrflow/core/services/flow_unit_preference_service.dart';
 import '../../domain/entities/daily_flow_forecast.dart';
 import '../../services/daily_forecast_processor.dart';
 import 'daily_forecast_row.dart';
@@ -51,18 +52,41 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
   int? _expandedIndex;
   bool _isProcessing = false;
   String? _errorMessage;
+  String _lastKnownUnit = 'CFS'; // ✅ NEW: Track unit changes
+
+  // ✅ NEW: Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == 'CMS' ? 'CMS' : 'CFS';
+  }
 
   @override
   void initState() {
     super.initState();
+    _lastKnownUnit = _getCurrentFlowUnit(); // ✅ NEW: Initialize unit tracking
     _processData();
   }
 
   @override
   void didUpdateWidget(DailyFlowForecastWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // ✅ NEW: Check for unit changes
+    final currentUnit = _getCurrentFlowUnit();
+    final unitChanged = currentUnit != _lastKnownUnit;
+
     if (oldWidget.forecastResponse != widget.forecastResponse ||
-        oldWidget.forecastType != widget.forecastType) {
+        oldWidget.forecastType != widget.forecastType ||
+        unitChanged) {
+      // ✅ NEW: React to unit changes
+
+      if (unitChanged) {
+        print(
+          'DAILY_WIDGET: Unit changed from $_lastKnownUnit to $currentUnit - reprocessing data',
+        );
+        _lastKnownUnit = currentUnit; // ✅ NEW: Update tracked unit
+      }
+
       _processData();
     }
   }
@@ -84,16 +108,21 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
     });
 
     try {
+      // ✅ NEW: Get current unit for processing
+      final currentUnit = _getCurrentFlowUnit();
+
       // Process the forecast data based on type
       List<DailyFlowForecast> dailyForecasts;
 
       if (widget.forecastType.toLowerCase() == 'medium_range') {
         dailyForecasts = DailyForecastProcessor.processMediumRange(
           forecastResponse: widget.forecastResponse!,
+          targetUnit: currentUnit, // ✅ NEW: Pass target unit
         );
       } else if (widget.forecastType.toLowerCase() == 'long_range') {
         dailyForecasts = DailyForecastProcessor.processLongRange(
           forecastResponse: widget.forecastResponse!,
+          targetUnit: currentUnit, // ✅ NEW: Pass target unit
         );
       } else {
         // Generic processing for custom forecast types
@@ -105,14 +134,18 @@ class _DailyFlowForecastWidgetState extends State<DailyFlowForecastWidget> {
           forecastData: forecastData,
           reach: widget.forecastResponse!.reach,
           forecastType: widget.forecastType,
+          targetUnit: currentUnit, // ✅ NEW: Pass target unit
         );
       }
 
-      // Calculate flow bounds for consistent scaling
+      // Calculate flow bounds for consistent scaling (values should already be converted)
       final flowBounds = DailyForecastProcessor.getFlowBounds(dailyForecasts);
 
       // Print processing summary for debugging
-      DailyForecastProcessor.printProcessingSummary(dailyForecasts);
+      DailyForecastProcessor.printProcessingSummary(
+        dailyForecasts,
+        currentUnit,
+      ); // ✅ NEW: Include unit in summary
 
       setState(() {
         _dailyForecasts = dailyForecasts;
@@ -440,6 +473,12 @@ class SimpleDailyFlowForecastWidget extends StatelessWidget {
     this.onViewMore,
   });
 
+  // ✅ NEW: Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == 'CMS' ? 'CMS' : 'CFS';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (forecastResponse == null) {
@@ -449,15 +488,20 @@ class SimpleDailyFlowForecastWidget extends StatelessWidget {
       );
     }
 
-    // Process data
+    // ✅ NEW: Get current unit for processing
+    final currentUnit = _getCurrentFlowUnit();
+
+    // Process data with unit conversion
     List<DailyFlowForecast> dailyForecasts;
     if (forecastType.toLowerCase() == 'medium_range') {
       dailyForecasts = DailyForecastProcessor.processMediumRange(
         forecastResponse: forecastResponse!,
+        targetUnit: currentUnit, // ✅ NEW: Pass target unit
       );
     } else {
       dailyForecasts = DailyForecastProcessor.processLongRange(
         forecastResponse: forecastResponse!,
+        targetUnit: currentUnit, // ✅ NEW: Pass target unit
       );
     }
 

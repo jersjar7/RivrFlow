@@ -2,7 +2,6 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:rivrflow/core/models/reach_data.dart';
-import 'package:rivrflow/core/models/user_settings.dart';
 import 'package:rivrflow/features/forecast/widgets/daily_expandable_widget/flow_condition_icon.dart';
 import 'package:rivrflow/features/forecast/widgets/daily_expandable_widget/flow_range_bar.dart';
 import '../../../../core/services/flow_unit_preference_service.dart';
@@ -60,11 +59,21 @@ class _DailyForecastRowState extends State<DailyForecastRow>
   late bool _isExpanded;
   late AnimationController _animationController;
   late Animation<double> _expandAnimation;
+  String _lastKnownUnit = 'CFS'; // ✅ NEW: Track unit changes
+
+  // ✅ FIXED: Get current flow units from preference service (string-based)
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == 'CMS'
+        ? 'CMS'
+        : 'CFS'; // ✅ Fixed: Use strings consistently
+  }
 
   @override
   void initState() {
     super.initState();
     _isExpanded = widget.initiallyExpanded;
+    _lastKnownUnit = _getCurrentFlowUnit(); // ✅ NEW: Initialize unit tracking
 
     // Setup animation controller
     _animationController = AnimationController(
@@ -92,6 +101,11 @@ class _DailyForecastRowState extends State<DailyForecastRow>
   @override
   void didUpdateWidget(DailyForecastRow oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // ✅ NEW: Check for unit changes and rebuild if necessary
+    final currentUnit = _getCurrentFlowUnit();
+    final unitChanged = currentUnit != _lastKnownUnit;
+
     if (oldWidget.initiallyExpanded != widget.initiallyExpanded) {
       _isExpanded = widget.initiallyExpanded;
       if (_isExpanded) {
@@ -100,12 +114,15 @@ class _DailyForecastRowState extends State<DailyForecastRow>
         _animationController.reverse();
       }
     }
-  }
 
-  // Get current flow units from preference service
-  String _getCurrentFlowUnit() {
-    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
-    return currentUnit == FlowUnit.cms ? 'CMS' : 'CFS';
+    if (unitChanged) {
+      print(
+        'DAILY_ROW: Unit changed from $_lastKnownUnit to $currentUnit - rebuilding',
+      );
+      _lastKnownUnit = currentUnit;
+      // Force rebuild by calling setState
+      setState(() {});
+    }
   }
 
   /// Toggle the expansion state
@@ -197,29 +214,19 @@ class _DailyForecastRowState extends State<DailyForecastRow>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Min and max flow values
+                // ✅ UPDATED: Min and max flow values with dynamic units
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      _formatFlow(widget.forecast.minFlow),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: widget.isToday
-                            ? CupertinoColors.systemBlue.resolveFrom(context)
-                            : CupertinoColors.label.resolveFrom(context),
-                      ),
+                    _buildFlowValueWithUnit(
+                      context,
+                      widget.forecast.minFlow,
+                      isToday: widget.isToday,
                     ),
-                    Text(
-                      _formatFlow(widget.forecast.maxFlow),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: widget.isToday
-                            ? CupertinoColors.systemBlue.resolveFrom(context)
-                            : CupertinoColors.label.resolveFrom(context),
-                      ),
+                    _buildFlowValueWithUnit(
+                      context,
+                      widget.forecast.maxFlow,
+                      isToday: widget.isToday,
                     ),
                   ],
                 ),
@@ -248,6 +255,44 @@ class _DailyForecastRowState extends State<DailyForecastRow>
               CupertinoIcons.chevron_down,
               size: 16,
               color: CupertinoColors.systemGrey.resolveFrom(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ✅ NEW: Build flow value with unit label
+  Widget _buildFlowValueWithUnit(
+    BuildContext context,
+    double flowValue, {
+    bool isToday = false,
+  }) {
+    final currentUnit = _getCurrentFlowUnit();
+
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: _formatFlow(flowValue),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: isToday
+                  ? CupertinoColors.systemBlue.resolveFrom(context)
+                  : CupertinoColors.label.resolveFrom(context),
+            ),
+          ),
+          TextSpan(
+            text: ' $currentUnit',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
+              color: isToday
+                  ? CupertinoColors.systemBlue
+                        .resolveFrom(context)
+                        .withOpacity(0.7)
+                  : CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ],
@@ -352,7 +397,7 @@ class _DailyForecastRowState extends State<DailyForecastRow>
     );
   }
 
-  /// Build individual statistic item
+  /// ✅ UPDATED: Build individual statistic item with correct unit display
   Widget _buildStatItem(BuildContext context, String label, double value) {
     final currentUnit = _getCurrentFlowUnit(); // Get current unit
 
@@ -376,7 +421,7 @@ class _DailyForecastRowState extends State<DailyForecastRow>
         ),
         const SizedBox(height: 4),
         Text(
-          '${_formatFlow(value)} $currentUnit', // UPDATED: Now dynamic
+          '${_formatFlow(value)} $currentUnit', // ✅ UPDATED: Now dynamic
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
@@ -442,7 +487,7 @@ class _DailyForecastRowState extends State<DailyForecastRow>
   }
 }
 
-/// Compact version for use in lists
+/// ✅ UPDATED: Compact version with unit conversion support
 class CompactDailyForecastRow extends StatelessWidget {
   final DailyFlowForecast forecast;
   final double minFlowBound;
@@ -461,8 +506,16 @@ class CompactDailyForecastRow extends StatelessWidget {
     this.onTap,
   });
 
+  // ✅ NEW: Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == 'CMS' ? 'CMS' : 'CFS';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentUnit = _getCurrentFlowUnit();
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -502,10 +555,28 @@ class CompactDailyForecastRow extends StatelessWidget {
 
             const SizedBox(width: 8),
 
-            // Max flow
-            Text(
-              _formatFlow(forecast.maxFlow),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            // ✅ UPDATED: Max flow with unit
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: _formatFlow(forecast.maxFlow),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: CupertinoColors.label,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' $currentUnit',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w400,
+                      color: CupertinoColors.secondaryLabel,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

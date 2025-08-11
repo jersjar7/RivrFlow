@@ -2,7 +2,6 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
-import 'package:rivrflow/core/models/user_settings.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../../../core/services/flow_unit_preference_service.dart';
 import 'dart:math' as math;
@@ -32,12 +31,14 @@ class HorizontalFlowTimeline extends StatefulWidget {
 class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   late FlowTimelineViewMode _viewMode;
   ScrollController? _scrollController;
+  String _lastKnownUnit = 'CFS'; // ✅ NEW: Track unit changes
 
   @override
   void initState() {
     super.initState();
     _viewMode = widget.initialViewMode;
     _scrollController = ScrollController();
+    _lastKnownUnit = _getCurrentFlowUnit(); // ✅ NEW: Initialize unit tracking
   }
 
   @override
@@ -46,10 +47,39 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     super.dispose();
   }
 
-  // Get current flow units from preference service
+  // ✅ FIXED: Get current flow units from preference service (string-based)
   String _getCurrentFlowUnit() {
     final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
-    return currentUnit == FlowUnit.cms ? 'CMS' : 'CFS';
+    return currentUnit == 'CMS'
+        ? 'CMS'
+        : 'CFS'; // ✅ Fixed: Use strings consistently
+  }
+
+  // ✅ NEW: Convert flow value to current unit preference
+  double _convertFlowToCurrentUnit(double flowValue) {
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
+
+    // Assume stored data is in CFS (API default) and convert if needed
+    return unitService.convertFlow(flowValue, 'CFS', currentUnit);
+  }
+
+  // ✅ NEW: Check for unit changes and rebuild if necessary
+  @override
+  void didUpdateWidget(HorizontalFlowTimeline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final currentUnit = _getCurrentFlowUnit();
+    final unitChanged = currentUnit != _lastKnownUnit;
+
+    if (unitChanged) {
+      print(
+        'HORIZONTAL_FLOW_TIMELINE: Unit changed from $_lastKnownUnit to $currentUnit - rebuilding',
+      );
+      _lastKnownUnit = currentUnit;
+      // Force rebuild by calling setState
+      setState(() {});
+    }
   }
 
   @override
@@ -174,6 +204,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     HourlyFlowDataPoint dataPoint,
     ReachDataProvider reachProvider,
   ) {
+    // ✅ FIXED: Flow is already converted in _extractShortRangeData, no need to convert again
     final flowCategory = _getFlowCategory(dataPoint.flow, reachProvider);
     final categoryColor = _getCategoryColor(flowCategory);
     final isCurrentHour = _isCurrentOrNearCurrentHour(dataPoint.validTime);
@@ -232,7 +263,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
 
             const SizedBox(height: 8),
 
-            // Flow value
+            // ✅ FIXED: Flow value (already converted in data extraction)
             Text(
               _formatFlow(dataPoint.flow),
               style: const TextStyle(
@@ -242,7 +273,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
               ),
             ),
 
-            // UPDATED: Now dynamic units
+            // ✅ UPDATED: Now dynamic units
             Text(
               currentUnit,
               style: const TextStyle(
@@ -305,12 +336,13 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     List<HourlyFlowDataPoint> data,
     ReachDataProvider reachProvider,
   ) {
+    // ✅ FIXED: Data is already converted in _extractShortRangeData, use as-is
     return Container(
       height: widget.height,
       padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 16),
       child: CustomPaint(
         painter: FlowWavePainter(
-          data: data,
+          data: data, // ✅ Use data as-is (already converted)
           reachProvider: reachProvider,
           context: context,
         ),
@@ -319,25 +351,49 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     );
   }
 
-  // Data extraction method - THIS METHOD NEEDS TO BE ADDED TO CORE DATA SERVICES
+  // ✅ UPDATED: Data extraction method with unit conversion (converts once here)
   List<HourlyFlowDataPoint> _extractShortRangeData(
     ReachDataProvider reachProvider,
   ) {
-    return reachProvider.getShortRangeHourlyData();
+    final rawData = reachProvider.getShortRangeHourlyData();
+
+    // Convert all flow values to current unit preference ONCE here
+    return rawData.map((point) {
+      final convertedFlow = _convertFlowToCurrentUnit(point.flow);
+      return HourlyFlowDataPoint(
+        validTime: point.validTime,
+        flow: convertedFlow, // ✅ Converted flow value - used throughout
+        trend: point.trend,
+        trendPercentage: point.trendPercentage,
+        confidence: point.confidence,
+        metadata: point.metadata,
+      );
+    }).toList();
   }
 
-  String _getFlowCategory(double flow, ReachDataProvider reachProvider) {
+  // ✅ FIXED: Flow category calculation (flow is already converted)
+  String _getFlowCategory(
+    double convertedFlow,
+    ReachDataProvider reachProvider,
+  ) {
     if (!reachProvider.hasData) return 'Unknown';
 
     final reach = reachProvider.currentReach!;
     if (!reach.hasReturnPeriods) return 'Unknown';
 
-    // Data is already in user's preferred unit, so use it directly
-    final periods = reach.returnPeriods!.entries.toList()
+    final currentUnit = _getCurrentFlowUnit();
+
+    // Get return periods in the same unit as the converted flow
+    final convertedReturnPeriods = reach.getReturnPeriodsInUnit(currentUnit);
+    if (convertedReturnPeriods == null || convertedReturnPeriods.isEmpty) {
+      return 'Unknown';
+    }
+
+    final periods = convertedReturnPeriods.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
     for (final period in periods) {
-      if (flow < period.value) {
+      if (convertedFlow < period.value) {
         if (period.key == 2) return 'Normal';
         if (period.key <= 5) return 'Elevated';
         return 'High';
@@ -535,7 +591,7 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
   }
 }
 
-// Custom painter for flow wave visualization
+// ✅ FIXED: Custom painter for flow wave visualization (receives already converted data)
 class FlowWavePainter extends CustomPainter {
   final List<HourlyFlowDataPoint> data;
   final ReachDataProvider reachProvider;
@@ -561,7 +617,7 @@ class FlowWavePainter extends CustomPainter {
       ..color = CupertinoColors.systemBlue.resolveFrom(context).withOpacity(0.1)
       ..style = PaintingStyle.fill;
 
-    // Calculate scaling
+    // Calculate scaling - data is already converted to current units in _extractShortRangeData
     final minFlow = data.map((d) => d.flow).reduce(math.min);
     final maxFlow = data.map((d) => d.flow).reduce(math.max);
     final flowRange = maxFlow - minFlow;
@@ -572,7 +628,9 @@ class FlowWavePainter extends CustomPainter {
 
     for (int i = 0; i < data.length; i++) {
       final x = (i / (data.length - 1)) * size.width;
-      final normalizedFlow = (data[i].flow - minFlow) / flowRange;
+      final normalizedFlow = flowRange > 0
+          ? (data[i].flow - minFlow) / flowRange
+          : 0.5;
       final y =
           size.height -
           (normalizedFlow * size.height * 0.8) -
@@ -603,7 +661,9 @@ class FlowWavePainter extends CustomPainter {
 
     for (int i = 0; i < data.length; i++) {
       final x = (i / (data.length - 1)) * size.width;
-      final normalizedFlow = (data[i].flow - minFlow) / flowRange;
+      final normalizedFlow = flowRange > 0
+          ? (data[i].flow - minFlow) / flowRange
+          : 0.5;
       final y =
           size.height -
           (normalizedFlow * size.height * 0.8) -
@@ -639,7 +699,8 @@ class FlowWavePainter extends CustomPainter {
 // Enhanced data model for hourly flow data
 class HourlyFlowDataPoint {
   final DateTime validTime;
-  final double flow; // in user's preferred unit (CFS or CMS)
+  final double
+  flow; // CONVERTED to user's preferred unit (CFS or CMS) in _extractShortRangeData
   final FlowTrend? trend;
   final double? trendPercentage; // Percentage change from previous hour
   final double? confidence;
