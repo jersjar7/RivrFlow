@@ -274,8 +274,8 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            CupertinoColors.systemBlue.withOpacity(0.1),
-            CupertinoColors.systemBackground,
+            CupertinoColors.systemBlue.resolveFrom(context).withOpacity(0.1),
+            CupertinoColors.systemBackground.resolveFrom(context),
           ],
         ),
       ),
@@ -285,10 +285,10 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
           // Main title - Shows immediately
           Text(
             reach.displayName,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: CupertinoColors.label,
+              color: CupertinoColors.label.resolveFrom(context),
             ),
           ),
 
@@ -297,9 +297,9 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
           // Use cached formatted location (fixes subtitle issue)
           Text(
             reachProvider.getFormattedLocation(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ],
@@ -359,12 +359,12 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Forecast Categories',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: CupertinoColors.label,
+              color: CupertinoColors.label.resolveFrom(context),
             ),
           ),
           const SizedBox(height: 16),
@@ -452,12 +452,12 @@ class _ReachOverviewPageState extends State<ReachOverviewPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Station Information',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: CupertinoColors.label,
+              color: CupertinoColors.label.resolveFrom(context),
             ),
           ),
 
