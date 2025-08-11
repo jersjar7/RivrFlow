@@ -199,6 +199,9 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
     );
   }
 
+  // Fix for horizontal_flow_timeline.dart
+  // Replace the _buildHourCard method with this version
+
   Widget _buildHourCard(
     BuildContext context,
     HourlyFlowDataPoint dataPoint,
@@ -263,22 +266,22 @@ class _HorizontalFlowTimelineState extends State<HorizontalFlowTimeline> {
 
             const SizedBox(height: 8),
 
-            // ✅ FIXED: Flow value (already converted in data extraction)
+            // Flow value with proper dark mode support
             Text(
               _formatFlow(dataPoint.flow),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: CupertinoColors.label,
+                color: CupertinoColors.label.resolveFrom(context), //
               ),
             ),
 
-            // ✅ UPDATED: Now dynamic units
+            // Unit text with proper dark mode support
             Text(
               currentUnit,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context), //
               ),
             ),
 
