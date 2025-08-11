@@ -1,5 +1,7 @@
 // lib/core/models/favorite_river.dart
 
+import 'package:rivrflow/core/services/flow_unit_preference_service.dart';
+
 /// Simple model for storing user's favorite rivers
 /// Designed for JSON serialization with SharedPreferences
 class FavoriteRiver {
@@ -113,10 +115,17 @@ class FavoriteRiver {
     return DateTime.now().difference(lastUpdated!).inHours > 2;
   }
 
-  /// Get formatted flow display
+  /// Get formatted flow display with proper unit conversion
+  /// Get formatted flow display - data already converted by API layer
   String get formattedFlow {
     if (lastKnownFlow == null) return 'No data';
-    return '${lastKnownFlow!.toStringAsFixed(0)} CFS';
+
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
+
+    // Just display the value with current unit label
+    // Flow values are already in the correct unit from NoaaApiService
+    return '${lastKnownFlow!.toStringAsFixed(0)} $currentUnit';
   }
 
   @override

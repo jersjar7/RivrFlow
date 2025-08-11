@@ -28,8 +28,6 @@ class _FavoritesPageState extends State<FavoritesPage> {
   bool _isRefreshing = false;
   bool _showSearch = false; // New state for search visibility
   String _selectedFlowUnit = 'CFS';
-  bool _isUpdatingFlowUnit =
-      false; // ADD: Track loading state for flow unit updates
 
   @override
   void initState() {
@@ -498,73 +496,37 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   // Enhanced error handling in the async method
   Future<void> _updateFlowUnitAsync(String value) async {
-    print('=== FLOW UNIT UPDATE START ===');
-    print('Requested value: $value');
-    print('Current _selectedFlowUnit: $_selectedFlowUnit');
-    print('_isUpdatingFlowUnit: $_isUpdatingFlowUnit');
-
     try {
-      print('Step 1: Getting auth provider...');
       final authProvider = context.read<AuthProvider>();
-      print('Step 2: Got auth provider');
-
       final userId = authProvider.currentUser?.uid;
-      print('Step 3: User ID: $userId');
 
       if (userId != null) {
-        print('Step 4: User ID exists, updating settings...');
-
         // Update user settings with new flow unit
         final flowUnit = value == 'CMS' ? FlowUnit.cms : FlowUnit.cfs;
-        print('Step 5: FlowUnit enum value: $flowUnit');
 
-        print('Step 6: Calling UserSettingsService.updateFlowUnit...');
         await UserSettingsService().updateFlowUnit(userId, flowUnit);
-        print(
-          'Step 7: UserSettingsService.updateFlowUnit completed successfully',
-        );
-
-        print('Step 8: Updating FlowUnitPreferenceService...');
         FlowUnitPreferenceService().setFlowUnit(value);
-        print('Step 9: FlowUnitPreferenceService updated');
 
-        print('FAVORITES_PAGE: Flow unit updated to: $value');
-
-        // Trigger app refresh by refreshing favorites (they'll show in new units)
+        // Force UI rebuild to show new units immediately
         if (mounted) {
-          print('Step 10: Widget is mounted, getting favorites provider...');
-          final favoritesProvider = context.read<FavoritesProvider>();
-          print(
-            'Step 11: Got favorites provider, calling refreshAllFavorites...',
-          );
-
-          await favoritesProvider.refreshAllFavorites();
-          print('Step 12: refreshAllFavorites completed successfully');
-        } else {
-          print('Step 10: Widget NOT mounted, skipping favorites refresh');
+          setState(() {
+            // This setState triggers rebuild of all widgets that use formattedFlow
+          });
         }
       } else {
-        print('ERROR: No user ID available for flow unit update');
         // Revert UI state if no user
         if (mounted) {
-          print('Reverting UI state due to missing user ID');
           setState(() {
             _selectedFlowUnit = _selectedFlowUnit == 'CFS' ? 'CMS' : 'CFS';
           });
         }
       }
-    } catch (e, stackTrace) {
-      print('=== ERROR IN FLOW UNIT UPDATE ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-
+    } catch (e) {
       // Revert UI state on error
       if (mounted) {
-        print('Reverting UI state due to error');
         setState(() {
           _selectedFlowUnit = _selectedFlowUnit == 'CFS' ? 'CMS' : 'CFS';
         });
-        print('UI state reverted. New _selectedFlowUnit: $_selectedFlowUnit');
 
         // Show error to user
         showCupertinoDialog(
@@ -581,16 +543,6 @@ class _FavoritesPageState extends State<FavoritesPage> {
           ),
         );
       }
-    } finally {
-      print('=== FLOW UNIT UPDATE FINALLY BLOCK ===');
-      if (mounted) {
-        print('Setting _isUpdatingFlowUnit = false');
-        setState(() {
-          _isUpdatingFlowUnit = false;
-        });
-        print('Final _selectedFlowUnit: $_selectedFlowUnit');
-      }
-      print('=== FLOW UNIT UPDATE END ===');
     }
   }
 
@@ -707,17 +659,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
           CupertinoSlidingSegmentedControl<String>(
             groupValue: _selectedFlowUnit,
             onValueChanged: (String? value) {
-              if (value != null &&
-                  value != _selectedFlowUnit &&
-                  !_isUpdatingFlowUnit) {
+              if (value != null && value != _selectedFlowUnit) {
                 // Update both the page state AND modal state
                 setState(() {
                   _selectedFlowUnit = value;
-                  _isUpdatingFlowUnit = true;
                 });
                 setModalState(() {
                   _selectedFlowUnit = value;
-                  _isUpdatingFlowUnit = true;
                 });
                 _updateFlowUnitAsync(value);
               }
@@ -735,10 +683,6 @@ class _FavoritesPageState extends State<FavoritesPage> {
           ),
           const Spacer(),
           Icon(CupertinoIcons.drop, color: CupertinoColors.white, size: 22),
-          if (_isUpdatingFlowUnit) ...[
-            const SizedBox(width: 8),
-            const CupertinoActivityIndicator(radius: 8),
-          ],
         ],
       ),
     );

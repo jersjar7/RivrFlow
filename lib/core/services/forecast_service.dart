@@ -918,6 +918,14 @@ class ForecastService {
     return [];
   }
 
+  void clearUnitDependentCaches() {
+    print('FORECAST_SERVICE: Clearing unit-dependent caches for unit change');
+
+    // Clear flow and category caches (these depend on units)
+    _currentFlowCache.clear();
+    _flowCategoryCache.clear();
+  }
+
   // Clear all caches (useful for testing)
   void clearComputedCaches() {
     _currentFlowCache.clear();

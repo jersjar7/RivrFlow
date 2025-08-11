@@ -607,6 +607,21 @@ class ReachDataProvider with ChangeNotifier {
     _availableForecastTypesCache.remove(reachId);
   }
 
+  /// Clear unit-dependent cached values (call when unit preference changes)
+  void clearUnitDependentCaches() {
+    print('REACH_PROVIDER: Clearing unit-dependent caches for unit change');
+
+    // Clear flow and category caches (these depend on units)
+    _currentFlowCache.clear();
+    _flowCategoryCache.clear();
+
+    // Also clear ForecastService unit-dependent caches
+    _forecastService.clearUnitDependentCaches();
+
+    // Trigger UI update to refresh displayed values
+    notifyListeners();
+  }
+
   // Clear all computed caches
   void _clearAllComputedCaches() {
     _currentFlowCache.clear();

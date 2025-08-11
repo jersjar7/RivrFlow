@@ -295,7 +295,7 @@ class ForecastCategoryGrid extends StatelessWidget {
     } else if (isAvailable) {
       return defaultDescription;
     } else {
-      return 'Data will load shortly...';
+      return 'Data not available at the moment';
     }
   }
 
