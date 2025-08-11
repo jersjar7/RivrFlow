@@ -450,8 +450,8 @@ class _MapSearchModalState extends State<MapSearchModal> {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
-      decoration: const BoxDecoration(
-        color: CupertinoColors.systemBackground,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
@@ -468,13 +468,25 @@ class _MapSearchModalState extends State<MapSearchModal> {
   }
 
   Widget _buildHeader() {
-    return Padding(
+    return Container(
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: CupertinoColors.systemGrey5.resolveFrom(context),
+            width: 0.5,
+          ),
+        ),
+      ),
       child: Row(
         children: [
-          const Text(
+          Text(
             'Search Places',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
           const Spacer(),
           CupertinoButton(
@@ -492,14 +504,16 @@ class _MapSearchModalState extends State<MapSearchModal> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
+          context,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           Icon(
             CupertinoIcons.search,
-            color: CupertinoColors.systemGrey,
+            color: CupertinoColors.systemGrey.resolveFrom(context),
             size: 20,
           ),
           const SizedBox(width: 8),
@@ -509,7 +523,13 @@ class _MapSearchModalState extends State<MapSearchModal> {
               focusNode: _focusNode,
               placeholder: 'Search places...',
               decoration: null,
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(
+                fontSize: 16,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
+              placeholderStyle: TextStyle(
+                color: CupertinoColors.placeholderText.resolveFrom(context),
+              ),
             ),
           ),
           if (_isSearching) ...[
@@ -521,7 +541,7 @@ class _MapSearchModalState extends State<MapSearchModal> {
               onTap: () => _searchController.clear(),
               child: Icon(
                 CupertinoIcons.xmark_circle_fill,
-                color: CupertinoColors.systemGrey3,
+                color: CupertinoColors.systemGrey3.resolveFrom(context),
                 size: 20,
               ),
             ),
