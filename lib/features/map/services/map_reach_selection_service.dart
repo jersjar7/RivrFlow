@@ -85,6 +85,9 @@ class MapReachSelectionService {
       for (final queriedFeature in queryResult) {
         if (queriedFeature != null) {
           try {
+            print(
+              '🔍 Processing feature: ${queriedFeature.queriedFeature.feature['properties']}',
+            );
             final visibleStream = _createVisibleStreamFromFeature(
               queriedFeature,
             );
@@ -92,10 +95,17 @@ class MapReachSelectionService {
                 !seenStationIds.contains(visibleStream.stationId)) {
               visibleStreams.add(visibleStream);
               seenStationIds.add(visibleStream.stationId);
+              print('✅ Added stream: ${visibleStream.stationId}');
+            } else if (visibleStream == null) {
+              print('❌ Failed to create VisibleStream from feature');
+            } else {
+              print('⚠️ Duplicate stream ID: ${visibleStream.stationId}');
             }
           } catch (e) {
             print('⚠️ Error processing stream feature: $e');
           }
+        } else {
+          print('⚠️ Null feature in query result');
         }
       }
 
@@ -248,9 +258,8 @@ class MapReachSelectionService {
         ),
       );
 
-      // ✅ Query the CORRECT streams2 layer names (exactly from working code)
+      // ✅ Query the CORRECT streams2 layer names (excluding commented debug layer)
       final streams2LayerIds = [
-        'streams2-debug-correct', // Our main debug layer
         'streams2-order-1-2', // Small streams
         'streams2-order-3-4', // Medium streams
         'streams2-order-5-plus', // Large rivers
@@ -334,31 +343,49 @@ class MapReachSelectionService {
           ? Map<String, dynamic>.from(feature['properties'] as Map)
           : <String, dynamic>{};
 
+      print('🔍 Feature properties keys: ${properties.keys.toList()}');
+      print('🔍 station_id: ${properties['station_id']}');
+      print('🔍 streamOrde: ${properties['streamOrde']}');
+
       // Validate required properties
       if (!properties.containsKey('station_id') ||
           !properties.containsKey('streamOrde')) {
+        print(
+          '❌ Missing required properties - station_id: ${properties.containsKey('station_id')}, streamOrde: ${properties.containsKey('streamOrde')}',
+        );
         return null;
       }
 
       // Get the geometry to extract coordinates
       final geometry = feature['geometry'];
       if (geometry == null) {
+        print('❌ No geometry found in feature');
         return null;
       }
 
       // Cast geometry to Map to safely access its properties
       final geometryMap = geometry as Map<String, dynamic>;
 
+      print('🔍 Geometry type: ${geometryMap['type']}');
+
       if (geometryMap['type'] != 'LineString') {
+        print('❌ Geometry is not LineString: ${geometryMap['type']}');
         return null;
       }
 
       final coordinates = geometryMap['coordinates'] as List;
-      if (coordinates.isEmpty) return null;
+      if (coordinates.isEmpty) {
+        print('❌ Empty coordinates in LineString');
+        return null;
+      }
 
       // Use the middle point of the LineString for the stream location
       final middleIndex = coordinates.length ~/ 2;
       final middleCoord = coordinates[middleIndex] as List;
+
+      print(
+        '✅ Created VisibleStream: ${properties['station_id']} at [${middleCoord[0]}, ${middleCoord[1]}]',
+      );
 
       return VisibleStream(
         stationId: properties['station_id'].toString(),
