@@ -138,7 +138,7 @@ class MapPageState extends State<MapPage> {
 
         // Map control buttons in top-right
         Positioned(
-          top: 30,
+          top: 60,
           right: 0,
           child: SafeArea(
             child: Container(
