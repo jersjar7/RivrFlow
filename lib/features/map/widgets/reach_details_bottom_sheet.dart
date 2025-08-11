@@ -588,6 +588,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       // Wait for overview data first (shows flow immediately)
       final forecast = await overviewFuture;
 
+      if (!mounted) return;
       setState(() {
         _riverName = forecast.reach.riverName;
         _formattedLocation = forecast.reach.formattedLocation;
@@ -621,6 +622,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
         context: 'loadReachDetails',
       );
 
+      if (!mounted) return;
       setState(() {
         _errorMessage = userMessage;
         _isLoadingFlow = false;
@@ -660,6 +662,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           enhancedForecast.reach,
         );
 
+        if (!mounted) return;
         setState(() {
           _flowCategory = flowCategory;
           _isLoadingClassification = false;
@@ -667,6 +670,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
         print('BOTTOM_SHEET: ✅ Flow classification updated: $flowCategory');
       } else {
+        if (!mounted) return;
         setState(() {
           _isLoadingClassification = false;
         });
@@ -676,6 +680,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       }
     } catch (e) {
       print('BOTTOM_SHEET: ⚠️ Failed to load return periods: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingClassification = false;
       });
@@ -690,6 +695,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     final reachId = widget.selectedReach.reachId;
     final isFavorited = favoritesProvider.isFavorite(reachId);
 
+    if (!mounted) return;
     setState(() {
       _isTogglingFavorite = true;
     });
@@ -727,6 +733,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       _showFeedback('Failed to update favorites', isError: true);
     }
 
+    if (!mounted) return;
     setState(() {
       _isTogglingFavorite = false;
     });
