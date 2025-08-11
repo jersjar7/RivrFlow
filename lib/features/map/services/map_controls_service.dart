@@ -2,6 +2,8 @@
 
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import '../../../core/services/map_preference_service.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../widgets/base_layer_modal.dart';
 
 class MapControlsService {
@@ -18,6 +20,107 @@ class MapControlsService {
 
   void setMapboxMap(MapboxMap mapboxMap) {
     _mapboxMap = mapboxMap;
+  }
+
+  /// Initialize map with correct style based on theme and preferences
+  Future<void> initializeMapStyle(ThemeProvider themeProvider) async {
+    if (_mapboxMap == null) {
+      print('❌ Map not initialized');
+      return;
+    }
+
+    try {
+      // Get the active map layer based on preferences and theme
+      final activeLayer = await MapPreferenceService.getActiveMapLayer(
+        themeProvider,
+      );
+
+      // Apply the style if it's different from current
+      if (activeLayer != _currentLayer) {
+        await _mapboxMap!.loadStyleURI(activeLayer.styleUrl);
+        _currentLayer = activeLayer;
+        print('✅ Map initialized with layer: ${activeLayer.displayName}');
+      }
+    } catch (e) {
+      print('❌ Error initializing map style: $e');
+    }
+  }
+
+  /// Update map style when theme changes (auto mode only)
+  Future<void> updateMapForThemeChange(ThemeProvider themeProvider) async {
+    if (_mapboxMap == null) {
+      print('❌ Map not initialized');
+      return;
+    }
+
+    try {
+      // Only update if in auto mode
+      final isAuto = await MapPreferenceService.isAutoMode();
+      if (!isAuto) {
+        print('📍 Map in manual mode, skipping auto theme update');
+        return;
+      }
+
+      // Get the active layer for current theme
+      final activeLayer = await MapPreferenceService.getActiveMapLayer(
+        themeProvider,
+      );
+
+      // Apply the style if it's different from current
+      if (activeLayer != _currentLayer) {
+        await _mapboxMap!.loadStyleURI(activeLayer.styleUrl);
+        _currentLayer = activeLayer;
+        print('✅ Map auto-updated for theme: ${activeLayer.displayName}');
+      }
+    } catch (e) {
+      print('❌ Error updating map for theme: $e');
+    }
+  }
+
+  /// Change map base layer (manual selection by user)
+  Future<void> changeBaseLayer(MapBaseLayer newLayer) async {
+    if (_mapboxMap == null) {
+      print('❌ Map not initialized');
+      return;
+    }
+
+    try {
+      // Update the map style
+      await _mapboxMap!.loadStyleURI(newLayer.styleUrl);
+      _currentLayer = newLayer;
+
+      // Save as manual preference (switches to manual mode)
+      await MapPreferenceService.setManualMapLayer(newLayer);
+
+      print('✅ Map layer manually changed to: ${newLayer.displayName}');
+    } catch (e) {
+      print('❌ Error changing map layer: $e');
+    }
+  }
+
+  /// Reset to auto mode (follows app theme)
+  Future<void> enableAutoMode(ThemeProvider themeProvider) async {
+    try {
+      // Enable auto mode in preferences
+      await MapPreferenceService.enableAutoMode();
+
+      // Update map to match current theme
+      await updateMapForThemeChange(themeProvider);
+
+      print('✅ Map set to auto mode');
+    } catch (e) {
+      print('❌ Error enabling auto mode: $e');
+    }
+  }
+
+  /// Check if map is in auto mode
+  Future<bool> isAutoMode() async {
+    try {
+      return await MapPreferenceService.isAutoMode();
+    } catch (e) {
+      print('❌ Error checking auto mode: $e');
+      return true; // Default to auto mode
+    }
   }
 
   /// Initialize location services and get current position
@@ -97,22 +200,6 @@ class MapControlsService {
       print('✅ Map recentered to device location');
     } catch (e) {
       print('❌ Error recentering map: $e');
-    }
-  }
-
-  /// Change map base layer
-  Future<void> changeBaseLayer(MapBaseLayer newLayer) async {
-    if (_mapboxMap == null) {
-      print('❌ Map not initialized');
-      return;
-    }
-
-    try {
-      await _mapboxMap!.loadStyleURI(newLayer.styleUrl);
-      _currentLayer = newLayer;
-      print('✅ Map layer changed to: ${newLayer.displayName}');
-    } catch (e) {
-      print('❌ Error changing map layer: $e');
     }
   }
 

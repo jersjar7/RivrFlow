@@ -3,6 +3,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:provider/provider.dart';
 import 'package:rivrflow/core/widgets/navigation_button.dart';
 import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
 // NEW IMPORTS
@@ -11,6 +12,8 @@ import 'package:rivrflow/features/map/widgets/base_layer_modal.dart';
 import 'package:rivrflow/features/map/services/map_controls_service.dart';
 // EXISTING IMPORTS
 import '../../core/config.dart';
+import '../../core/constants.dart';
+import '../../core/providers/theme_provider.dart';
 import '../../core/services/cache_service.dart';
 import 'services/map_vector_tiles_service.dart';
 import 'services/map_reach_selection_service.dart';
@@ -35,12 +38,34 @@ class MapPageState extends State<MapPage> {
   bool _isLoading = true;
   String? _errorMessage;
   MapboxMap? _mapboxMap;
+  ThemeProvider? _themeProvider;
 
   @override
   void initState() {
     super.initState();
     _setupSelectionCallbacks();
     _initializeCacheService();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Set up theme listener
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    // If theme provider changed, update map
+    if (_themeProvider != themeProvider) {
+      final oldTheme = _themeProvider?.currentBrightness;
+      _themeProvider = themeProvider;
+
+      // Update map if theme changed and map is ready
+      if (oldTheme != null &&
+          oldTheme != themeProvider.currentBrightness &&
+          _mapboxMap != null) {
+        _updateMapForThemeChange();
+      }
+    }
   }
 
   @override
@@ -64,6 +89,13 @@ class MapPageState extends State<MapPage> {
     } catch (e) {
       print('❌ Cache service initialization error: $e');
       // Don't fail the whole page if cache fails - search will still work
+    }
+  }
+
+  /// Update map when theme changes
+  Future<void> _updateMapForThemeChange() async {
+    if (_themeProvider != null) {
+      await _controlsService.updateMapForThemeChange(_themeProvider!);
     }
   }
 
@@ -135,7 +167,7 @@ class MapPageState extends State<MapPage> {
         ),
         zoom: AppConfig.defaultZoom,
       ),
-      styleUri: AppConfig.mapboxStyleUrl,
+      styleUri: AppConstants.defaultMapboxStyleUrl,
       textureView: true,
       onMapCreated: _onMapCreated,
       onTapListener: _onMapTap,
@@ -211,9 +243,12 @@ class MapPageState extends State<MapPage> {
       // Initialize core map services
       _vectorTilesService.setMapboxMap(mapboxMap);
       _reachSelectionService.setMapboxMap(mapboxMap);
-      _controlsService.setMapboxMap(
-        mapboxMap,
-      ); // NEW: Initialize controls service
+      _controlsService.setMapboxMap(mapboxMap);
+
+      // NEW: Initialize map style based on preferences and theme
+      if (_themeProvider != null) {
+        await _controlsService.initializeMapStyle(_themeProvider!);
+      }
 
       print('🚀 Services initialized, loading initial content...');
 

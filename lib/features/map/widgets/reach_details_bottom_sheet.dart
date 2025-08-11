@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/forecast_service.dart';
 import '../../../core/services/error_service.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 import '../../../core/providers/favorites_provider.dart';
 import '../../../core/constants.dart';
 import '../models/selected_reach.dart';
@@ -57,19 +58,52 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     _loadDataProgressively();
   }
 
-  // Simple flow formatting with unit conversion
+  // Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit; // Returns 'CFS' or 'CMS' directly
+  }
+
+  // Convert raw flow value to user's preferred unit
+  double? _convertFlowToCurrentUnit(double? rawFlow) {
+    if (rawFlow == null) return null;
+
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
+
+    // Convert from API unit (assume CFS) to user's preferred unit
+    return unitService.convertFlow(rawFlow, 'CFS', currentUnit);
+  }
+
+  // Flow formatting with unit conversion
   String _formatFlow(double flowCfs) {
-    // TODO: Get user preference and convert if needed
-    // For now, default to CFS like other widgets
-    return '${flowCfs.toStringAsFixed(0)} CFS';
+    // Convert to user's preferred unit
+    final convertedFlow = _convertFlowToCurrentUnit(flowCfs);
+    if (convertedFlow == null) return '${flowCfs.toStringAsFixed(0)} CFS';
+
+    final currentUnit = _getCurrentFlowUnit();
+
+    // Format the converted value
+    String formattedValue;
+    if (convertedFlow >= 1000000) {
+      formattedValue = '${(convertedFlow / 1000000).toStringAsFixed(1)}M';
+    } else if (convertedFlow >= 1000) {
+      formattedValue = '${(convertedFlow / 1000).toStringAsFixed(1)}K';
+    } else if (convertedFlow >= 100) {
+      formattedValue = convertedFlow.toStringAsFixed(0);
+    } else {
+      formattedValue = convertedFlow.toStringAsFixed(1);
+    }
+
+    return '$formattedValue $currentUnit';
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: CupertinoColors.systemBackground,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
@@ -85,8 +119,16 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
   }
 
   Widget _buildHeader() {
-    return Padding(
+    return Container(
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: CupertinoColors.systemGrey5.resolveFrom(context),
+            width: 0.5,
+          ),
+        ),
+      ),
       child: Row(
         children: [
           // Stream order icon
@@ -95,7 +137,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
             decoration: BoxDecoration(
               color: AppConstants.getStreamOrderColor(
                 widget.selectedReach.streamOrder,
-              ).withOpacity(0.1),
+              ).withOpacity(0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -117,9 +159,10 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
                 if (_riverName != null)
                   Text(
                     _riverName!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
+                      color: CupertinoColors.label.resolveFrom(context),
                     ),
                   )
                 else if (_isLoadingFlow)
@@ -129,7 +172,9 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
                         width: 120,
                         height: 18,
                         decoration: BoxDecoration(
-                          color: CupertinoColors.systemGrey5,
+                          color: CupertinoColors.systemGrey4.resolveFrom(
+                            context,
+                          ),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -146,17 +191,18 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
                     widget
                         .selectedReach
                         .displayName, // Fallback if loading failed
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
+                      color: CupertinoColors.label.resolveFrom(context),
                     ),
                   ),
                 const SizedBox(height: 4),
                 Text(
                   widget.selectedReach.streamOrderDescription,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: CupertinoColors.secondaryLabel,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
                   ),
                 ),
               ],
@@ -170,9 +216,9 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
             CupertinoButton(
               padding: EdgeInsets.zero,
               onPressed: () => Navigator.pop(context),
-              child: const Icon(
+              child: Icon(
                 CupertinoIcons.xmark_circle_fill,
-                color: CupertinoColors.systemGrey3,
+                color: CupertinoColors.systemGrey2.resolveFrom(context),
                 size: 24,
               ),
             ),
@@ -201,8 +247,14 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
+          context,
+        ),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: CupertinoColors.separator.resolveFrom(context),
+          width: 0.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,9 +300,12 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
                 size: 16,
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Current Flow',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
               ),
               const Spacer(),
               // Show classification loading state
@@ -265,7 +320,11 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           const SizedBox(height: 12),
           Text(
             _formatFlow(_currentFlow!),
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
           const SizedBox(height: 8),
           _buildFlowClassification(),
@@ -297,15 +356,15 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: CupertinoColors.systemGrey4,
+          color: CupertinoColors.systemGrey3.resolveFrom(context),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Text(
+        child: Text(
           'Classifying flow level...',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: CupertinoColors.secondaryLabel,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
           ),
         ),
       );
@@ -314,15 +373,15 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: CupertinoColors.systemGrey5,
+          color: CupertinoColors.systemGrey4.resolveFrom(context),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Text(
+        child: Text(
           'Classification unavailable',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: CupertinoColors.secondaryLabel,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
           ),
         ),
       );
@@ -337,6 +396,10 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       decoration: BoxDecoration(
         color: CupertinoColors.systemRed.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: CupertinoColors.systemRed.withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,7 +422,13 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(_errorMessage!, style: const TextStyle(fontSize: 14)),
+          Text(
+            _errorMessage!,
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
+          ),
         ],
       ),
     );
@@ -373,11 +442,15 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
       decoration: BoxDecoration(
         color: CupertinoColors.systemOrange.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: CupertinoColors.systemOrange.withOpacity(0.3),
+          width: 1,
+        ),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(
                 CupertinoIcons.info_circle,
@@ -394,10 +467,13 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
               ),
             ],
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             'Current flow data is not available for this reach.',
-            style: TextStyle(fontSize: 14),
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
         ],
       ),
@@ -437,7 +513,8 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
                 return CupertinoButton(
                   color: isFavorited
                       ? CupertinoColors.systemRed.withOpacity(0.1)
-                      : CupertinoColors.systemGrey5,
+                      : CupertinoColors.tertiarySystemGroupedBackground
+                            .resolveFrom(context),
                   onPressed: _isTogglingFavorite
                       ? null
                       : () => _toggleFavoriteOptimized(favoritesProvider),
@@ -449,7 +526,7 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
                               : CupertinoIcons.heart,
                           color: isFavorited
                               ? CupertinoColors.systemRed
-                              : CupertinoColors.systemGrey,
+                              : CupertinoColors.systemGrey.resolveFrom(context),
                         ),
                 );
               },
@@ -460,11 +537,13 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
           // More options
           CupertinoButton(
-            color: CupertinoColors.systemGrey5,
+            color: CupertinoColors.tertiarySystemGroupedBackground.resolveFrom(
+              context,
+            ),
             onPressed: _showMoreOptions,
-            child: const Icon(
+            child: Icon(
               CupertinoIcons.ellipsis,
-              color: CupertinoColors.systemGrey,
+              color: CupertinoColors.systemGrey.resolveFrom(context),
             ),
           ),
         ],
@@ -647,16 +726,20 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
           width: 100,
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
         ),
       ],

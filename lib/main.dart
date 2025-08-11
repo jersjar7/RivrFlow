@@ -8,6 +8,7 @@ import 'package:rivrflow/core/providers/reach_data_provider.dart';
 import 'package:rivrflow/core/providers/favorites_provider.dart';
 import 'package:rivrflow/core/providers/theme_provider.dart';
 import 'package:rivrflow/core/services/theme_service.dart';
+import 'package:rivrflow/core/services/map_preference_service.dart';
 import 'package:rivrflow/features/favorites/favorites_page.dart';
 import 'package:rivrflow/features/forecast/pages/reach_overview_page.dart';
 import 'package:rivrflow/features/forecast/pages/short_range_detail_page.dart';
@@ -48,7 +49,7 @@ class _RivrFlowAppState extends State<RivrFlowApp> with WidgetsBindingObserver {
     super.initState();
     _themeProvider = ThemeProvider();
     WidgetsBinding.instance.addObserver(this);
-    _initializeTheme();
+    _initializeServices();
   }
 
   @override
@@ -64,12 +65,18 @@ class _RivrFlowAppState extends State<RivrFlowApp> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _initializeTheme() async {
+  Future<void> _initializeServices() async {
+    // Initialize theme service
     final savedTheme = await ThemeService.loadTheme();
     _themeProvider.setTheme(savedTheme);
     _themeProvider.updateSystemBrightness(
       WidgetsBinding.instance.platformDispatcher.platformBrightness,
     );
+
+    // Initialize map preference service (loads saved preferences)
+    await MapPreferenceService.loadMapPreference();
+
+    print('🚀 App services initialized');
   }
 
   @override
