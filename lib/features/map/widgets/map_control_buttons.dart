@@ -5,11 +5,13 @@ import 'package:flutter/cupertino.dart';
 class MapControlButtons extends StatelessWidget {
   final VoidCallback onLayersPressed;
   final VoidCallback onRecenterPressed;
+  final VoidCallback onStreamsPressed;
 
   const MapControlButtons({
     super.key,
     required this.onLayersPressed,
     required this.onRecenterPressed,
+    required this.onStreamsPressed,
   });
 
   @override
@@ -22,6 +24,13 @@ class MapControlButtons extends StatelessWidget {
           icon: CupertinoIcons.layers_alt,
           onPressed: onLayersPressed,
           tooltip: 'Map Layers',
+        ),
+        const SizedBox(height: 8),
+        // Streams list button
+        _buildControlButton(
+          icon: CupertinoIcons.list_bullet,
+          onPressed: onStreamsPressed,
+          tooltip: 'Visible Streams',
         ),
         const SizedBox(height: 8),
         // Recenter button

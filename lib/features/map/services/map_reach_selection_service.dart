@@ -2,10 +2,12 @@
 
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../models/selected_reach.dart';
+import '../models/visible_stream.dart';
 
 /// Service for handling river reach selection from vector tiles
 class MapReachSelectionService {
   MapboxMap? _mapboxMap;
+  String? _currentHighlightLayerId; // Track current highlight layer
 
   // Callbacks for selection events
   Function(SelectedReach)? onReachSelected;
@@ -42,6 +44,185 @@ class MapReachSelectionService {
     } catch (e) {
       print('❌ Error handling map tap: $e');
       onEmptyTap?.call(context.point);
+    }
+  }
+
+  /// Get all visible streams in the current map bounds
+  Future<List<VisibleStream>> getVisibleStreams() async {
+    if (_mapboxMap == null) return [];
+
+    try {
+      print('🔍 Querying visible streams...');
+
+      // Get map size to create screen box covering entire visible area
+      final size = await _mapboxMap!.getSize();
+
+      // Create a screen box covering the entire visible area
+      final screenBox = ScreenBox(
+        min: ScreenCoordinate(x: 0, y: 0),
+        max: ScreenCoordinate(x: size.width, y: size.height),
+      );
+
+      // Query all streams in visible area
+      final streams2LayerIds = [
+        'streams2-order-1-2', // Small streams
+        'streams2-order-3-4', // Medium streams
+        'streams2-order-5-plus', // Large rivers
+      ];
+
+      final List<QueriedRenderedFeature?> queryResult = await _mapboxMap!
+          .queryRenderedFeatures(
+            RenderedQueryGeometry.fromScreenBox(screenBox),
+            RenderedQueryOptions(layerIds: streams2LayerIds),
+          );
+
+      print('📊 Found ${queryResult.length} stream features in visible area');
+
+      // Convert features to VisibleStream objects
+      final visibleStreams = <VisibleStream>[];
+      final seenStationIds = <String>{}; // Avoid duplicates
+
+      for (final queriedFeature in queryResult) {
+        if (queriedFeature != null) {
+          try {
+            final visibleStream = _createVisibleStreamFromFeature(
+              queriedFeature,
+            );
+            if (visibleStream != null &&
+                !seenStationIds.contains(visibleStream.stationId)) {
+              visibleStreams.add(visibleStream);
+              seenStationIds.add(visibleStream.stationId);
+            }
+          } catch (e) {
+            print('⚠️ Error processing stream feature: $e');
+          }
+        }
+      }
+
+      // Sort by stream order (larger streams first) then by station ID
+      visibleStreams.sort((a, b) {
+        final orderCompare = b.streamOrder.compareTo(a.streamOrder);
+        if (orderCompare != 0) return orderCompare;
+        return a.stationId.compareTo(b.stationId);
+      });
+
+      print('✅ Found ${visibleStreams.length} unique streams');
+      return visibleStreams;
+    } catch (e) {
+      print('❌ Error getting visible streams: $e');
+      return [];
+    }
+  }
+
+  /// Fly to a selected stream and highlight it
+  Future<void> flyToStream(VisibleStream stream) async {
+    if (_mapboxMap == null) return;
+
+    try {
+      print('🛫 Flying to stream ${stream.stationId}...');
+
+      // Clear any existing highlight first
+      await clearHighlight();
+
+      // Create camera options for the stream location
+      final cameraOptions = CameraOptions(
+        center: Point(coordinates: Position(stream.longitude, stream.latitude)),
+        zoom: 14.0, // Good zoom level for individual streams
+      );
+
+      // Fly to the stream location
+      await _mapboxMap!.flyTo(
+        cameraOptions,
+        MapAnimationOptions(duration: 1500, startDelay: 0),
+      );
+
+      // Highlight the stream after flying
+      await highlightStream(stream);
+
+      print('✅ Flew to and highlighted stream ${stream.stationId}');
+    } catch (e) {
+      print('❌ Error flying to stream: $e');
+    }
+  }
+
+  /// Highlight a specific stream on the map
+  Future<void> highlightStream(VisibleStream stream) async {
+    if (_mapboxMap == null) return;
+
+    try {
+      // Clear any existing highlight
+      await clearHighlight();
+
+      // Create a temporary source with just this stream's data
+      final highlightSourceId = 'stream-highlight-source';
+      final highlightLayerId = 'stream-highlight-layer';
+
+      // Create GeoJSON string for the stream point
+      final streamPointGeoJson =
+          '''
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [${stream.longitude}, ${stream.latitude}]
+      },
+      "properties": {
+        "station_id": "${stream.stationId}"
+      }
+    }
+  ]
+}
+''';
+
+      // Add the highlight source
+      await _mapboxMap!.style.addSource(
+        GeoJsonSource(id: highlightSourceId, data: streamPointGeoJson),
+      );
+
+      // Add a circle layer to highlight the stream location
+      await _mapboxMap!.style.addLayer(
+        CircleLayer(
+          id: highlightLayerId,
+          sourceId: highlightSourceId,
+          circleColor: 0xFFFF0000, // Bright red
+          circleRadius: 12.0, // Large enough to be visible
+          circleOpacity: 0.7,
+          circleStrokeColor: 0xFFFFFFFF, // White border
+          circleStrokeWidth: 2.0,
+        ),
+      );
+
+      _currentHighlightLayerId = highlightLayerId;
+      print('✅ Highlighted stream ${stream.stationId}');
+
+      // Auto-clear highlight after 5 seconds
+      Future.delayed(const Duration(seconds: 5), () {
+        clearHighlight();
+      });
+    } catch (e) {
+      print('❌ Error highlighting stream: $e');
+    }
+  }
+
+  /// Clear the current stream highlight
+  Future<void> clearHighlight() async {
+    if (_mapboxMap == null || _currentHighlightLayerId == null) return;
+
+    try {
+      // Remove highlight layer
+      await _mapboxMap!.style.removeStyleLayer(_currentHighlightLayerId!);
+
+      // Remove highlight source
+      await _mapboxMap!.style.removeStyleSource('stream-highlight-source');
+
+      _currentHighlightLayerId = null;
+      print('✅ Cleared stream highlight');
+    } catch (e) {
+      // Ignore errors when removing non-existent layers/sources
+      _currentHighlightLayerId = null;
     }
   }
 
@@ -143,8 +324,57 @@ class MapReachSelectionService {
     }
   }
 
+  /// Create VisibleStream from vector tile feature
+  VisibleStream? _createVisibleStreamFromFeature(
+    QueriedRenderedFeature queriedRenderedFeature,
+  ) {
+    try {
+      final feature = queriedRenderedFeature.queriedFeature.feature;
+      final properties = feature['properties'] != null
+          ? Map<String, dynamic>.from(feature['properties'] as Map)
+          : <String, dynamic>{};
+
+      // Validate required properties
+      if (!properties.containsKey('station_id') ||
+          !properties.containsKey('streamOrde')) {
+        return null;
+      }
+
+      // Get the geometry to extract coordinates
+      final geometry = feature['geometry'];
+      if (geometry == null) {
+        return null;
+      }
+
+      // Cast geometry to Map to safely access its properties
+      final geometryMap = geometry as Map<String, dynamic>;
+
+      if (geometryMap['type'] != 'LineString') {
+        return null;
+      }
+
+      final coordinates = geometryMap['coordinates'] as List;
+      if (coordinates.isEmpty) return null;
+
+      // Use the middle point of the LineString for the stream location
+      final middleIndex = coordinates.length ~/ 2;
+      final middleCoord = coordinates[middleIndex] as List;
+
+      return VisibleStream(
+        stationId: properties['station_id'].toString(),
+        streamOrder: properties['streamOrde'] as int,
+        longitude: middleCoord[0].toDouble(),
+        latitude: middleCoord[1].toDouble(),
+      );
+    } catch (e) {
+      print('❌ Error creating VisibleStream: $e');
+      return null;
+    }
+  }
+
   /// Dispose resources
   void dispose() {
+    clearHighlight(); // Clean up any highlights
     _mapboxMap = null;
     onReachSelected = null;
     onEmptyTap = null;

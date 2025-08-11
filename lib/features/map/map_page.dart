@@ -9,6 +9,7 @@ import 'package:rivrflow/features/map/widgets/map_search_widget.dart';
 // NEW IMPORTS
 import 'package:rivrflow/features/map/widgets/map_control_buttons.dart';
 import 'package:rivrflow/features/map/widgets/base_layer_modal.dart';
+import 'package:rivrflow/features/map/widgets/streams_list_bottom_sheet.dart'; // NEW: Import streams list
 import 'package:rivrflow/features/map/services/map_controls_service.dart';
 // EXISTING IMPORTS
 import '../../core/config.dart';
@@ -135,7 +136,7 @@ class MapPageState extends State<MapPage> {
           ),
         ),
 
-        // NEW: Map control buttons in top-right
+        // Map control buttons in top-right
         Positioned(
           top: 30,
           right: 0,
@@ -144,6 +145,8 @@ class MapPageState extends State<MapPage> {
               margin: const EdgeInsets.only(top: 8, right: 16),
               child: MapControlButtons(
                 onLayersPressed: _showLayersModal,
+                onStreamsPressed:
+                    _showStreamsModal, // NEW: Wire up streams button
                 onRecenterPressed: _recenterToLocation,
               ),
             ),
@@ -347,6 +350,57 @@ class MapPageState extends State<MapPage> {
         await _controlsService.changeBaseLayer(layer);
         print('🗺️ Layer changed to: ${layer.displayName}');
       },
+    );
+  }
+
+  // NEW: Show streams modal
+  void _showStreamsModal() async {
+    if (_mapboxMap == null) {
+      print('❌ Map not ready for streams list');
+      return;
+    }
+
+    try {
+      // Get visible streams from the reach selection service
+      final visibleStreams = await _reachSelectionService.getVisibleStreams();
+
+      if (visibleStreams.isEmpty) {
+        // Show feedback if no streams are visible
+        _showNoStreamsAlert();
+        return;
+      }
+
+      // Show the streams list bottom sheet
+      showStreamsListModal(
+        context,
+        streams: visibleStreams,
+        onStreamSelected: (stream) async {
+          // Fly to the selected stream and highlight it
+          await _reachSelectionService.flyToStream(stream);
+          print('🎯 Flying to stream: ${stream.stationId}');
+        },
+      );
+    } catch (e) {
+      print('❌ Error showing streams modal: $e');
+    }
+  }
+
+  // Helper method to show alert when no streams are visible
+  void _showNoStreamsAlert() {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('No Streams Visible'),
+        content: const Text(
+          'Zoom in or pan the map to see streams in the current view.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('OK'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
     );
   }
 
