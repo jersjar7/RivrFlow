@@ -10,28 +10,22 @@ import '../domain/entities/daily_flow_forecast.dart';
 /// structured daily forecasts suitable for display in expandable widgets.
 /// Prioritizes 'mean' data with fallback to first available ensemble member.
 class DailyForecastProcessor {
-  /// ✅ UPDATED: Process medium or long range forecast data into daily summaries with unit conversion
+  /// Process medium or long range forecast data into daily summaries
   ///
   /// [forecastData] - The ensemble forecast data (mediumRange or longRange from ForecastResponse)
   /// [reach] - The reach data containing return period information for flow categorization
   /// [forecastType] - Type identifier ('medium_range' or 'long_range') for tracking
-  /// [targetUnit] - Target unit for conversion ('CFS' or 'CMS')
   ///
   /// Returns a list of DailyFlowForecast objects, one per day covered by the forecast
   static List<DailyFlowForecast> processForecastData({
     required Map<String, ForecastSeries> forecastData,
     required ReachData reach,
     required String forecastType,
-    String? targetUnit, // ✅ NEW: Optional target unit for conversion
   }) {
     if (forecastData.isEmpty) {
       print('DAILY_PROCESSOR: No forecast data available for $forecastType');
       return [];
     }
-
-    // ✅ NEW: Get target unit (fallback to current preference if not specified)
-    final unitService = FlowUnitPreferenceService();
-    final convertToUnit = targetUnit ?? unitService.currentFlowUnit;
 
     // Step 1: Get the preferred data source (mean first, then first member)
     final selectedData = _selectDataSource(forecastData);
@@ -43,19 +37,16 @@ class DailyForecastProcessor {
     final dataSource = selectedData['source'] as String;
     final forecastSeries = selectedData['series'] as ForecastSeries;
 
-    // Get the source unit from the forecast series (may need conversion)
-    final sourceUnit = forecastSeries.units; // Will be CFS or CMS
+    // Get current unit for manual conversion
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
 
     print(
-      'DAILY_PROCESSOR: Using $dataSource for $forecastType (${forecastSeries.data.length} points, $sourceUnit → $convertToUnit)',
+      'DAILY_PROCESSOR: Using $dataSource for $forecastType (${forecastSeries.data.length} points, ${forecastSeries.units} → $currentUnit)',
     );
 
-    // Step 2: Group hourly data by calendar date with unit conversion
-    final dailyGroups = _groupHourlyDataByDate(
-      forecastSeries,
-      sourceUnit,
-      convertToUnit,
-    );
+    // Step 2: Group hourly data by calendar date with manual conversion
+    final dailyGroups = _groupHourlyDataByDate(forecastSeries);
 
     // Step 3: Process each day's data into DailyFlowForecast objects
     final dailyForecasts = <DailyFlowForecast>[];
@@ -72,7 +63,7 @@ class DailyForecastProcessor {
           hourlyData: hourlyData,
           dataSource: dataSource,
           reach: reach,
-          dataUnit: convertToUnit, // Use target unit
+          dataUnit: currentUnit,
         );
 
         if (dailyForecast != null) {
@@ -88,34 +79,30 @@ class DailyForecastProcessor {
     dailyForecasts.sort((a, b) => a.date.compareTo(b.date));
 
     print(
-      'DAILY_PROCESSOR: Generated ${dailyForecasts.length} daily forecasts from $dataSource ($convertToUnit)',
+      'DAILY_PROCESSOR: Generated ${dailyForecasts.length} daily forecasts from $dataSource ($currentUnit)',
     );
     return dailyForecasts;
   }
 
-  /// ✅ UPDATED: Convenience method for processing medium range data specifically
+  /// Convenience method for processing medium range data specifically
   static List<DailyFlowForecast> processMediumRange({
     required ForecastResponse forecastResponse,
-    String? targetUnit, // ✅ NEW: Optional target unit
   }) {
     return processForecastData(
       forecastData: forecastResponse.mediumRange,
       reach: forecastResponse.reach,
       forecastType: 'medium_range',
-      targetUnit: targetUnit, // ✅ NEW: Pass target unit
     );
   }
 
-  /// ✅ UPDATED: Convenience method for processing long range data specifically
+  /// Convenience method for processing long range data specifically
   static List<DailyFlowForecast> processLongRange({
     required ForecastResponse forecastResponse,
-    String? targetUnit, // ✅ NEW: Optional target unit
   }) {
     return processForecastData(
       forecastData: forecastResponse.longRange,
       reach: forecastResponse.reach,
       forecastType: 'long_range',
-      targetUnit: targetUnit, // ✅ NEW: Pass target unit
     );
   }
 
@@ -167,12 +154,6 @@ class DailyForecastProcessor {
 
   // Private helper methods
 
-  /// ✅ NEW: Convert flow value between units
-  static double _convertFlow(double value, String fromUnit, String toUnit) {
-    final unitService = FlowUnitPreferenceService();
-    return unitService.convertFlow(value, fromUnit, toUnit);
-  }
-
   /// Select the preferred data source from ensemble data
   /// Priority: mean > first available member
   static Map<String, dynamic>? _selectDataSource(
@@ -203,13 +184,13 @@ class DailyForecastProcessor {
     return null; // No valid data found
   }
 
-  /// ✅ UPDATED: Group hourly forecast points by calendar date with unit conversion
+  /// Group hourly forecast points by calendar date with manual conversion
   static Map<DateTime, Map<DateTime, double>> _groupHourlyDataByDate(
     ForecastSeries forecastSeries,
-    String sourceUnit,
-    String targetUnit,
   ) {
     final dailyGroups = <DateTime, Map<DateTime, double>>{};
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
 
     for (final point in forecastSeries.data) {
       // Convert to local time and get the calendar date
@@ -219,8 +200,12 @@ class DailyForecastProcessor {
       // Initialize day group if needed
       dailyGroups[dateKey] ??= <DateTime, double>{};
 
-      // ✅ NEW: Convert flow value to target unit
-      final convertedFlow = _convertFlow(point.flow, sourceUnit, targetUnit);
+      // Manual conversion from API units to user preference
+      final convertedFlow = unitService.convertFlow(
+        point.flow,
+        forecastSeries.units, // Source unit from API
+        currentUnit, // Target unit
+      );
       dailyGroups[dateKey]![localTime] = convertedFlow;
     }
 
@@ -238,24 +223,23 @@ class DailyForecastProcessor {
   }) {
     if (hourlyData.isEmpty) return null;
 
-    // Calculate daily statistics (flow values already converted to target unit)
+    // Calculate daily statistics (flow values already converted)
     final flows = hourlyData.values.toList();
     final minFlow = flows.reduce((a, b) => a < b ? a : b);
     final maxFlow = flows.reduce((a, b) => a > b ? a : b);
     final avgFlow = flows.reduce((a, b) => a + b) / flows.length;
 
     // Use unit-aware flow category calculation
-    // Use the maximum flow of the day for category determination (most conservative)
     final flowCategory = reach.hasReturnPeriods
-        ? reach.getFlowCategory(maxFlow, dataUnit) // Unit-aware!
+        ? reach.getFlowCategory(maxFlow, dataUnit)
         : 'Unknown';
 
     return DailyFlowForecast(
       date: date,
-      minFlow: minFlow, // Already converted to target unit
-      maxFlow: maxFlow, // Already converted to target unit
-      avgFlow: avgFlow, // Already converted to target unit
-      hourlyData: Map.from(hourlyData), // Already converted to target unit
+      minFlow: minFlow,
+      maxFlow: maxFlow,
+      avgFlow: avgFlow,
+      hourlyData: Map.from(hourlyData),
       flowCategory: flowCategory,
       dataSource: dataSource,
     );
@@ -288,7 +272,7 @@ class DailyForecastProcessor {
     return invalidCount == 0;
   }
 
-  /// ✅ UPDATED: Debug helper to print processing summary with unit parameter
+  /// Debug helper to print processing summary with unit parameter
   static void printProcessingSummary(
     List<DailyFlowForecast> forecasts, [
     String? unit,
@@ -298,7 +282,7 @@ class DailyForecastProcessor {
       return;
     }
 
-    // ✅ UPDATED: Use provided unit or get current unit for display
+    // Use provided unit or get current unit for display
     final displayUnit = unit ?? FlowUnitPreferenceService().currentFlowUnit;
 
     print('DAILY_PROCESSOR: Processing Summary:');
