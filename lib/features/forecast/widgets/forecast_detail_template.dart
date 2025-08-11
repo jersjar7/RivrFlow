@@ -2,6 +2,7 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:rivrflow/core/services/flow_unit_preference_service.dart';
 import 'package:rivrflow/features/forecast/widgets/horizontal_flow_timeline.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../../../core/services/forecast_service.dart';
@@ -338,16 +339,22 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
 
     final forecast = reachProvider.currentForecast!;
 
-    // Calculate real metrics from forecast data
+    // Calculate real metrics from forecast data with unit conversion
     final peakFlow = _calculatePeakFlow(forecast);
     final currentTrend = _calculateCurrentTrend(forecast);
     final flowCategory = _forecastService.getFlowCategory(forecast);
+
+    // Get current unit for display
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
 
     return Column(
       children: [
         _buildMetricRow(
           'Peak Flow',
-          peakFlow != null ? '${peakFlow.toStringAsFixed(0)} CFS' : 'N/A',
+          peakFlow != null
+              ? '${peakFlow.toStringAsFixed(0)} $currentUnit'
+              : 'N/A',
           CupertinoIcons.arrow_up,
         ),
         const SizedBox(height: 8),
@@ -395,7 +402,13 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
         }
       }
 
-      return maxFlow > -9000 ? maxFlow : null;
+      if (maxFlow <= -9000) return null;
+
+      // ✅ FIXED: Convert from API units (CFS) to user preference
+      final unitService = FlowUnitPreferenceService();
+      final currentUnit = unitService.currentFlowUnit;
+
+      return unitService.convertFlow(maxFlow, 'CFS', currentUnit);
     } catch (e) {
       print('Error calculating peak flow: $e');
       return null;
@@ -404,20 +417,38 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
 
   String _calculateCurrentTrend(dynamic forecast) {
     try {
+      final unitService = FlowUnitPreferenceService();
+      final currentUnit = unitService.currentFlowUnit;
+
       // For short range, use hourly data to calculate trend
       if (widget.forecastType == 'short_range') {
         final hourlyData = _forecastService.getShortRangeHourlyData(forecast);
         if (hourlyData.length >= 3) {
-          // Compare current flow vs next 2 hours
-          final current = hourlyData[0].flow;
-          final future1 = hourlyData[1].flow;
-          final future2 = hourlyData[2].flow;
+          // Convert flow values to user preference for comparison
+          final current = unitService.convertFlow(
+            hourlyData[0].flow,
+            'CFS',
+            currentUnit,
+          );
+          final future1 = unitService.convertFlow(
+            hourlyData[1].flow,
+            'CFS',
+            currentUnit,
+          );
+          final future2 = unitService.convertFlow(
+            hourlyData[2].flow,
+            'CFS',
+            currentUnit,
+          );
 
           final avgFuture = (future1 + future2) / 2;
           final change = avgFuture - current;
 
-          if (change > 10) return 'Rising';
-          if (change < -10) return 'Falling';
+          // Use dynamic thresholds based on unit (CMS values are ~35x smaller)
+          final threshold = currentUnit == 'CMS' ? 0.3 : 10.0;
+
+          if (change > threshold) return 'Rising';
+          if (change < -threshold) return 'Falling';
           return 'Stable';
         }
       }
@@ -425,12 +456,24 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
       // For other forecast types, use first few data points
       final forecastSeries = forecast.getPrimaryForecast(widget.forecastType);
       if (forecastSeries != null && forecastSeries.data.length >= 3) {
-        final first = forecastSeries.data[0].flow;
-        final third = forecastSeries.data[2].flow;
+        // Convert values for comparison
+        final first = unitService.convertFlow(
+          forecastSeries.data[0].flow,
+          'CFS',
+          currentUnit,
+        );
+        final third = unitService.convertFlow(
+          forecastSeries.data[2].flow,
+          'CFS',
+          currentUnit,
+        );
         final change = third - first;
 
-        if (change > 20) return 'Rising';
-        if (change < -20) return 'Falling';
+        // Use dynamic thresholds based on unit
+        final threshold = currentUnit == 'CMS' ? 0.6 : 20.0;
+
+        if (change > threshold) return 'Rising';
+        if (change < -threshold) return 'Falling';
         return 'Stable';
       }
 

@@ -396,9 +396,9 @@ class _HydrographPageState extends State<HydrographPage> {
 
   String _buildChartInfoMessage() {
     final typeNames = {
-      'short_range': 'Short Range (Hourly)',
-      'medium_range': 'Medium Range (Daily)',
-      'long_range': 'Long Range (Weekly)',
+      'short_range': 'Hourly (Short Range)',
+      'medium_range': 'Daily (Medium Range)',
+      'long_range': 'Extended (Long Range)',
     };
 
     final typeName = typeNames[_forecastType] ?? _forecastType?.toUpperCase();

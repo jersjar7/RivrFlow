@@ -2,6 +2,7 @@
 
 import 'package:flutter/cupertino.dart';
 import '../../../core/constants.dart';
+import '../../../core/services/flow_unit_preference_service.dart';
 import '../domain/entities/daily_flow_forecast.dart';
 
 /// Modal bottom sheet that displays detailed flow information for a selected calendar day
@@ -19,6 +20,12 @@ class CalendarDayDetailSheet extends StatefulWidget {
 }
 
 class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
+  // Get current flow units from preference service
+  String _getCurrentFlowUnit() {
+    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
+    return currentUnit == 'CMS' ? 'CMS' : 'CFS';
+  }
+
   @override
   Widget build(BuildContext context) {
     final dayLabel = _getFullDayName(widget.forecast.date);
@@ -193,8 +200,10 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
     );
   }
 
-  /// Build individual flow statistic
+  /// Build individual flow statistic with correct unit
   Widget _buildFlowStat(String label, double value) {
+    final currentUnit = _getCurrentFlowUnit();
+
     return Column(
       children: [
         Text(
@@ -207,7 +216,7 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
         ),
         const SizedBox(height: 4),
         Text(
-          '${value.toStringAsFixed(0)} CFS',
+          '${value.toStringAsFixed(0)} $currentUnit',
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -256,12 +265,13 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
     );
   }
 
-  /// Build individual hourly flow card
+  /// Build individual hourly flow card with correct unit
   Widget _buildHourlyCard(DateTime time, double flow) {
     final isCurrentHour = _isCurrentHour(time);
     final categoryColor = AppConstants.getFlowCategoryColor(
       widget.forecast.flowCategory,
     );
+    final currentUnit = _getCurrentFlowUnit();
 
     return Container(
       width: 80,
@@ -304,9 +314,9 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
             ),
           ),
 
-          // CFS label
+          // Unit label
           Text(
-            'CFS',
+            currentUnit,
             style: TextStyle(
               fontSize: 10,
               color: CupertinoColors.secondaryLabel.resolveFrom(context),

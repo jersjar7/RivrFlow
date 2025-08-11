@@ -1,7 +1,6 @@
 // lib/features/forecast/widgets/flood_categories_info_sheet.dart
 
 import 'package:flutter/cupertino.dart';
-import 'package:rivrflow/core/models/user_settings.dart';
 import '../../../core/constants.dart';
 import '../../../core/services/flow_unit_preference_service.dart';
 
@@ -14,7 +13,18 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
   // Get current flow units from preference service
   String _getCurrentFlowUnit() {
     final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
-    return currentUnit == FlowUnit.cms ? 'CMS' : 'CFS';
+    return currentUnit == 'CMS' ? 'CMS' : 'CFS';
+  }
+
+  // Convert return period value to user's preferred unit
+  double? _convertReturnPeriod(double? cmsValue) {
+    if (cmsValue == null) return null;
+
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
+
+    // Return periods are stored in CMS, convert to user preference
+    return unitService.convertFlow(cmsValue, 'CMS', currentUnit);
   }
 
   @override
@@ -62,7 +72,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                       AppConstants.returnPeriodActionBg,
                       CupertinoColors.systemYellow,
                       CupertinoIcons.exclamationmark_triangle,
-                      returnPeriods?[2],
+                      _convertReturnPeriod(returnPeriods?[2]),
                     ),
 
                     _buildFloodCategoryItem(
@@ -72,7 +82,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                       AppConstants.returnPeriodModerateBg,
                       CupertinoColors.systemOrange,
                       CupertinoIcons.exclamationmark_triangle_fill,
-                      returnPeriods?[5],
+                      _convertReturnPeriod(returnPeriods?[5]),
                     ),
 
                     _buildFloodCategoryItem(
@@ -82,7 +92,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                       AppConstants.returnPeriodMajorBg,
                       CupertinoColors.systemRed,
                       CupertinoIcons.exclamationmark_octagon_fill,
-                      returnPeriods?[10],
+                      _convertReturnPeriod(returnPeriods?[10]),
                     ),
 
                     _buildFloodCategoryItem(
@@ -92,7 +102,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                       AppConstants.returnPeriodExtremeBg,
                       CupertinoColors.systemPurple,
                       CupertinoIcons.xmark_octagon_fill,
-                      returnPeriods?[25], // No upper bound
+                      _convertReturnPeriod(returnPeriods?[25]),
                     ),
 
                     const SizedBox(height: 20),
@@ -155,7 +165,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
     Color backgroundColor,
     Color iconColor,
     IconData icon,
-    double? thresholdFlow, // Already in user's preferred unit
+    double? thresholdFlow, // Converted to user's preferred unit
   ) {
     // Get current flow unit for display
     final currentUnit = _getCurrentFlowUnit();
@@ -189,7 +199,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                     if (thresholdFlow != null) ...[
                       const Spacer(),
                       Text(
-                        '${_formatFlowValue(thresholdFlow)} $currentUnit', // UPDATED: Now dynamic
+                        '${_formatFlowValue(thresholdFlow)} $currentUnit',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
