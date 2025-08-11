@@ -599,12 +599,12 @@ class _MapSearchModalState extends State<MapSearchModal> {
           ..._searchResults.map((place) => _buildPlaceItem(place)),
         ],
         if (hasRecent) ...[
-          const Text(
+          Text(
             'Recent Searches',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.systemGrey.resolveFrom(context),
             ),
           ),
           const SizedBox(height: 8),
@@ -656,9 +656,9 @@ class _MapSearchModalState extends State<MapSearchModal> {
         subtitle: place.displaySubtitle.isNotEmpty
             ? Text(
                 place.displaySubtitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.systemGrey2.resolveFrom(context),
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
