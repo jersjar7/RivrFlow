@@ -142,7 +142,12 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        0,
+      ), // Reduced bottom padding from 16 to 8
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -193,11 +198,11 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          const SizedBox(height: 16),
+          const SizedBox(height: 8), // Reduced from 16 to 8
           // Results count
           if (_searchController.text.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: 8), // Reduced from 12 to 8
               child: Row(
                 children: [
                   Text(
@@ -214,6 +219,8 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
           // List
           Expanded(
             child: ListView.separated(
+              padding: EdgeInsets.zero,
+              primary: false,
               itemCount: _filteredStreams.length,
               separatorBuilder: (context, index) =>
                   const Divider(height: 1, color: CupertinoColors.separator),
