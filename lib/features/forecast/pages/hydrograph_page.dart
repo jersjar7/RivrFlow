@@ -290,61 +290,145 @@ class _HydrographPageState extends State<HydrographPage> {
       return;
     }
 
-    // FIXED: Use interactive_chart's ChartDataPoint type directly
-    final chartData = forecastSeries.data
-        .map(
-          (point) =>
-              ChartDataPoint(time: point.validTime.toLocal(), flow: point.flow),
-        )
-        .toList();
+    // Proper type checking and error handling
+    try {
+      final List<ChartDataPoint> chartData = [];
 
-    // Get return periods for flood categories
-    final returnPeriods = reach.returnPeriods;
+      // Check if data is the correct type and convert safely
+      if (forecastSeries.data is List<dynamic>) {
+        // Handle the case where data is List<dynamic>
+        final dynamicList = forecastSeries.data as List<dynamic>;
 
-    await ExportFunctionality.exportDataAsCSV(
-      chartData: chartData,
-      reachName: reach.displayName,
-      forecastType: _forecastType!,
-      returnPeriods: returnPeriods,
-    );
+        for (final item in dynamicList) {
+          try {
+            // Try to access the fields we need
+            if (item is Map<String, dynamic>) {
+              final validTimeStr = item['validTime'];
+              final flowValue = item['flow'];
+
+              if (validTimeStr != null && flowValue != null) {
+                final validTime = DateTime.parse(validTimeStr.toString());
+                final flow = (flowValue as num).toDouble();
+
+                chartData.add(
+                  ChartDataPoint(time: validTime.toLocal(), flow: flow),
+                );
+              }
+            } else if (item != null) {
+              // Try to access as ForecastPoint properties
+              final dynamic validTime = (item as dynamic).validTime;
+              final dynamic flow = (item as dynamic).flow;
+
+              if (validTime != null && flow != null) {
+                chartData.add(
+                  ChartDataPoint(
+                    time: (validTime as DateTime).toLocal(),
+                    flow: (flow as num).toDouble(),
+                  ),
+                );
+              }
+            }
+          } catch (itemError) {
+            print('Error processing forecast point: $itemError');
+            // Skip this item and continue
+            continue;
+          }
+        }
+      } else {
+        // Handle the expected case where data is List<ForecastPoint>
+        for (final point in forecastSeries.data) {
+          chartData.add(
+            ChartDataPoint(time: point.validTime.toLocal(), flow: point.flow),
+          );
+        }
+      }
+
+      if (chartData.isEmpty) {
+        ExportFunctionality.showErrorMessage(
+          context,
+          'No valid forecast data points found',
+        );
+        return;
+      }
+
+      // Get return periods for flood categories
+      final returnPeriods = reach.returnPeriods;
+
+      await ExportFunctionality.exportDataAsCSV(
+        chartData: chartData,
+        reachName: reach.displayName,
+        forecastType: _forecastType!,
+        returnPeriods: returnPeriods,
+      );
+    } catch (e) {
+      print('Error in _exportSingleSeriesAsCSV: $e');
+      ExportFunctionality.showErrorMessage(
+        context,
+        'Failed to export data: ${e.toString()}',
+      );
+    }
   }
 
   Future<void> _exportEnsembleDataAsCSV(reach, forecast) async {
-    // Get ensemble data using our service
-    final ensembleData = _forecastService.getEnsembleReferenceData(
-      forecast,
-      _forecastType!,
-    );
+    try {
+      // Get ensemble data using our service
+      final ensembleData = _forecastService.getEnsembleReferenceData(
+        forecast,
+        _forecastType!,
+      );
 
-    if (ensembleData.isEmpty) {
+      if (ensembleData.isEmpty) {
+        ExportFunctionality.showErrorMessage(
+          context,
+          'No ensemble data available',
+        );
+        return;
+      }
+
+      // Convert to ChartDataPoint format with error handling
+      final List<ChartDataPoint> chartData = [];
+
+      for (final point in ensembleData) {
+        try {
+          chartData.add(
+            ChartDataPoint(
+              time: point.time,
+              flow: point.flow,
+              metadata: point.metadata,
+            ),
+          );
+        } catch (e) {
+          print('Error processing ensemble point: $e');
+          // Skip this point and continue
+          continue;
+        }
+      }
+
+      if (chartData.isEmpty) {
+        ExportFunctionality.showErrorMessage(
+          context,
+          'No valid ensemble data points found',
+        );
+        return;
+      }
+
+      // Get return periods for flood categories
+      final returnPeriods = reach.returnPeriods;
+
+      // Export with special naming for ensemble data
+      await ExportFunctionality.exportDataAsCSV(
+        chartData: chartData,
+        reachName: reach.displayName,
+        forecastType: '${_forecastType!}_ensemble',
+        returnPeriods: returnPeriods,
+      );
+    } catch (e) {
+      print('Error in _exportEnsembleDataAsCSV: $e');
       ExportFunctionality.showErrorMessage(
         context,
-        'No ensemble data available',
+        'Failed to export ensemble data: ${e.toString()}',
       );
-      return;
     }
-
-    // Convert to the interactive_chart ChartDataPoint format
-    final chartData = ensembleData
-        .map(
-          (point) => ChartDataPoint(
-            time: point.time,
-            flow: point.flow,
-            metadata: point.metadata,
-          ),
-        )
-        .toList();
-
-    // Get return periods for flood categories
-    final returnPeriods = reach.returnPeriods;
-
-    // Export with special naming for ensemble data
-    await ExportFunctionality.exportDataAsCSV(
-      chartData: chartData,
-      reachName: reach.displayName,
-      forecastType: '${_forecastType!}_ensemble',
-      returnPeriods: returnPeriods,
-    );
   }
 
   void _showFloodCategoriesInfo() {
