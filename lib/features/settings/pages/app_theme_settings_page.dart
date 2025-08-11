@@ -1,9 +1,9 @@
 // lib/features/settings/pages/app_theme_settings_page.dart
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
-
-enum ThemeOption { light, dark, system }
+import 'package:provider/provider.dart';
+import '../../../core/providers/theme_provider.dart';
+import '../../../core/services/theme_service.dart';
 
 /// App theme settings page with light, dark, and system options
 class AppThemeSettingsPage extends StatefulWidget {
@@ -14,8 +14,6 @@ class AppThemeSettingsPage extends StatefulWidget {
 }
 
 class _AppThemeSettingsPageState extends State<AppThemeSettingsPage> {
-  ThemeOption _selectedTheme = ThemeOption.system; // Default to system
-
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -100,37 +98,37 @@ class _AppThemeSettingsPageState extends State<AppThemeSettingsPage> {
     required IconData icon,
     required ThemeOption themeOption,
   }) {
-    final bool isSelected = _selectedTheme == themeOption;
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final bool isSelected = themeProvider.themeOption == themeOption;
 
-    return CupertinoListTile(
-      leading: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: _getIconBackgroundColor(themeOption),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: CupertinoColors.white, size: 18),
-      ),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: isSelected
-          ? const Icon(
-              CupertinoIcons.checkmark,
-              color: CupertinoColors.systemBlue,
-              size: 20,
-            )
-          : null,
-      onTap: () {
-        setState(() {
-          _selectedTheme = themeOption;
-        });
+        return CupertinoListTile(
+          leading: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: _getIconBackgroundColor(themeOption),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: CupertinoColors.white, size: 18),
+          ),
+          title: Text(title),
+          subtitle: Text(subtitle),
+          trailing: isSelected
+              ? const Icon(
+                  CupertinoIcons.checkmark,
+                  color: CupertinoColors.systemBlue,
+                  size: 20,
+                )
+              : null,
+          onTap: () async {
+            // Update theme provider
+            themeProvider.setTheme(themeOption);
 
-        // Add haptic feedback
-        HapticFeedback.selectionClick();
-
-        // TODO: Implement actual theme switching logic
-        print('Selected theme: ${themeOption.name}');
+            // Save to persistence
+            await ThemeService.saveTheme(themeOption);
+          },
+        );
       },
     );
   }
