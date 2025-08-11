@@ -2,7 +2,6 @@
 
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
-import 'package:rivrflow/core/models/user_settings.dart';
 import '../../../core/providers/reach_data_provider.dart';
 import '../../../core/services/flow_unit_preference_service.dart';
 
@@ -41,10 +40,33 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
     super.dispose();
   }
 
-  // Get current flow units from preference service
+  // ✅ FIXED: Get current flow units from preference service
   String _getCurrentFlowUnit() {
-    final currentUnit = FlowUnitPreferenceService().currentFlowUnit;
-    return currentUnit == FlowUnit.cms ? 'CMS' : 'CFS';
+    final unitService = FlowUnitPreferenceService();
+    return unitService.currentFlowUnit; // Returns 'CFS' or 'CMS' directly
+  }
+
+  // ✅ NEW: Calculate flow category using converted values (avoid stale cache)
+  String _calculateFlowCategory(double? convertedFlow, dynamic reach) {
+    if (convertedFlow == null || reach?.returnPeriods == null) {
+      return 'Unknown';
+    }
+
+    final currentUnit = _getCurrentFlowUnit();
+
+    // Use the ReachData method with proper unit-aware calculation
+    return reach.getFlowCategory(convertedFlow, currentUnit);
+  }
+
+  // ✅ NEW: Convert raw flow value to user's preferred unit
+  double? _convertFlowToCurrentUnit(double? rawFlow) {
+    if (rawFlow == null) return null;
+
+    final unitService = FlowUnitPreferenceService();
+    final currentUnit = unitService.currentFlowUnit;
+
+    // Convert from API unit (assume CFS) to user's preferred unit
+    return unitService.convertFlow(rawFlow, 'CFS', currentUnit);
   }
 
   @override
@@ -62,10 +84,15 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
           return _buildEmptyCard();
         }
 
-        // NEW: Use cached values instead of direct calls
-        final currentFlow = reachProvider.getCurrentFlow(); // Now cached!
-        final category = reachProvider.getFlowCategory(); // Now cached!
+        // Get raw values from provider
+        final rawCurrentFlow = reachProvider.getCurrentFlow(); // Raw API value
         final reach = reachProvider.currentReach;
+
+        // ✅ FIXED: Convert current flow to user's preferred unit
+        final convertedCurrentFlow = _convertFlowToCurrentUnit(rawCurrentFlow);
+
+        // ✅ FIXED: Calculate category using converted flow (don't use stale cache)
+        final category = _calculateFlowCategory(convertedCurrentFlow, reach);
 
         return GestureDetector(
           onTap: widget.onTap,
@@ -98,12 +125,13 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
                       children: [
                         _buildHeader(category),
                         const SizedBox(height: 16),
-                        _buildFlowValue(currentFlow),
+                        // ✅ FIXED: Use converted flow value
+                        _buildFlowValue(convertedCurrentFlow),
                         const SizedBox(height: 16),
 
                         // NEW: Progressive flow indicator based on loading state
                         _buildProgressiveFlowIndicator(
-                          currentFlow,
+                          convertedCurrentFlow,
                           reach,
                           reachProvider,
                         ),
@@ -193,7 +221,7 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
         Padding(
           padding: const EdgeInsets.only(bottom: 4, left: 4),
           child: Text(
-            currentUnit, // UPDATED: Now dynamic
+            currentUnit, // Dynamic unit
             style: const TextStyle(
               color: CupertinoColors.white,
               fontSize: 16,
@@ -215,7 +243,8 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
     if (reach?.returnPeriods != null &&
         reach!.returnPeriods!.isNotEmpty &&
         currentFlow != null) {
-      return _buildFlowIndicator(currentFlow, reach.returnPeriods!);
+      // ✅ FIXED: Use converted return periods for proper comparison
+      return _buildFlowIndicator(currentFlow, reach);
     }
 
     // Show loading state if we're loading supplementary data (return periods)
@@ -294,13 +323,26 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
     );
   }
 
+  // ✅ FIXED: Use converted return periods for proper unit comparison
   Widget _buildFlowIndicator(
-    double currentFlow, // Already in user's preferred unit
-    Map<int, double> returnPeriods, // Already in user's preferred unit
+    double currentFlow, // Already converted to user's preferred unit
+    dynamic reach,
   ) {
-    final maxReturnPeriod = returnPeriods.values.reduce(
-      (a, b) => a > b ? a : b,
-    );
+    final currentUnit = _getCurrentFlowUnit();
+
+    // Get return periods in the same unit as current flow
+    final convertedReturnPeriods = reach.getReturnPeriodsInUnit(currentUnit);
+    if (convertedReturnPeriods == null || convertedReturnPeriods.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // ✅ FIXED: Proper type handling for max calculation
+    double maxReturnPeriod = 0.0;
+    for (final value in convertedReturnPeriods.values) {
+      if (value > maxReturnPeriod) {
+        maxReturnPeriod = value;
+      }
+    }
     final scale = maxReturnPeriod * 1.1; // 10% padding
 
     return Column(
@@ -323,7 +365,7 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
             children: [
               // Current flow marker
               Positioned(
-                // Now we're comparing same units to same units ✅
+                // Now comparing same units to same units ✅
                 left:
                     (currentFlow /
                             scale *
@@ -488,7 +530,7 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
   ) {
     // Show return period table if we have the data
     if (reach?.returnPeriods != null && reach!.returnPeriods!.isNotEmpty) {
-      return _buildReturnPeriodTable(reach.returnPeriods!);
+      return _buildReturnPeriodTable(reach);
     }
 
     // Show loading state if we're loading supplementary data
@@ -545,7 +587,8 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
     );
   }
 
-  Widget _buildReturnPeriodTable(Map<int, double> returnPeriods) {
+  // ✅ FIXED: Use converted return periods and dynamic header
+  Widget _buildReturnPeriodTable(dynamic reach) {
     final periods = [
       2,
       5,
@@ -553,10 +596,16 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
       25,
       50,
       100,
-    ].where((year) => returnPeriods.containsKey(year)).toList();
+    ].where((year) => reach.returnPeriods.containsKey(year)).toList();
 
     // Get current flow unit for table header
     final currentUnit = _getCurrentFlowUnit();
+
+    // ✅ FIXED: Get return periods converted to current unit
+    final convertedReturnPeriods = reach.getReturnPeriodsInUnit(currentUnit);
+    if (convertedReturnPeriods == null) {
+      return _buildReturnPeriodNotAvailable();
+    }
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -580,7 +629,7 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
               ),
               Expanded(
                 child: Text(
-                  'Flow ($currentUnit)', // UPDATED: Now dynamic
+                  'Flow ($currentUnit)', // ✅ FIXED: Dynamic unit header
                   style: const TextStyle(
                     color: CupertinoColors.white,
                     fontWeight: FontWeight.bold,
@@ -592,8 +641,8 @@ class _CurrentFlowStatusCardState extends State<CurrentFlowStatusCard>
           ),
           const SizedBox(height: 8),
           ...periods.map((year) {
-            final flow = returnPeriods[year]!;
-            // Data is already in user's preferred unit from the backend
+            // ✅ FIXED: Use converted return periods
+            final flow = convertedReturnPeriods[year]!;
 
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
