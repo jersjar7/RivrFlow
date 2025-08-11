@@ -64,15 +64,27 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
     return currentUnit; // Returns 'CFS' or 'CMS' directly
   }
 
-  // Convert raw flow value to user's preferred unit
+  // Convert raw flow value to user's preferred unit (same as current_flow_status_card.dart)
   double? _convertFlowToCurrentUnit(double? rawFlow) {
     if (rawFlow == null) return null;
 
     final unitService = FlowUnitPreferenceService();
     final currentUnit = unitService.currentFlowUnit;
 
-    // Convert from API unit (assume CFS) to user's preferred unit
+    // Convert from API unit (CFS) to user's preferred unit
     return unitService.convertFlow(rawFlow, 'CFS', currentUnit);
+  }
+
+  // Calculate flow category using converted values (same as current_flow_status_card.dart)
+  String _calculateFlowCategory(double? convertedFlow, dynamic reach) {
+    if (convertedFlow == null || reach?.returnPeriods == null) {
+      return 'Unknown';
+    }
+
+    final currentUnit = _getCurrentFlowUnit();
+
+    // Use the ReachData method with proper unit-aware calculation
+    return reach.getFlowCategory(convertedFlow, currentUnit);
   }
 
   // Flow formatting with unit conversion
@@ -586,7 +598,9 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
         // Check if we already have return periods (cached)
         if (forecast.reach.hasReturnPeriods && _currentFlow != null) {
-          _flowCategory = _forecastService.getFlowCategory(forecast);
+          // Use same approach as current_flow_status_card.dart
+          final convertedFlow = _convertFlowToCurrentUnit(_currentFlow!);
+          _flowCategory = _calculateFlowCategory(convertedFlow, forecast.reach);
         } else if (_currentFlow != null) {
           // We have flow but not return periods yet
           _isLoadingClassification = true;
@@ -639,7 +653,12 @@ class _ReachDetailsBottomSheetState extends State<ReachDetailsBottomSheet> {
 
       // Update flow classification if we now have return periods
       if (enhancedForecast.reach.hasReturnPeriods && _currentFlow != null) {
-        final flowCategory = _forecastService.getFlowCategory(enhancedForecast);
+        // Use same approach as current_flow_status_card.dart
+        final convertedFlow = _convertFlowToCurrentUnit(_currentFlow!);
+        final flowCategory = _calculateFlowCategory(
+          convertedFlow,
+          enhancedForecast.reach,
+        );
 
         setState(() {
           _flowCategory = flowCategory;
