@@ -133,10 +133,13 @@ class _FavoritesSearchBarState extends State<FavoritesSearchBar>
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: CupertinoColors.systemBackground,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
         border: Border(
-          bottom: BorderSide(color: CupertinoColors.separator, width: 0.5),
+          bottom: BorderSide(
+            color: CupertinoColors.separator.resolveFrom(context),
+            width: 0.5,
+          ),
         ),
       ),
       child: Row(
@@ -149,7 +152,7 @@ class _FavoritesSearchBarState extends State<FavoritesSearchBar>
               placeholder: widget.placeholder ?? 'Search favorites...',
               style: const TextStyle(fontSize: 16),
               decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey6,
+                color: CupertinoColors.systemGrey6.resolveFrom(context),
                 borderRadius: BorderRadius.circular(10),
               ),
               onChanged: (value) {

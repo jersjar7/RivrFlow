@@ -313,13 +313,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
       padding: const EdgeInsets.fromLTRB(20, 16, 32, 16),
       child: Row(
         children: [
-          // App title
-          const Text(
+          // App title with theme-aware color
+          Text(
             'RivrFlow',
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
-              color: CupertinoColors.label,
+              color: CupertinoTheme.of(context).textTheme.textStyle.color,
             ),
           ),
 
