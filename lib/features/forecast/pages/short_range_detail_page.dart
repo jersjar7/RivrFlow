@@ -149,27 +149,30 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
                 color: CupertinoColors.systemBlue,
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Data Source',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: CupertinoColors.label,
+                  color: CupertinoColors.label.resolveFrom(context),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'NOAA National Water Model Short Range Forecast',
-            style: TextStyle(fontSize: 14, color: CupertinoColors.label),
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Updated hourly • 18 hours of forecast data available',
             style: TextStyle(
               fontSize: 12,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ],
@@ -243,7 +246,9 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
                     'Most reliable for the next 6 hours, suitable for emergency planning',
                     style: TextStyle(
                       fontSize: 11,
-                      color: CupertinoColors.secondaryLabel,
+                      color: CupertinoColors.secondaryLabel.resolveFrom(
+                        context,
+                      ),
                     ),
                   ),
                 ),
@@ -267,17 +272,17 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: CupertinoColors.label,
+                  color: CupertinoColors.label.resolveFrom(context),
                 ),
               ),
               Text(
                 description,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
             ],

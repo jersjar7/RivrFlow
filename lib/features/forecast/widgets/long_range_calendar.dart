@@ -163,10 +163,10 @@ class _LongRangeCalendarState extends State<LongRangeCalendar> {
         // Month and year
         Text(
           monthYear,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: CupertinoColors.label,
+            color: CupertinoColors.label.resolveFrom(context),
           ),
         ),
 

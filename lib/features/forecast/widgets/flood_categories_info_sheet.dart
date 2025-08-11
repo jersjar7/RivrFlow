@@ -30,9 +30,9 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: CupertinoColors.systemBackground,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
@@ -50,12 +50,13 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Explanation
-                    _buildExplanationSection(),
+                    _buildExplanationSection(context),
 
                     const SizedBox(height: 20),
 
                     // Categories
                     _buildFloodCategoryItem(
+                      context,
                       'Normal',
                       '0 - 2 year return period',
                       'Typical flow conditions with no flood risk',
@@ -66,6 +67,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                     ),
 
                     _buildFloodCategoryItem(
+                      context,
                       'Action',
                       '2 - 5 year return period',
                       'Time to prepare - minor flooding possible',
@@ -76,6 +78,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                     ),
 
                     _buildFloodCategoryItem(
+                      context,
                       'Moderate',
                       '5 - 10 year return period',
                       'Some property damage and evacuations may be needed',
@@ -86,6 +89,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                     ),
 
                     _buildFloodCategoryItem(
+                      context,
                       'Major',
                       '10 - 25 year return period',
                       'Extensive property damage and life-threatening flooding',
@@ -96,6 +100,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                     ),
 
                     _buildFloodCategoryItem(
+                      context,
                       'Extreme',
                       '25+ year return period',
                       'Catastrophic flooding with severe danger to life and property',
@@ -108,7 +113,7 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                     const SizedBox(height: 20),
 
                     // Note
-                    _buildDisclaimerNote(),
+                    _buildDisclaimerNote(context),
 
                     const SizedBox(height: 32), // Bottom padding for scrolling
                   ],
@@ -124,17 +129,24 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
   Widget _buildHeader(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: CupertinoColors.systemGrey5, width: 0.5),
+          bottom: BorderSide(
+            color: CupertinoColors.systemGrey5.resolveFrom(context),
+            width: 0.5,
+          ),
         ),
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Text(
               'Flood Risk Categories',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
             ),
           ),
           CupertinoButton(
@@ -151,24 +163,32 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildExplanationSection() {
-    return const Text(
+  Widget _buildExplanationSection(BuildContext context) {
+    return Text(
       'These categories help assess flood risk based on streamflow return periods. Return periods indicate how often flows of this magnitude typically occur.',
-      style: TextStyle(fontSize: 14, color: CupertinoColors.secondaryLabel),
+      style: TextStyle(
+        fontSize: 14,
+        color: CupertinoColors.secondaryLabel.resolveFrom(context),
+      ),
     );
   }
 
   Widget _buildFloodCategoryItem(
+    BuildContext context,
     String title,
     String subtitle,
     String description,
     Color backgroundColor,
     Color iconColor,
     IconData icon,
-    double? thresholdFlow, // Converted to user's preferred unit
+    double? thresholdFlow,
   ) {
     // Get current flow unit for display
     final currentUnit = _getCurrentFlowUnit();
+
+    // Calculate appropriate text colors based on background
+    final textColor = _getTextColorForBackground(backgroundColor);
+    final subtitleColor = _getSubtitleColorForBackground(backgroundColor);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -212,19 +232,16 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: CupertinoColors.secondaryLabel,
+                    color: subtitleColor,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: CupertinoColors.label,
-                  ),
+                  style: TextStyle(fontSize: 13, color: textColor),
                 ),
               ],
             ),
@@ -234,18 +251,44 @@ class FloodCategoriesInfoSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildDisclaimerNote() {
+  // Helper method to get appropriate text color for colored backgrounds
+  Color _getTextColorForBackground(Color backgroundColor) {
+    // Calculate luminance of the background color
+    final luminance = backgroundColor.computeLuminance();
+
+    // Use dark text for light backgrounds, light text for dark backgrounds
+    if (luminance > 0.5) {
+      return const Color(0xFF1D1D1F); // Dark gray text for light backgrounds
+    } else {
+      return const Color(0xFFFFFFFF); // White text for dark backgrounds
+    }
+  }
+
+  // Helper method to get appropriate subtitle color for colored backgrounds
+  Color _getSubtitleColorForBackground(Color backgroundColor) {
+    // Calculate luminance of the background color
+    final luminance = backgroundColor.computeLuminance();
+
+    // Use slightly lighter/darker variants for subtitles
+    if (luminance > 0.5) {
+      return const Color(0xFF6D6D70); // Medium gray for light backgrounds
+    } else {
+      return const Color(0xFFE5E5E7); // Light gray for dark backgrounds
+    }
+  }
+
+  Widget _buildDisclaimerNote(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Text(
+      child: Text(
         'Note: These categories are based on statistical analysis of historical flow data. Actual flood impacts may vary depending on local conditions, infrastructure, and other factors.',
         style: TextStyle(
           fontSize: 12,
-          color: CupertinoColors.secondaryLabel,
+          color: CupertinoColors.secondaryLabel.resolveFrom(context),
           fontStyle: FontStyle.italic,
         ),
       ),

@@ -225,12 +225,12 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
                 color: CupertinoColors.systemBlue,
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Data Source',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: CupertinoColors.label,
+                  color: CupertinoColors.label.resolveFrom(context),
                 ),
               ),
             ],
@@ -238,14 +238,17 @@ class _MediumRangeDetailPageState extends State<MediumRangeDetailPage> {
           const SizedBox(height: 8),
           Text(
             dataSourceDetail,
-            style: const TextStyle(fontSize: 14, color: CupertinoColors.label),
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             updateInfo,
             style: TextStyle(
               fontSize: 12,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ],

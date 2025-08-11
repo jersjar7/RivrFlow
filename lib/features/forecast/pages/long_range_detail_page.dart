@@ -152,27 +152,30 @@ class _LongRangeDetailPageState extends State<LongRangeDetailPage> {
                 color: CupertinoColors.systemBlue,
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Data Source',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: CupertinoColors.label,
+                  color: CupertinoColors.label.resolveFrom(context),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'NOAA National Water Model Long Range Forecast',
-            style: TextStyle(fontSize: 14, color: CupertinoColors.label),
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             'Updated daily • Up to 30 days of forecast data available',
             style: TextStyle(
               fontSize: 12,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
         ],

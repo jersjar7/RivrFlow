@@ -520,18 +520,18 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: CupertinoColors.secondaryLabel,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context), //
             ),
           ),
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: CupertinoColors.label,
+            fontWeight: FontWeight.w600,
+            color: CupertinoColors.label.resolveFrom(context),
           ),
         ),
       ],
