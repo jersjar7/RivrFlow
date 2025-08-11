@@ -306,7 +306,7 @@ class MapReachSelectionService {
       // Fly to stream location
       final cameraOptions = CameraOptions(
         center: Point(coordinates: Position(stream.longitude, stream.latitude)),
-        zoom: 14.0,
+        zoom: 12.0,
       );
 
       await _mapboxMap!.flyTo(

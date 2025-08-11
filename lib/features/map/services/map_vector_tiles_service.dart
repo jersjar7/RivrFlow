@@ -125,7 +125,7 @@ class MapVectorTilesService {
           id: 'streams2-order-1-2',
           sourceId: AppConfig.vectorSourceId,
           sourceLayer: AppConfig.vectorSourceLayer, // 'streams2-7jgd8p'
-          lineColor: 0xFF87CEEB, // Light blue
+          lineColor: 0xFF191970, // Midnight blue
           lineWidth: 1.0,
           lineOpacity: 0.8,
           filter: [
@@ -142,7 +142,7 @@ class MapVectorTilesService {
           id: 'streams2-order-3-4',
           sourceId: AppConfig.vectorSourceId,
           sourceLayer: AppConfig.vectorSourceLayer, // 'streams2-7jgd8p'
-          lineColor: 0xFF4682B4, // Steel blue
+          lineColor: 0xFF191970, // Midnight blue
           lineWidth: 2.0,
           lineOpacity: 0.8,
           filter: [
