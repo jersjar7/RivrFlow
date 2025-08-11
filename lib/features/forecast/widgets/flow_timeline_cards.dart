@@ -35,13 +35,13 @@ class FlowTimelineCards extends StatelessWidget {
         }
 
         if (!reachProvider.hasData) {
-          return _buildEmptyState();
+          return _buildEmptyState(context);
         }
 
         final forecastData = _extractForecastData(reachProvider);
 
         if (forecastData.isEmpty) {
-          return _buildNoDataState();
+          return _buildNoDataState(context);
         }
 
         return _buildTimelineCards(context, forecastData, reachProvider);
@@ -143,19 +143,19 @@ class FlowTimelineCards extends StatelessWidget {
             // Flow value
             Text(
               _formatFlow(dataPoint.flow),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: CupertinoColors.label,
+                color: CupertinoColors.label.resolveFrom(context),
               ),
             ),
 
-            // UPDATED: Now dynamic units
+            // With dynamic units
             Text(
               currentUnit,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
 
@@ -216,46 +216,46 @@ class FlowTimelineCards extends StatelessWidget {
         itemBuilder: (context, index) {
           return Padding(
             padding: EdgeInsets.only(right: index == 5 ? 0 : 12),
-            child: _buildLoadingCard(),
+            child: _buildLoadingCard(context),
           );
         },
       ),
     );
   }
 
-  Widget _buildLoadingCard() {
+  Widget _buildLoadingCard(BuildContext context) {
     return Container(
       width: 120,
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: const Center(child: CupertinoActivityIndicator(radius: 12)),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               CupertinoIcons.chart_bar,
               size: 32,
-              color: CupertinoColors.systemGrey,
+              color: CupertinoColors.systemGrey.resolveFrom(context),
             ),
             SizedBox(height: 8),
             Text(
               'No forecast data',
               style: TextStyle(
                 fontSize: 14,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
           ],
@@ -264,18 +264,18 @@ class FlowTimelineCards extends StatelessWidget {
     );
   }
 
-  Widget _buildNoDataState() {
+  Widget _buildNoDataState(BuildContext context) {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6,
+        color: CupertinoColors.systemGrey6.resolveFrom(context),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               CupertinoIcons.exclamationmark_circle,
               size: 32,
               color: CupertinoColors.systemOrange,
@@ -285,7 +285,7 @@ class FlowTimelineCards extends StatelessWidget {
               'No forecast data available',
               style: TextStyle(
                 fontSize: 14,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
           ],

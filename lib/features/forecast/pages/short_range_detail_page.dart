@@ -189,12 +189,12 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Hourly Forecast Details',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: CupertinoColors.label,
+                  color: CupertinoColors.label.resolveFrom(context),
                 ),
               ),
             ],

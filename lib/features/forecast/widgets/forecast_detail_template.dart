@@ -281,10 +281,10 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w600,
-        color: CupertinoColors.label,
+        color: CupertinoColors.label.resolveFrom(context),
       ),
     );
   }
@@ -319,10 +319,10 @@ class _ForecastDetailTemplateState extends State<ForecastDetailTemplate> {
         children: [
           Text(
             'Forecast Summary',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: CupertinoColors.label,
+              color: CupertinoColors.label.resolveFrom(context),
             ),
           ),
           const SizedBox(height: 12),

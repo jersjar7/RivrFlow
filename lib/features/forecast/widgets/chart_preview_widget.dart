@@ -40,9 +40,12 @@ class ChartPreviewWidget extends StatelessWidget {
             height: height,
             margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground,
+              color: CupertinoColors.systemBackground.resolveFrom(context),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: CupertinoColors.separator, width: 0.5),
+              border: Border.all(
+                color: CupertinoColors.separator.resolveFrom(context),
+                width: 0.5,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
