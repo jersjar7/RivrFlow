@@ -59,11 +59,14 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = MediaQuery.of(context).platformBrightness;
+    final isDark = brightness == Brightness.dark;
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.75, // 75% of screen height
-      decoration: const BoxDecoration(
-        color: CupertinoColors.systemBackground,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
@@ -72,8 +75,8 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
         top: false,
         child: Column(
           children: [
-            _buildHeader(),
-            _buildSearchBar(),
+            _buildHeader(isDark),
+            _buildSearchBar(isDark),
             Expanded(child: _buildStreamsList()),
           ],
         ),
@@ -81,7 +84,7 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isDark) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -90,12 +93,14 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withOpacity(0.1),
+              color: CupertinoColors.systemBlue
+                  .resolveFrom(context)
+                  .withOpacity(isDark ? 0.15 : 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
+            child: Icon(
               CupertinoIcons.list_bullet,
-              color: CupertinoColors.systemBlue,
+              color: CupertinoColors.systemBlue.resolveFrom(context),
               size: 24,
             ),
           ),
@@ -106,19 +111,19 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Visible Streams',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
-                    color: CupertinoColors.label,
+                    color: CupertinoColors.label.resolveFrom(context),
                   ),
                 ),
                 Text(
                   '${widget.streams.length} stream${widget.streams.length == 1 ? '' : 's'} in view',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: CupertinoColors.secondaryLabel,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
                   ),
                 ),
               ],
@@ -129,9 +134,9 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: () => Navigator.pop(context),
-            child: const Icon(
+            child: Icon(
               CupertinoIcons.xmark_circle_fill,
-              color: CupertinoColors.systemGrey3,
+              color: CupertinoColors.systemGrey3.resolveFrom(context),
               size: 24,
             ),
           ),
@@ -140,7 +145,7 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(bool isDark) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         16,
@@ -151,14 +156,16 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: CupertinoColors.systemGrey6,
+          color: isDark
+              ? CupertinoColors.systemGrey5.resolveFrom(context)
+              : CupertinoColors.systemGrey6.resolveFrom(context),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               CupertinoIcons.search,
-              color: CupertinoColors.systemGrey,
+              color: CupertinoColors.systemGrey.resolveFrom(context),
               size: 20,
             ),
             const SizedBox(width: 8),
@@ -166,8 +173,14 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
               child: CupertinoTextField(
                 controller: _searchController,
                 placeholder: 'Search by station ID...',
+                placeholderStyle: TextStyle(
+                  color: CupertinoColors.placeholderText.resolveFrom(context),
+                ),
                 decoration: null,
-                style: const TextStyle(fontSize: 16),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: CupertinoColors.label.resolveFrom(context),
+                ),
                 padding: EdgeInsets.zero,
               ),
             ),
@@ -177,9 +190,9 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
                 onPressed: () {
                   _searchController.clear();
                 },
-                child: const Icon(
+                child: Icon(
                   CupertinoIcons.clear_circled_solid,
-                  color: CupertinoColors.systemGrey3,
+                  color: CupertinoColors.systemGrey3.resolveFrom(context),
                   size: 18,
                 ),
               ),
@@ -207,9 +220,11 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
                 children: [
                   Text(
                     '${_filteredStreams.length} result${_filteredStreams.length == 1 ? '' : 's'}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: CupertinoColors.secondaryLabel,
+                      color: CupertinoColors.secondaryLabel.resolveFrom(
+                        context,
+                      ),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -222,8 +237,10 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
               padding: EdgeInsets.zero,
               primary: false,
               itemCount: _filteredStreams.length,
-              separatorBuilder: (context, index) =>
-                  const Divider(height: 1, color: CupertinoColors.separator),
+              separatorBuilder: (context, index) => Divider(
+                height: 1,
+                color: CupertinoColors.separator.resolveFrom(context),
+              ),
               itemBuilder: (context, index) {
                 final stream = _filteredStreams[index];
                 return _buildStreamItem(stream);
@@ -236,6 +253,9 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
   }
 
   Widget _buildStreamItem(VisibleStream stream) {
+    final brightness = MediaQuery.of(context).platformBrightness;
+    final isDark = brightness == Brightness.dark;
+
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
       onPressed: () => _onStreamTap(stream),
@@ -247,7 +267,7 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
             decoration: BoxDecoration(
               color: AppConstants.getStreamOrderColor(
                 stream.streamOrder,
-              ).withOpacity(0.1),
+              ).withOpacity(isDark ? 0.15 : 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
@@ -265,26 +285,26 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
               children: [
                 Text(
                   stream.displayName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: CupertinoColors.label,
+                    color: CupertinoColors.label.resolveFrom(context),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Station ${stream.stationId} • Order ${stream.streamOrder}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: CupertinoColors.secondaryLabel,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   stream.coordinates,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: CupertinoColors.tertiaryLabel,
+                    color: CupertinoColors.tertiaryLabel.resolveFrom(context),
                     fontFamily: 'SF Mono', // Monospace for coordinates
                   ),
                 ),
@@ -293,9 +313,9 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
           ),
 
           // Arrow indicator
-          const Icon(
+          Icon(
             CupertinoIcons.location_fill,
-            color: CupertinoColors.systemBlue,
+            color: CupertinoColors.systemBlue.resolveFrom(context),
             size: 16,
           ),
         ],
@@ -315,17 +335,17 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
                   ? CupertinoIcons.search
                   : CupertinoIcons.list_bullet,
               size: 48,
-              color: CupertinoColors.systemGrey3,
+              color: CupertinoColors.systemGrey3.resolveFrom(context),
             ),
             const SizedBox(height: 16),
             Text(
               _searchController.text.isNotEmpty
                   ? 'No streams found'
                   : 'No streams visible',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 8),
@@ -333,9 +353,9 @@ class _StreamsListBottomSheetState extends State<StreamsListBottomSheet> {
               _searchController.text.isNotEmpty
                   ? 'Try a different search term'
                   : 'Zoom in or pan to see streams',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: CupertinoColors.tertiaryLabel,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
               ),
               textAlign: TextAlign.center,
             ),
