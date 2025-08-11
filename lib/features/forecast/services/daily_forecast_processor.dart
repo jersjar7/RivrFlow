@@ -200,10 +200,10 @@ class DailyForecastProcessor {
       // Initialize day group if needed
       dailyGroups[dateKey] ??= <DateTime, double>{};
 
-      // Manual conversion from API units to user preference
+      // Manual conversion from CFS (API default) to user preference
       final convertedFlow = unitService.convertFlow(
         point.flow,
-        forecastSeries.units, // Source unit from API
+        'CFS', // API always returns CFS
         currentUnit, // Target unit
       );
       dailyGroups[dateKey]![localTime] = convertedFlow;

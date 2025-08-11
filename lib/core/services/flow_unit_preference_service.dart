@@ -13,7 +13,7 @@ class FlowUnitPreferenceService {
 
   // Conversion constants
   static const double _cmsToCs = 35.3147; // 1 CMS = 35.3147 CFS
-  static const double _csToCs = 1.0 / _cmsToCs; // 1 CFS = 0.0283168 CMS
+  static const double _cfsToCs = 1.0 / _cmsToCs; // 1 CFS = 0.0283168 CMS
 
   /// Get the current flow unit preference
   String get currentFlowUnit => _currentFlowUnit;
@@ -41,7 +41,7 @@ class FlowUnitPreferenceService {
 
     // Convert CFS to CMS
     if (fromUnit == 'CFS' && toUnit == 'CMS') {
-      return value * _csToCs;
+      return value * _cfsToCs;
     }
 
     // Fallback - return original value if unknown units
