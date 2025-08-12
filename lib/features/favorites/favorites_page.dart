@@ -41,6 +41,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Future<void> _initializeFavorites() async {
+    final authProvider = context.read<AuthProvider>();
+    if (!authProvider.isAuthenticated) return;
+
     final favoritesProvider = context.read<FavoritesProvider>();
     await favoritesProvider.initializeAndRefresh();
   }
@@ -204,11 +207,12 @@ class _FavoritesPageState extends State<FavoritesPage> {
                     const SizedBox(height: 12),
 
                     // Description
-                    const Text(
+                    Text(
                       'Discover rivers on the map and add them to your favorites for quick access to flow forecasts.',
                       style: TextStyle(
                         fontSize: 16,
-                        color: CupertinoColors.secondaryLabel,
+                        color: CupertinoColors.systemGrey2
+                          ..resolveFrom(context),
                         height: 1.4,
                       ),
                       textAlign: TextAlign.center,

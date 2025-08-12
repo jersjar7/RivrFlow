@@ -117,10 +117,7 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Divider(),
-          const SizedBox(height: 16),
-          _buildForecastDetails(reachProvider),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           _buildDataSourceInfo(reachProvider),
         ],
       ),
@@ -177,118 +174,6 @@ class _ShortRangeDetailPageState extends State<ShortRangeDetailPage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildForecastDetails(ReachDataProvider reachProvider) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6.resolveFrom(context),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Hourly Forecast Details',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildDetailItem(
-            'Purpose',
-            'Emergency response and flash flood monitoring',
-            CupertinoIcons.exclamationmark_triangle,
-          ),
-          const SizedBox(height: 8),
-          _buildDetailItem(
-            'Time Range',
-            'Next 18 hours from current time',
-            CupertinoIcons.clock,
-          ),
-          const SizedBox(height: 8),
-          _buildDetailItem(
-            'Update Frequency',
-            'New forecast every hour',
-            CupertinoIcons.arrow_clockwise,
-          ),
-          const SizedBox(height: 8),
-          _buildDetailItem(
-            'Best Use',
-            'Real-time monitoring and immediate decision making',
-            CupertinoIcons.checkmark_circle,
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  CupertinoIcons.lightbulb,
-                  size: 14,
-                  color: CupertinoColors.systemGreen,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Most reliable for the next 6 hours, suitable for emergency planning',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: CupertinoColors.secondaryLabel.resolveFrom(
-                        context,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailItem(String title, String description, IconData icon) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 14, color: CupertinoColors.systemBlue),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
-              ),
-              Text(
-                description,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 

@@ -33,26 +33,15 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
     return CupertinoPopupSurface(
       child: Container(
         height: MediaQuery.of(context).size.height * 0.55,
-        decoration: const BoxDecoration(
-          color: CupertinoColors.systemBackground,
-          borderRadius: BorderRadius.only(
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemBackground.resolveFrom(context),
+          borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(12),
             topRight: Radius.circular(12),
           ),
         ),
         child: Column(
           children: [
-            // Handle bar
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 8),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey4,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
             // Header
             _buildHeader(dayLabel),
 
@@ -93,7 +82,7 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
   /// Build the header section with date and close button
   Widget _buildHeader(String dayLabel) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       decoration: const BoxDecoration(
         border: Border(
           bottom: BorderSide(color: CupertinoColors.separator, width: 0.5),
@@ -108,10 +97,10 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
               children: [
                 Text(
                   dayLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: CupertinoColors.label,
+                    color: CupertinoColors.label.resolveFrom(context),
                   ),
                 ),
                 Text(
@@ -151,9 +140,9 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: categoryColor.withOpacity(0.1),
+        color: categoryColor.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: categoryColor.withOpacity(0.3), width: 1),
+        border: Border.all(color: categoryColor.withOpacity(0.4), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,10 +206,10 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
         const SizedBox(height: 4),
         Text(
           '${value.toStringAsFixed(0)} $currentUnit',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: CupertinoColors.label,
+            color: CupertinoColors.label.resolveFrom(context),
           ),
         ),
       ],
@@ -231,10 +220,10 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w600,
-        color: CupertinoColors.label,
+        color: CupertinoColors.label.resolveFrom(context),
       ),
     );
   }
@@ -278,12 +267,15 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isCurrentHour
-            ? categoryColor.withOpacity(0.15)
-            : CupertinoColors.systemGrey6.resolveFrom(context),
+            ? categoryColor.withOpacity(0.2)
+            : CupertinoColors.tertiarySystemBackground.resolveFrom(context),
         borderRadius: BorderRadius.circular(8),
         border: isCurrentHour
-            ? Border.all(color: categoryColor, width: 1)
-            : null,
+            ? Border.all(color: categoryColor.withOpacity(0.8), width: 1.5)
+            : Border.all(
+                color: CupertinoColors.separator.resolveFrom(context),
+                width: 0.5,
+              ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -333,7 +325,7 @@ class _CalendarDayDetailSheetState extends State<CalendarDayDetailSheet> {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey6.resolveFrom(context),
+        color: CupertinoColors.tertiarySystemBackground.resolveFrom(context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

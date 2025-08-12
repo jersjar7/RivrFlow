@@ -24,6 +24,7 @@ class UserSettings {
   final bool enableNotifications;
   final bool enableDarkMode;
   final List<String> favoriteReachIds;
+  final String? fcmToken; // ADD: FCM token for push notifications
   final DateTime lastLoginDate;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -38,6 +39,7 @@ class UserSettings {
     required this.enableNotifications,
     required this.enableDarkMode,
     required this.favoriteReachIds,
+    this.fcmToken, // ADD: Optional FCM token
     required this.lastLoginDate,
     required this.createdAt,
     required this.updatedAt,
@@ -60,6 +62,7 @@ class UserSettings {
       favoriteReachIds: List<String>.from(
         json['favoriteReachIds'] as List? ?? [],
       ),
+      fcmToken: json['fcmToken'] as String?, // ADD: Parse FCM token
       lastLoginDate: DateTime.parse(json['lastLoginDate'] as String),
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
@@ -77,6 +80,7 @@ class UserSettings {
       'enableNotifications': enableNotifications,
       'enableDarkMode': enableDarkMode,
       'favoriteReachIds': favoriteReachIds,
+      'fcmToken': fcmToken, // ADD: Include FCM token in JSON
       'lastLoginDate': lastLoginDate.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -92,6 +96,7 @@ class UserSettings {
     bool? enableNotifications,
     bool? enableDarkMode,
     List<String>? favoriteReachIds,
+    String? fcmToken, // ADD: FCM token parameter
     DateTime? lastLoginDate,
   }) {
     return UserSettings(
@@ -104,6 +109,7 @@ class UserSettings {
       enableNotifications: enableNotifications ?? this.enableNotifications,
       enableDarkMode: enableDarkMode ?? this.enableDarkMode,
       favoriteReachIds: favoriteReachIds ?? this.favoriteReachIds,
+      fcmToken: fcmToken ?? this.fcmToken, // ADD: Handle FCM token in copy
       lastLoginDate: lastLoginDate ?? this.lastLoginDate,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
@@ -125,4 +131,7 @@ class UserSettings {
   bool isFavorite(String reachId) => favoriteReachIds.contains(reachId);
 
   String get fullName => '$firstName $lastName'.trim();
+
+  // ADD: Helper method to check if user has valid FCM token
+  bool get hasValidFCMToken => fcmToken != null && fcmToken!.isNotEmpty;
 }

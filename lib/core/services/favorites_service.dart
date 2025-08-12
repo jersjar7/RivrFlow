@@ -1,35 +1,52 @@
 // lib/core/services/favorites_service.dart
 
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/favorite_river.dart';
+import '../services/auth_service.dart';
+import '../../features/auth/services/user_settings_service.dart';
 
 /// Simple service for managing user's favorite rivers
-/// Uses SharedPreferences with JSON storage - no over-engineering
+/// Uses Firestore via UserSettings.favoriteReachIds - no local storage
 class FavoritesService {
-  static const String _favoritesKey = 'user_favorite_rivers';
+  final UserSettingsService _userSettingsService = UserSettingsService();
+  final AuthService _authService = AuthService();
 
-  /// Load all favorites from storage
+  /// Get current user ID or return null if not signed in
+  String? get _currentUserIdOrNull => _authService.currentUser?.uid;
+
+  /// Load all favorites from Firestore
   Future<List<FavoriteRiver>> loadFavorites() async {
     try {
-      print('FAVORITES_SERVICE: Loading favorites from storage');
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_favoritesKey);
+      print('FAVORITES_SERVICE: Loading favorites from Firestore');
 
-      if (jsonString == null) {
-        print('FAVORITES_SERVICE: No favorites found - returning empty list');
+      final userId = _currentUserIdOrNull;
+      if (userId == null) {
+        print('FAVORITES_SERVICE: No user signed in - returning empty list');
         return [];
       }
 
-      final jsonList = jsonDecode(jsonString) as List<dynamic>;
-      final favorites = jsonList
-          .map((json) => FavoriteRiver.fromJson(json as Map<String, dynamic>))
-          .toList();
+      final userSettings = await _userSettingsService.getUserSettings(userId);
+      if (userSettings == null) {
+        print(
+          'FAVORITES_SERVICE: No user settings found - returning empty list',
+        );
+        return [];
+      }
 
-      // Sort by display order to maintain user's arrangement
-      favorites.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+      // Convert simple reach IDs to FavoriteRiver objects
+      final favorites = <FavoriteRiver>[];
+      for (int i = 0; i < userSettings.favoriteReachIds.length; i++) {
+        final reachId = userSettings.favoriteReachIds[i];
+        favorites.add(
+          FavoriteRiver(
+            reachId: reachId,
+            displayOrder: i, // Use array index as display order
+          ),
+        );
+      }
 
-      print('FAVORITES_SERVICE: ✅ Loaded ${favorites.length} favorites');
+      print(
+        'FAVORITES_SERVICE: ✅ Loaded ${favorites.length} favorites from cloud',
+      );
       return favorites;
     } catch (e) {
       print('FAVORITES_SERVICE: ❌ Error loading favorites: $e');
@@ -37,17 +54,30 @@ class FavoritesService {
     }
   }
 
-  /// Save all favorites to storage
+  /// Save all favorites to Firestore
   Future<bool> saveFavorites(List<FavoriteRiver> favorites) async {
     try {
-      print('FAVORITES_SERVICE: Saving ${favorites.length} favorites');
-      final prefs = await SharedPreferences.getInstance();
+      final userId = _currentUserIdOrNull;
+      if (userId == null) {
+        print('FAVORITES_SERVICE: No user signed in - cannot save');
+        return false;
+      }
 
-      final jsonList = favorites.map((favorite) => favorite.toJson()).toList();
-      final jsonString = jsonEncode(jsonList);
+      print('FAVORITES_SERVICE: Saving ${favorites.length} favorites to cloud');
 
-      await prefs.setString(_favoritesKey, jsonString);
-      print('FAVORITES_SERVICE: ✅ Favorites saved successfully');
+      // Sort by display order first
+      final sortedFavorites = List<FavoriteRiver>.from(favorites);
+      sortedFavorites.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+
+      // Extract just the reach IDs in order
+      final reachIds = sortedFavorites.map((f) => f.reachId).toList();
+
+      // Update user settings
+      await _userSettingsService.updateUserSettings(userId, {
+        'favoriteReachIds': reachIds,
+      });
+
+      print('FAVORITES_SERVICE: ✅ Favorites saved to cloud successfully');
       return true;
     } catch (e) {
       print('FAVORITES_SERVICE: ❌ Error saving favorites: $e');
@@ -55,7 +85,7 @@ class FavoritesService {
     }
   }
 
-  /// Add a new favorite river with coordinates
+  /// Add a new favorite river
   Future<bool> addFavorite(
     String reachId, {
     String? customName,
@@ -63,39 +93,36 @@ class FavoritesService {
     double? longitude,
   }) async {
     try {
+      final userId = _currentUserIdOrNull;
+      if (userId == null) {
+        print('FAVORITES_SERVICE: No user signed in - cannot add favorite');
+        return false;
+      }
+
       print('FAVORITES_SERVICE: Adding favorite: $reachId');
-      final favorites = await loadFavorites();
+
+      final userSettings = await _userSettingsService.getUserSettings(userId);
+      if (userSettings == null) {
+        print('FAVORITES_SERVICE: ❌ No user settings found');
+        return false;
+      }
 
       // Check if already exists
-      if (favorites.any((f) => f.reachId == reachId)) {
+      if (userSettings.favoriteReachIds.contains(reachId)) {
         print('FAVORITES_SERVICE: ⚠️ Reach $reachId already in favorites');
         return false;
       }
 
-      // Create new favorite with next display order and coordinates
-      final maxOrder = favorites.isEmpty
-          ? -1
-          : favorites
-                .map((f) => f.displayOrder)
-                .reduce((a, b) => a > b ? a : b);
+      // Add to the end of the list
+      final updatedReachIds = [...userSettings.favoriteReachIds, reachId];
 
-      final newFavorite = FavoriteRiver(
-        reachId: reachId,
-        customName: customName,
-        displayOrder: maxOrder + 1,
-        latitude: latitude,
-        longitude: longitude,
-      );
+      // Update user settings
+      await _userSettingsService.updateUserSettings(userId, {
+        'favoriteReachIds': updatedReachIds,
+      });
 
-      favorites.add(newFavorite);
-      final success = await saveFavorites(favorites);
-
-      if (success) {
-        print(
-          'FAVORITES_SERVICE: ✅ Added favorite: $reachId (coords: ${latitude != null && longitude != null})',
-        );
-      }
-      return success;
+      print('FAVORITES_SERVICE: ✅ Added favorite: $reachId');
+      return true;
     } catch (e) {
       print('FAVORITES_SERVICE: ❌ Error adding favorite: $e');
       return false;
@@ -105,22 +132,38 @@ class FavoritesService {
   /// Remove a favorite river
   Future<bool> removeFavorite(String reachId) async {
     try {
+      final userId = _currentUserIdOrNull;
+      if (userId == null) {
+        print('FAVORITES_SERVICE: No user signed in - cannot remove favorite');
+        return false;
+      }
+
       print('FAVORITES_SERVICE: Removing favorite: $reachId');
-      final favorites = await loadFavorites();
 
-      final originalLength = favorites.length;
-      favorites.removeWhere((f) => f.reachId == reachId);
+      final userSettings = await _userSettingsService.getUserSettings(userId);
+      if (userSettings == null) {
+        print('FAVORITES_SERVICE: ❌ No user settings found');
+        return false;
+      }
 
-      if (favorites.length == originalLength) {
+      // Check if exists
+      if (!userSettings.favoriteReachIds.contains(reachId)) {
         print('FAVORITES_SERVICE: ⚠️ Reach $reachId not found in favorites');
         return false;
       }
 
-      final success = await saveFavorites(favorites);
-      if (success) {
-        print('FAVORITES_SERVICE: ✅ Removed favorite: $reachId');
-      }
-      return success;
+      // Remove from list
+      final updatedReachIds = userSettings.favoriteReachIds
+          .where((id) => id != reachId)
+          .toList();
+
+      // Update user settings
+      await _userSettingsService.updateUserSettings(userId, {
+        'favoriteReachIds': updatedReachIds,
+      });
+
+      print('FAVORITES_SERVICE: ✅ Removed favorite: $reachId');
+      return true;
     } catch (e) {
       print('FAVORITES_SERVICE: ❌ Error removing favorite: $e');
       return false;
@@ -130,8 +173,13 @@ class FavoritesService {
   /// Check if a reach is favorited
   Future<bool> isFavorite(String reachId) async {
     try {
-      final favorites = await loadFavorites();
-      return favorites.any((f) => f.reachId == reachId);
+      final userId = _currentUserIdOrNull;
+      if (userId == null) return false;
+
+      final userSettings = await _userSettingsService.getUserSettings(userId);
+      if (userSettings == null) return false;
+
+      return userSettings.favoriteReachIds.contains(reachId);
     } catch (e) {
       print('FAVORITES_SERVICE: ❌ Error checking favorite status: $e');
       return false;
@@ -141,29 +189,35 @@ class FavoritesService {
   /// Reorder favorites (for drag-and-drop)
   Future<bool> reorderFavorites(List<FavoriteRiver> reorderedFavorites) async {
     try {
+      final userId = _currentUserIdOrNull;
+      if (userId == null) {
+        print('FAVORITES_SERVICE: No user signed in - cannot reorder');
+        return false;
+      }
+
       print(
         'FAVORITES_SERVICE: Reordering ${reorderedFavorites.length} favorites',
       );
 
-      // Update display orders to match new arrangement
-      final updatedFavorites = <FavoriteRiver>[];
-      for (int i = 0; i < reorderedFavorites.length; i++) {
-        final favorite = reorderedFavorites[i].copyWith(displayOrder: i);
-        updatedFavorites.add(favorite);
-      }
+      // Extract reach IDs in the new order
+      final reorderedReachIds = reorderedFavorites
+          .map((f) => f.reachId)
+          .toList();
 
-      final success = await saveFavorites(updatedFavorites);
-      if (success) {
-        print('FAVORITES_SERVICE: ✅ Favorites reordered successfully');
-      }
-      return success;
+      // Update user settings with new order
+      await _userSettingsService.updateUserSettings(userId, {
+        'favoriteReachIds': reorderedReachIds,
+      });
+
+      print('FAVORITES_SERVICE: ✅ Favorites reordered successfully');
+      return true;
     } catch (e) {
       print('FAVORITES_SERVICE: ❌ Error reordering favorites: $e');
       return false;
     }
   }
 
-  /// Update a favorite's properties (name, image, flow data, coordinates)
+  /// Update a favorite's properties
   Future<bool> updateFavorite(
     String reachId, {
     String? customName,
@@ -175,53 +229,60 @@ class FavoritesService {
     double? longitude,
   }) async {
     try {
-      print('FAVORITES_SERVICE: Updating favorite: $reachId');
-      final favorites = await loadFavorites();
+      final userId = _currentUserIdOrNull;
+      if (userId == null) return false;
 
-      final index = favorites.indexWhere((f) => f.reachId == reachId);
-      if (index == -1) {
+      print('FAVORITES_SERVICE: Update favorite called for: $reachId');
+
+      // Check if favorite exists
+      final isFav = await isFavorite(reachId);
+      if (!isFav) {
         print('FAVORITES_SERVICE: ⚠️ Reach $reachId not found for update');
         return false;
       }
 
-      favorites[index] = favorites[index].copyWith(
-        customName: customName,
-        riverName: riverName,
-        customImageAsset: customImageAsset,
-        lastKnownFlow: lastKnownFlow,
-        lastUpdated: lastUpdated,
-        latitude: latitude,
-        longitude: longitude,
+      print(
+        'FAVORITES_SERVICE: ⚠️ Note: Extra properties not persisted in simplified cloud storage',
       );
-
-      final success = await saveFavorites(favorites);
-      if (success) {
-        print('FAVORITES_SERVICE: ✅ Updated favorite: $reachId');
-      }
-      return success;
+      return true;
     } catch (e) {
       print('FAVORITES_SERVICE: ❌ Error updating favorite: $e');
       return false;
     }
   }
 
-  /// Get count of favorites for UI logic
+  /// Get count of favorites
   Future<int> getFavoritesCount() async {
     try {
-      final favorites = await loadFavorites();
-      return favorites.length;
+      final userId = _currentUserIdOrNull;
+      if (userId == null) return 0;
+
+      final userSettings = await _userSettingsService.getUserSettings(userId);
+      if (userSettings == null) return 0;
+
+      return userSettings.favoriteReachIds.length;
     } catch (e) {
       print('FAVORITES_SERVICE: ❌ Error getting favorites count: $e');
       return 0;
     }
   }
 
-  /// Clear all favorites (for testing or user request)
+  /// Clear all favorites
   Future<bool> clearAllFavorites() async {
     try {
+      final userId = _currentUserIdOrNull;
+      if (userId == null) {
+        print('FAVORITES_SERVICE: No user signed in - cannot clear');
+        return false;
+      }
+
       print('FAVORITES_SERVICE: Clearing all favorites');
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_favoritesKey);
+
+      // Update user settings with empty list
+      await _userSettingsService.updateUserSettings(userId, {
+        'favoriteReachIds': <String>[],
+      });
+
       print('FAVORITES_SERVICE: ✅ All favorites cleared');
       return true;
     } catch (e) {

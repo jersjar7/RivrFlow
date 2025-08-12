@@ -7,7 +7,7 @@ import '../services/favorites_service.dart';
 import '../services/forecast_service.dart';
 
 /// State management for user's favorite rivers
-/// Coordinates with ForecastService for flow data and handles background refresh
+/// Works with cloud-based favorites (reach IDs only) and manages rich data in memory
 class FavoritesProvider with ChangeNotifier {
   final FavoritesService _favoritesService = FavoritesService();
   final ForecastService _forecastService = ForecastService();
@@ -18,16 +18,38 @@ class FavoritesProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // Session data (not persisted, loaded fresh each session)
+  final Map<String, String> _sessionRiverNames = {}; // reachId -> riverName
+  final Map<String, double?> _sessionFlowData = {}; // reachId -> lastKnownFlow
+  final Map<String, DateTime> _sessionFlowUpdates =
+      {}; // reachId -> lastUpdated
+  final Map<String, ({double lat, double lon})> _sessionCoordinates =
+      {}; // reachId -> coordinates
+
   // Track loading state per favorite for individual refresh indicators
   final Set<String> _refreshingReachIds = {};
 
   // Getters
-  List<FavoriteRiver> get favorites => List.unmodifiable(_favorites);
+  List<FavoriteRiver> get favorites => _buildEnrichedFavorites();
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  int get favoritesCount => _favorites.length;
-  bool get isEmpty => _favorites.isEmpty;
-  bool get shouldShowSearch => _favorites.length >= 4;
+  int get favoritesCount => _favoriteReachIds.length;
+  bool get isEmpty => _favoriteReachIds.isEmpty;
+  bool get shouldShowSearch => _favoriteReachIds.length >= 4;
+
+  /// Build enriched favorites list combining cloud data + session data
+  List<FavoriteRiver> _buildEnrichedFavorites() {
+    return _favorites.map((favorite) {
+      final reachId = favorite.reachId;
+      return favorite.copyWith(
+        riverName: _sessionRiverNames[reachId],
+        lastKnownFlow: _sessionFlowData[reachId],
+        lastUpdated: _sessionFlowUpdates[reachId],
+        latitude: _sessionCoordinates[reachId]?.lat,
+        longitude: _sessionCoordinates[reachId]?.lon,
+      );
+    }).toList();
+  }
 
   /// Check if a specific favorite is being refreshed
   bool isRefreshing(String reachId) => _refreshingReachIds.contains(reachId);
@@ -39,13 +61,13 @@ class FavoritesProvider with ChangeNotifier {
 
   /// Get favorites that have coordinates for map markers
   List<FavoriteRiver> getFavoritesWithCoordinates() {
-    return _favorites.where((f) => f.hasCoordinates).toList();
+    return favorites.where((f) => f.hasCoordinates).toList();
   }
 
   /// Compare favorites lists and return what changed for efficient marker updates
   Map<String, dynamic> diffFavorites(List<FavoriteRiver> oldFavorites) {
     final oldReachIds = oldFavorites.map((f) => f.reachId).toSet();
-    final newReachIds = _favorites.map((f) => f.reachId).toSet();
+    final newReachIds = _favoriteReachIds;
 
     return {
       'added': newReachIds.difference(oldReachIds).toList(),
@@ -55,13 +77,13 @@ class FavoritesProvider with ChangeNotifier {
 
   /// Initialize favorites and start background refresh
   Future<void> initializeAndRefresh() async {
-    print('FAVORITES_PROVIDER: Initializing favorites');
+    print('FAVORITES_PROVIDER: Initializing favorites with cloud storage');
 
     _setLoading(true);
     _clearError();
 
     try {
-      // Load favorites from storage first
+      // Load favorites from cloud storage first
       await _loadFavoritesFromStorage();
 
       // Start background refresh after short delay (let UI show cached data)
@@ -76,13 +98,13 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  /// Load favorites from storage and update lookup set
+  /// Load favorites from cloud storage (reach IDs only)
   Future<void> _loadFavoritesFromStorage() async {
     try {
       _favorites = await _favoritesService.loadFavorites();
       _updateFavoriteReachIds(); // Update lookup set
       print(
-        'FAVORITES_PROVIDER: ✅ Loaded ${_favorites.length} favorites from storage',
+        'FAVORITES_PROVIDER: ✅ Loaded ${_favorites.length} favorites from cloud',
       );
       notifyListeners();
     } catch (e) {
@@ -96,7 +118,7 @@ class FavoritesProvider with ChangeNotifier {
     _favoriteReachIds = _favorites.map((f) => f.reachId).toSet();
   }
 
-  /// Add a new favorite river with coordinates from API
+  /// Add a new favorite river (coordinates loaded in background)
   Future<bool> addFavorite(String reachId, {String? customName}) async {
     print('FAVORITES_PROVIDER: Adding favorite: $reachId');
 
@@ -107,37 +129,14 @@ class FavoritesProvider with ChangeNotifier {
         return false;
       }
 
-      // OPTIMIZED: Fetch coordinates from API using efficient loading
-      double? latitude, longitude;
-      try {
-        final forecast = await _forecastService.loadCurrentFlowOnly(
-          reachId,
-        ); // ✅ EFFICIENT LOADING
-        latitude = forecast.reach.latitude;
-        longitude = forecast.reach.longitude;
-        print(
-          'FAVORITES_PROVIDER: ✅ Got coordinates for $reachId: $latitude, $longitude',
-        );
-      } catch (e) {
-        print(
-          'FAVORITES_PROVIDER: ⚠️ Could not get coordinates for $reachId: $e',
-        );
-        // Continue without coordinates - can be added later
-      }
-
-      // Add to storage with coordinates
-      final success = await _favoritesService.addFavorite(
-        reachId,
-        customName: customName,
-        latitude: latitude,
-        longitude: longitude,
-      );
+      // Add to cloud storage (reach ID only)
+      final success = await _favoritesService.addFavorite(reachId);
       if (!success) return false;
 
       // Reload from storage to get updated list
       await _loadFavoritesFromStorage();
 
-      // Start background data loading for the new favorite
+      // Load rich data in background
       _loadFavoriteDataInBackground(reachId);
 
       print('FAVORITES_PROVIDER: ✅ Added favorite: $reachId');
@@ -149,8 +148,7 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  /// OPTIMIZED: Add favorite with known coordinates (avoids duplicate loading)
-  /// Use this when coordinates are already available from bottom sheet data
+  /// Add favorite with known coordinates (avoids duplicate loading)
   Future<bool> addFavoriteWithKnownCoordinates(
     String reachId, {
     String? customName,
@@ -169,24 +167,21 @@ class FavoritesProvider with ChangeNotifier {
         return false;
       }
 
-      // Add to storage with provided coordinates - NO API CALL NEEDED
-      final success = await _favoritesService.addFavorite(
-        reachId,
-        customName: customName,
-        latitude: latitude,
-        longitude: longitude,
-      );
+      // Add to cloud storage (reach ID only)
+      final success = await _favoritesService.addFavorite(reachId);
       if (!success) return false;
+
+      // Store rich data in session storage
+      _sessionCoordinates[reachId] = (lat: latitude, lon: longitude);
+      if (riverName != null) {
+        _sessionRiverNames[reachId] = riverName;
+      }
 
       // Reload from storage to get updated list
       await _loadFavoritesFromStorage();
 
-      // Optional: Start background data loading for flow data only (lightweight)
-      if (riverName != null) {
-        // If we have river name, we can update the favorite with it immediately
-        _updateFavoriteWithRiverName(reachId, riverName);
-      } else {
-        // Otherwise, load just the river name in background
+      // Load remaining data in background if needed
+      if (riverName == null) {
         _loadFavoriteRiverNameInBackground(reachId);
       }
 
@@ -201,43 +196,24 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  /// OPTIMIZED: Load only river name in background (much lighter than complete data)
+  /// Load only river name in background (lightweight)
   Future<void> _loadFavoriteRiverNameInBackground(String reachId) async {
     try {
-      // Use the lightweight overview data loading instead of complete data
+      // Use the lightweight overview data loading
       final forecast = await _forecastService.loadOverviewData(reachId);
-      final riverName = forecast.reach.riverName;
 
-      // Update just the river name
-      await _favoritesService.updateFavorite(reachId, riverName: riverName);
-
-      // Update local list
-      final index = _favorites.indexWhere((f) => f.reachId == reachId);
-      if (index != -1) {
-        _favorites[index] = _favorites[index].copyWith(riverName: riverName);
-        notifyListeners();
-      }
+      // Store in session data
+      _sessionRiverNames[reachId] = forecast.reach.riverName;
 
       print(
-        'FAVORITES_PROVIDER: ✅ Updated river name for $reachId: $riverName',
+        'FAVORITES_PROVIDER: ✅ Updated river name for $reachId: ${forecast.reach.riverName}',
       );
+      notifyListeners();
     } catch (e) {
       print(
         'FAVORITES_PROVIDER: ⚠️ Failed to load river name for $reachId: $e',
       );
       // This is not critical, so don't throw
-    }
-  }
-
-  /// Update favorite with river name immediately (when we already have it)
-  void _updateFavoriteWithRiverName(String reachId, String riverName) {
-    final index = _favorites.indexWhere((f) => f.reachId == reachId);
-    if (index != -1) {
-      _favorites[index] = _favorites[index].copyWith(riverName: riverName);
-      notifyListeners();
-
-      // Also update in storage
-      _favoritesService.updateFavorite(reachId, riverName: riverName);
     }
   }
 
@@ -249,11 +225,15 @@ class FavoritesProvider with ChangeNotifier {
       final success = await _favoritesService.removeFavorite(reachId);
       if (!success) return false;
 
+      // Clean up session data
+      _sessionRiverNames.remove(reachId);
+      _sessionFlowData.remove(reachId);
+      _sessionFlowUpdates.remove(reachId);
+      _sessionCoordinates.remove(reachId);
+      _refreshingReachIds.remove(reachId);
+
       // Reload from storage
       await _loadFavoritesFromStorage();
-
-      // Clear any loading state
-      _refreshingReachIds.remove(reachId);
 
       print('FAVORITES_PROVIDER: ✅ Removed favorite: $reachId');
       return true;
@@ -298,29 +278,24 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  /// Update favorite properties (name, image)
+  /// Update favorite properties (session data only - not persisted)
   Future<bool> updateFavorite(
     String reachId, {
     String? customName,
     String? riverName,
     String? customImageAsset,
   }) async {
-    print('FAVORITES_PROVIDER: Updating favorite: $reachId');
+    print('FAVORITES_PROVIDER: Updating favorite session data: $reachId');
 
     try {
-      final success = await _favoritesService.updateFavorite(
-        reachId,
-        customName: customName,
-        riverName: riverName,
-        customImageAsset: customImageAsset,
-      );
-
-      if (success) {
-        await _loadFavoritesFromStorage();
-        print('FAVORITES_PROVIDER: ✅ Updated favorite: $reachId');
+      // Update session data (not persisted to cloud)
+      if (riverName != null) {
+        _sessionRiverNames[reachId] = riverName;
       }
 
-      return success;
+      notifyListeners();
+      print('FAVORITES_PROVIDER: ✅ Updated favorite session data: $reachId');
+      return true;
     } catch (e) {
       print('FAVORITES_PROVIDER: ❌ Error updating favorite: $e');
       _setError(e.toString());
@@ -364,8 +339,7 @@ class FavoritesProvider with ChangeNotifier {
     await _refreshSingleFavorite(reachId);
   }
 
-  /// NEW: Ultra-fast favorite addition for map integration (coordinates only)
-  /// Used when user hearts a river on map - gets basic info immediately
+  /// Ultra-fast favorite addition for map integration
   Future<bool> addFavoriteFromMap(String reachId, {String? customName}) async {
     print('FAVORITES_PROVIDER: Adding favorite from map: $reachId');
 
@@ -388,14 +362,15 @@ class FavoritesProvider with ChangeNotifier {
         return false;
       }
 
-      // Add to storage with coordinates (no flow data yet)
-      final success = await _favoritesService.addFavorite(
-        reachId,
-        customName: customName,
-        latitude: reach.latitude,
-        longitude: reach.longitude,
-      );
+      // Add to cloud storage (reach ID only)
+      final success = await _favoritesService.addFavorite(reachId);
       if (!success) return false;
+
+      // Store session data
+      _sessionCoordinates[reachId] = (
+        lat: reach.latitude,
+        lon: reach.longitude,
+      );
 
       // Reload from storage to get updated list
       await _loadFavoritesFromStorage();
@@ -414,53 +389,26 @@ class FavoritesProvider with ChangeNotifier {
     }
   }
 
-  /// OPTIMIZED: Refresh a single favorite's flow data
+  /// Refresh a single favorite's flow data and store in session
   Future<void> _refreshSingleFavorite(String reachId) async {
     try {
       _refreshingReachIds.add(reachId);
       notifyListeners();
 
-      // OPTIMIZED: Use efficient loading for favorites refresh
-      final forecast = await _forecastService.loadCurrentFlowOnly(
-        reachId,
-      ); // ✅ EFFICIENT LOADING
+      // Load efficient data for favorites refresh
+      final forecast = await _forecastService.loadCurrentFlowOnly(reachId);
       final currentFlow = _forecastService.getCurrentFlow(forecast);
-      final riverName = forecast.reach.riverName;
 
-      // Also get coordinates if not cached yet
-      final currentFavorite = _favorites.firstWhere(
-        (f) => f.reachId == reachId,
-      );
-      double? latitude = currentFavorite.latitude;
-      double? longitude = currentFavorite.longitude;
-
-      if (!currentFavorite.hasCoordinates) {
-        latitude = forecast.reach.latitude;
-        longitude = forecast.reach.longitude;
-        print('FAVORITES_PROVIDER: ✅ Got missing coordinates for $reachId');
-      }
-
-      // Update the favorite with fresh flow data, river name, and coordinates
-      await _favoritesService.updateFavorite(
-        reachId,
-        riverName: riverName,
-        lastKnownFlow: currentFlow,
-        lastUpdated: DateTime.now(),
-        latitude: latitude,
-        longitude: longitude,
+      // Store all data in session storage (not persisted to cloud)
+      _sessionRiverNames[reachId] = forecast.reach.riverName;
+      _sessionFlowData[reachId] = currentFlow;
+      _sessionFlowUpdates[reachId] = DateTime.now();
+      _sessionCoordinates[reachId] = (
+        lat: forecast.reach.latitude,
+        lon: forecast.reach.longitude,
       );
 
-      // Update local list
-      final index = _favorites.indexWhere((f) => f.reachId == reachId);
-      if (index != -1) {
-        _favorites[index] = _favorites[index].copyWith(
-          riverName: riverName,
-          lastKnownFlow: currentFlow,
-          lastUpdated: DateTime.now(),
-          latitude: latitude,
-          longitude: longitude,
-        );
-      }
+      print('FAVORITES_PROVIDER: ✅ Refreshed session data for $reachId');
     } catch (e) {
       print('FAVORITES_PROVIDER: ❌ Failed to refresh $reachId: $e');
       // Individual failures don't break the whole list
@@ -472,10 +420,10 @@ class FavoritesProvider with ChangeNotifier {
 
   /// Filter favorites by search query
   List<FavoriteRiver> filterFavorites(String query) {
-    if (query.isEmpty) return _favorites;
+    if (query.isEmpty) return favorites;
 
     final lowerQuery = query.toLowerCase();
-    return _favorites.where((favorite) {
+    return favorites.where((favorite) {
       return favorite.displayName.toLowerCase().contains(lowerQuery) ||
           favorite.reachId.toLowerCase().contains(lowerQuery);
     }).toList();
@@ -499,11 +447,22 @@ class FavoritesProvider with ChangeNotifier {
   /// Clear all favorites (for testing)
   Future<void> clearAllFavorites() async {
     await _favoritesService.clearAllFavorites();
+
+    // Clear all data
     _favorites.clear();
-    _favoriteReachIds.clear(); // Clear lookup set
+    _favoriteReachIds.clear();
     _refreshingReachIds.clear();
+    _sessionRiverNames.clear();
+    _sessionFlowData.clear();
+    _sessionFlowUpdates.clear();
+    _sessionCoordinates.clear();
+
     _clearError();
     notifyListeners();
-    print('FAVORITES_PROVIDER: ✅ Cleared all favorites');
+    print('FAVORITES_PROVIDER: ✅ Cleared all favorites and session data');
   }
+
+  /// Get just the reach IDs for notification system
+  List<String> get favoriteReachIds =>
+      _favorites.map((f) => f.reachId).toList();
 }
