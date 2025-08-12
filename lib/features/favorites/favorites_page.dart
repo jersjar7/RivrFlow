@@ -112,10 +112,32 @@ class _FavoritesPageState extends State<FavoritesPage> {
     return Positioned(
       bottom: 50,
       right: 20,
-      child: FloatingActionButton(
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
         onPressed: _navigateToMap,
-        backgroundColor: CupertinoColors.darkBackgroundGray,
-        child: const Icon(CupertinoIcons.add, color: CupertinoColors.white),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemBlue.resolveFrom(context),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: CupertinoColors.black.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Icon(
+            CupertinoIcons.add,
+            color: CupertinoDynamicColor.resolve(
+              CupertinoColors.white,
+              context,
+            ),
+            size: 24,
+          ),
+        ),
       ),
     );
   }

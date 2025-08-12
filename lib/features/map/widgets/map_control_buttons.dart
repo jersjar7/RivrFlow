@@ -19,18 +19,18 @@ class MapControlButtons extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Layers button
-        _buildControlButton(
-          icon: CupertinoIcons.layers_alt,
-          onPressed: onLayersPressed,
-          tooltip: 'Map Layers',
-        ),
-        const SizedBox(height: 8),
         // Streams list button
         _buildControlButton(
           icon: CupertinoIcons.list_bullet,
           onPressed: onStreamsPressed,
           tooltip: 'Visible Streams',
+        ),
+        const SizedBox(height: 8),
+        // Layers button
+        _buildControlButton(
+          icon: CupertinoIcons.layers_alt,
+          onPressed: onLayersPressed,
+          tooltip: 'Map Layers',
         ),
         const SizedBox(height: 8),
         // Recenter button
