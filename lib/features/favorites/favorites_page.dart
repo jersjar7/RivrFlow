@@ -719,41 +719,87 @@ class _FavoritesPageState extends State<FavoritesPage> {
   Widget _buildSignOutOption() {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        return CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () async {
-            Navigator.pop(context); // Close menu first
-            await _handleSignOut(authProvider);
-          },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              children: [
-                Text(
-                  'Sign Out',
-                  style: TextStyle(
-                    color: authProvider.isLoading
-                        ? CupertinoColors.systemGrey
-                        : CupertinoColors.systemRed, // Red color for sign out
-                    fontSize: 17,
-                    fontWeight: FontWeight.w400,
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // User info section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  // User icon
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemBrown,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      CupertinoIcons.person_fill,
+                      color: CupertinoColors.systemBackground,
+                      size: 18,
+                    ),
                   ),
-                ),
-                const Spacer(),
-                authProvider.isLoading
-                    ? const CupertinoActivityIndicator(
-                        radius: 8,
+                  const SizedBox(width: 12),
+                  // User name
+                  Expanded(
+                    child: Text(
+                      authProvider.userDisplayName,
+                      style: const TextStyle(
                         color: CupertinoColors.systemGrey,
-                      )
-                    : const Icon(
-                        CupertinoIcons.square_arrow_right,
-                        color: CupertinoColors.systemRed,
-                        size: 22,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
                       ),
-              ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+
+            // Sign out button
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () async {
+                Navigator.pop(context); // Close menu first
+                await _handleSignOut(authProvider);
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.only(bottom: 10, left: 16, right: 16),
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: Text(
+                        'Sign Out',
+                        style: TextStyle(
+                          color: authProvider.isLoading
+                              ? CupertinoColors.systemGrey
+                              : CupertinoColors.systemRed,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+
+                    authProvider.isLoading
+                        ? const CupertinoActivityIndicator(
+                            radius: 8,
+                            color: CupertinoColors.systemGrey,
+                          )
+                        : const Icon(
+                            CupertinoIcons.square_arrow_right,
+                            color: CupertinoColors.systemRed,
+                            size: 22,
+                          ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         );
       },
     );

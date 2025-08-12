@@ -3,13 +3,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:rivrflow/features/auth/models/auth_user.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/models/user_settings.dart';
+import '../../auth/services/user_settings_service.dart';
 
 /// Simple authentication state management for RivrFlow
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
+  final UserSettingsService _userSettingsService = UserSettingsService();
 
   // State
   AuthUser? _currentUser;
+  UserSettings? _currentUserSettings;
   bool _isLoading = false;
   String _errorMessage = '';
   String _successMessage = '';
@@ -17,6 +21,7 @@ class AuthProvider with ChangeNotifier {
 
   // Getters
   AuthUser? get currentUser => _currentUser;
+  UserSettings? get currentUserSettings => _currentUserSettings;
   bool get isAuthenticated => _currentUser != null;
   bool get isLoading => _isLoading;
   String get errorMessage => _errorMessage;
@@ -32,12 +37,16 @@ class AuthProvider with ChangeNotifier {
     print('AUTH_PROVIDER: Initializing...');
 
     // Listen to auth state changes
-    _authService.authStateChanges.listen((firebaseUser) {
+    _authService.authStateChanges.listen((firebaseUser) async {
       if (firebaseUser != null) {
         _currentUser = AuthUser.fromFirebaseUser(firebaseUser);
         print('AUTH_PROVIDER: User signed in: ${_currentUser!.uid}');
+
+        // Fetch user settings
+        await _loadUserSettings();
       } else {
         _currentUser = null;
+        _currentUserSettings = null;
         print('AUTH_PROVIDER: User signed out');
       }
       notifyListeners();
@@ -47,11 +56,35 @@ class AuthProvider with ChangeNotifier {
     final firebaseUser = _authService.currentUser;
     if (firebaseUser != null) {
       _currentUser = AuthUser.fromFirebaseUser(firebaseUser);
+      await _loadUserSettings();
     }
 
     _isInitialized = true;
     notifyListeners();
     print('AUTH_PROVIDER: Initialization complete');
+  }
+
+  /// Load user settings from Firestore
+  Future<void> _loadUserSettings() async {
+    if (_currentUser == null) return;
+
+    try {
+      print('AUTH_PROVIDER: Loading user settings for: ${_currentUser!.uid}');
+      _currentUserSettings = await _userSettingsService.getUserSettings(
+        _currentUser!.uid,
+      );
+      print('AUTH_PROVIDER: User settings loaded successfully');
+    } catch (e) {
+      print('AUTH_PROVIDER: Error loading user settings: $e');
+      // Don't throw - user can still use the app without settings
+      _currentUserSettings = null;
+    }
+  }
+
+  /// Refresh user settings (call this after updating settings elsewhere)
+  Future<void> refreshUserSettings() async {
+    await _loadUserSettings();
+    notifyListeners();
   }
 
   // MARK: - Authentication Methods
@@ -150,9 +183,10 @@ class AuthProvider with ChangeNotifier {
     _setLoading(false);
 
     if (result.isSuccess) {
-      // Clear biometric cache
+      // Clear biometric cache and user settings
       _biometricAvailable = null;
       _biometricEnabled = null;
+      _currentUserSettings = null;
       _setSuccess('Signed out successfully');
     } else {
       _setError(result.error ?? 'Sign out failed');
@@ -234,6 +268,54 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // MARK: - User Information Getters
+
+  /// Get user's display name (fallback to email if no name available)
+  String get userDisplayName {
+    if (_currentUserSettings != null) {
+      final fullName = _currentUserSettings!.fullName;
+      if (fullName.isNotEmpty) return fullName;
+    }
+
+    if (_currentUser?.displayName?.isNotEmpty == true) {
+      return _currentUser!.displayName!;
+    }
+
+    return _currentUser?.email ?? 'User';
+  }
+
+  /// Get user's first name from UserSettings
+  String get userFirstName {
+    return _currentUserSettings?.firstName ?? _currentUser?.firstName ?? '';
+  }
+
+  /// Get user's last name from UserSettings
+  String get userLastName {
+    return _currentUserSettings?.lastName ?? _currentUser?.lastName ?? '';
+  }
+
+  /// Get formatted user name for display (e.g., "Santiago T.")
+  String get userDisplayNameShort {
+    final firstName = userFirstName;
+    final lastName = userLastName;
+
+    if (firstName.isEmpty) {
+      return _currentUser?.email.split('@').first ?? 'User';
+    }
+
+    if (lastName.isEmpty) {
+      return firstName;
+    }
+
+    // Return "FirstName L." format
+    return '$firstName ${lastName.substring(0, 1).toUpperCase()}.';
+  }
+
+  /// Get user's full name from UserSettings
+  String get userFullName {
+    return _currentUserSettings?.fullName ?? userDisplayName;
+  }
+
   // MARK: - Helper Methods
 
   void _setLoading(bool loading) {
@@ -272,18 +354,4 @@ class AuthProvider with ChangeNotifier {
         _errorMessage.contains('connection') ||
         _errorMessage.contains('timeout');
   }
-
-  /// Get user's display name
-  String get userDisplayName {
-    if (_currentUser?.displayName?.isNotEmpty == true) {
-      return _currentUser!.displayName!;
-    }
-    return _currentUser?.email ?? 'User';
-  }
-
-  /// Get user's first name
-  String get userFirstName => _currentUser?.firstName ?? '';
-
-  /// Get user's last name
-  String get userLastName => _currentUser?.lastName ?? '';
 }
